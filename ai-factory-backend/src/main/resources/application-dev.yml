@@ -1,0 +1,29 @@
+# 开发环境配置
+spring:
+  # DataSource配置 - MySQL (开发环境)
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://192.168.31.7:3306/ai_factory?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ai_factory
+    password: 111111
+
+  # Redis配置 (开发环境) - Spring Boot 3.x 使用 spring.data.redis
+  data:
+    redis:
+      host: 192.168.31.7
+      port: 6379
+      password: 111111
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 0
+
+# 开发环境日志级别
+logging:
+  level:
+    com.aifactory: debug
+    org.springframework.web: debug

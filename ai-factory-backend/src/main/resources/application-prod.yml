@@ -1,0 +1,40 @@
+server:
+  port: 1024
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      remote-ip-header: X-Forwarded-For
+      protocol-header: X-Forwarded-Proto
+      port-header: X-Forwarded-Port
+
+# 生产环境配置
+
+# 生产环境关闭Swagger接口文档
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+spring:
+  # DataSource配置 - MySQL (生产环境)
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://192.168.31.7:3306/ai_factory_prod?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ai_factory
+    password: 111111
+
+  # Redis配置 (生产环境) - Spring Boot 3.x 使用 spring.data.redis
+  data:
+    redis:
+      host: 192.168.31.7
+      port: 6379
+      password: 111111
+      database: 1
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 2

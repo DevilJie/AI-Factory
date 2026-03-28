@@ -1,0 +1,6 @@
+// ai-factory-frontend2/postcss.config.js
+export default {
+  plugins: {
+    '@tailwindcss/postcss': {}
+  }
+}

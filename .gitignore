@@ -1,0 +1,9 @@
+*.log
+CLAUDE.md
+.claude
+
+# Deploy secrets
+.deploy
+
+
+docs

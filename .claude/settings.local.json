@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(mvn spring-boot:run:*)",
+      "Bash(npm run dev:*)",
+      "Bash(mvn compile -q)",
+      "Bash(taskkill /PID 25468 /F)",
+      "Bash(taskkill //PID 25468 //F)",
+      "Bash(curl -s http://localhost:1024/api/project/detail/4 -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJsb2dpbk5hbWUiOiJhMzE0MTcwMTIyIiwidXNlcklkIjo0LCJzdWIiOiJhMzE0MTcwMTIyIiwiaWF0IjoxNzcyMTI3NDU3LCJleHAiOjE3NzI3MzIyNTd9.zY4OdZaAiekM-lx5dcrB-ZJVTLjbsYNPgjo87uMv7IE\")",
+      "Bash(curl -s \"http://localhost:1024/api/outline/list?projectId=4\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJsb2dpbk5hbWUiOiJhMzE0MTcwMTIyIiwidXNlcklkIjo0LCJzdWIiOiJhMzE0MTcwMTIyIiwiaWF0IjoxNzcyMTI3NDU3LCJleHAiOjE3NzI3MzIyNTd9.zY4OdZaAiekM-lx5dcrB-ZJVTLjbsYNPgjo87uMv7IE\")",
+      "Bash(curl -s \"http://localhost:1024/api/project/novel/volume-plans?projectId=4\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJsb2dpbk5hbWUiOiJhMzE0MTcwMTIyIiwidXNlcklkIjo0LCJzdWIiOiJhMzE0MTcwMTIyIiwiaWF0IjoxNzcyMTI3NDU3LCJleHAiOjE3NzI3MzIyNTd9.zY4OdZaAiekM-lx5dcrB-ZJVTLjbsYNPgjo87uMv7IE\")",
+      "mcp__mysql__execute_query",
+      "mcp__mysql__use_database",
+      "Bash(curl -s -X POST \"http://localhost:1024/api/chapter/generate\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJsb2dpbk5hbWUiOiJhMzE0MTcwMTIyIiwidXNlcklkIjo0LCJzdWIiOiJhMzE0MTcwMTIyIiwiaWF0IjoxNzcyMTI3NDU3LCJleHAiOjE3NzI3MzIyNTd9.zY4OdZaAiekM-lx5dcrB-ZJVTLjbsYNPgjo87uMv7IE\" -H \"Content-Type: application/json\" -d \"{\"\"planId\"\": 96}\")",
+      "Bash(curl -s -X POST \"http://localhost:1024/api/novel/4/chapters/generate-async/96\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJsb2dpbk5hbWUiOiJhMzE0MTcwMTIyIiwidXNlcklkIjo0LCJzdWIiOiJhMzE0MTcwMTIyIiwiaWF0IjoxNzcyMTI3NDU3LCJleHAiOjE3NzI3MzIyNTd9.zY4OdZaAiekM-lx5dcrB-ZJVTLjbsYNPgjo87uMv7IE\" -H \"Content-Type: application/json\")",
+      "Bash(curl -s \"http://localhost:1024/api/task/71\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJsb2dpbk5hbWUiOiJhMzE0MTcwMTIyIiwidXNlcklkIjo0LCJzdWIiOiJhMzE0MTcwMTIyIiwiaWF0IjoxNzcyMTI3NDU3LCJleHAiOjE3NzI3MzIyNTd9.zY4OdZaAiekM-lx5dcrB-ZJVTLjbsYNPgjo87uMv7IE\")",
+      "mcp__mysql__get_table_schema",
+      "Bash(curl -s http://localhost:1024/actuator/health)",
+      "Bash(taskkill /PID 27104 /F)",
+      "Bash(taskkill //PID 27104 //F)",
+      "Bash(mvn clean compile -q)",
+      "Bash(taskkill //F //IM java.exe)"
+    ]
+  }
+}
