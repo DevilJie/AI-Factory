@@ -115,15 +115,9 @@ public class LLMProviderFactory {
 
         List<AiProvider> providers = aiProviderService.getAiProviderMapper().selectList(wrapper);
 
-        // 如果查询不到数据，初始化默认配置
+        // 用户未配置LLM，提示去配置
         if (providers.isEmpty()) {
-            LoggingUtil.logBusiness("LLM提供商", "用户无LLM配置，初始化默认配置",
-                "userId=" + userId);
-            aiProviderService.initializeDefaultProviders(userId, "llm");
-            // 重新查询
-            providers = aiProviderService.getAiProviderMapper().selectList(wrapper);
-            LoggingUtil.logBusiness("LLM提供商", "默认配置初始化完成",
-                "提供商数量=" + providers.size());
+            throw new RuntimeException("您还未配置大语言模型，请先前往「系统设置 → AI模型」配置您的API Key和模型");
         }
 
         return providers;
