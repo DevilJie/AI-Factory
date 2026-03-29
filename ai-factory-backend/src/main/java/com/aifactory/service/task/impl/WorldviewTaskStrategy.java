@@ -141,11 +141,13 @@ public class WorldviewTaskStrategy implements TaskStrategy {
     private StepResult generateWorldview(AiTaskStep step, TaskContext context) {
         try {
             JsonNode config = context.getConfig();
-            String projectDescription = config.has("projectDescription") ?
-                config.get("projectDescription").asText() : "";
-            String storyTone = config.has("storyTone") ? config.get("storyTone").asText() : "";
-            String storyGenre = config.has("storyGenre") ? config.get("storyGenre").asText() : "";
-            String tags = config.has("tags") ? config.get("tags").asText() : "";
+                
+            // 基础信息
+            Project project = projectMapper.selectById(context.getProjectId());
+            String projectDescription = project.getDescription();
+            String storyTone = project.getStoryTone();
+            String storyGenre = project.getStoryGenre();
+            String tags = project.getTags();
 
             // 构建生成世界观的提示词
             String prompt = buildWorldviewPrompt(projectDescription, storyTone, storyGenre, tags);
