@@ -45,11 +45,6 @@ public class NovelWorldview {
     private String worldBackground;
 
     /**
-     * 力量体系/修炼体系
-     */
-    private String powerSystem;
-
-    /**
      * 地理环境
      */
     private String geography;
