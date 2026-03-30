@@ -282,97 +282,97 @@ onUnmounted(() => {
       </div>
 
       <div v-else class="space-y-6">
-        <!-- 世界类型 -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            世界类型
-          </label>
-          <div class="relative">
-            <select
-              v-model="formData.worldType"
+        <!-- 第一行：世界类型 + 世界背景 -->
+        <div class="grid grid-cols-2 gap-6">
+          <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              世界类型
+            </label>
+            <div class="relative">
+              <select
+                v-model="formData.worldType"
+                :disabled="generating"
+                class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+              >
+                <option value="">请选择世界类型</option>
+                <option v-for="type in worldTypes" :key="type.value" :value="type.value">
+                  {{ type.label }}
+                </option>
+              </select>
+              <ChevronDown class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              世界背景
+            </label>
+            <textarea
+              v-model="formData.worldBackground"
+              rows="4"
               :disabled="generating"
-              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-            >
-              <option value="">请选择世界类型</option>
-              <option v-for="type in worldTypes" :key="type.value" :value="type.value">
-                {{ type.label }}
-              </option>
-            </select>
-            <ChevronDown class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              placeholder="描述这个世界的基本背景设定，包括时代背景、社会环境等..."
+              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+            ></textarea>
           </div>
         </div>
 
-        <!-- 世界背景 -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            世界背景
-          </label>
-          <textarea
-            v-model="formData.worldBackground"
-            rows="4"
-            :disabled="generating"
-            placeholder="描述这个世界的基本背景设定，包括时代背景、社会环境等..."
-            class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-          ></textarea>
-        </div>
-
-        <!-- 力量体系 -->
+        <!-- 第二行：力量体系（整行） -->
         <PowerSystemSection ref="powerSystemRef" :project-id="projectId()" :disabled="generating" />
 
-        <!-- 地理环境 -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            地理环境
-          </label>
-          <textarea
-            v-model="formData.geography"
-            rows="4"
-            :disabled="generating"
-            placeholder="描述世界的地理环境、重要地点、区域划分等..."
-            class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-          ></textarea>
+        <!-- 第三行：地理环境 + 势力阵营 -->
+        <div class="grid grid-cols-2 gap-6">
+          <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              地理环境
+            </label>
+            <textarea
+              v-model="formData.geography"
+              rows="4"
+              :disabled="generating"
+              placeholder="描述世界的地理环境、重要地点、区域划分等..."
+              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+            ></textarea>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              势力阵营
+            </label>
+            <textarea
+              v-model="formData.forces"
+              rows="4"
+              :disabled="generating"
+              placeholder="描述世界中的主要势力、组织、阵营及其相互关系..."
+              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+            ></textarea>
+          </div>
         </div>
 
-        <!-- 势力阵营 -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            势力阵营
-          </label>
-          <textarea
-            v-model="formData.forces"
-            rows="4"
-            :disabled="generating"
-            placeholder="描述世界中的主要势力、组织、阵营及其相互关系..."
-            class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-          ></textarea>
-        </div>
-
-        <!-- 时间线 -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            时间线
-          </label>
-          <textarea
-            v-model="formData.timeline"
-            rows="4"
-            :disabled="generating"
-            placeholder="描述世界的重要历史事件和时间节点..."
-            class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-          ></textarea>
-        </div>
-
-        <!-- 世界规则 -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            世界规则
-          </label>
-          <textarea
-            v-model="formData.rules"
-            rows="4"
-            :disabled="generating"
-            placeholder="描述世界的运行规则、物理法则、禁忌等..."
-            class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-          ></textarea>
+        <!-- 第四行：时间线 + 世界规则 -->
+        <div class="grid grid-cols-2 gap-6">
+          <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              时间线
+            </label>
+            <textarea
+              v-model="formData.timeline"
+              rows="4"
+              :disabled="generating"
+              placeholder="描述世界的重要历史事件和时间节点..."
+              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+            ></textarea>
+          </div>
+          <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              世界规则
+            </label>
+            <textarea
+              v-model="formData.rules"
+              rows="4"
+              :disabled="generating"
+              placeholder="描述世界的运行规则、物理法则、禁忌等..."
+              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+            ></textarea>
+          </div>
         </div>
       </div>
     </div>

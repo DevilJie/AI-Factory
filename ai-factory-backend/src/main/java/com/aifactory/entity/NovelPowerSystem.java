@@ -1,10 +1,12 @@
 package com.aifactory.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @TableName("novel_power_system")
@@ -19,4 +21,7 @@ public class NovelPowerSystem {
     private String description;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
+    @TableField(exist = false)
+    private List<NovelPowerSystemLevel> levels;
 }

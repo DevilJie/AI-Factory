@@ -31,16 +31,24 @@ public class PowerSystemServiceImpl implements PowerSystemService {
 
     @Override
     public List<NovelPowerSystem> listByProjectId(Long projectId) {
-        return powerSystemMapper.selectList(
+        List<NovelPowerSystem> systems = powerSystemMapper.selectList(
             new LambdaQueryWrapper<NovelPowerSystem>()
                 .eq(NovelPowerSystem::getProjectId, projectId)
                 .orderByAsc(NovelPowerSystem::getId)
         );
+        for (NovelPowerSystem system : systems) {
+            fillLevelsAndSteps(system);
+        }
+        return systems;
     }
 
     @Override
     public NovelPowerSystem getById(Long id) {
-        return powerSystemMapper.selectById(id);
+        NovelPowerSystem system = powerSystemMapper.selectById(id);
+        if (system != null) {
+            fillLevelsAndSteps(system);
+        }
+        return system;
     }
 
     @Override
@@ -189,6 +197,23 @@ public class PowerSystemServiceImpl implements PowerSystemService {
         sb.append("4. 如果角色修炼多套体系，每套体系分别用一个V标签列出\n");
 
         return sb.toString();
+    }
+
+    private void fillLevelsAndSteps(NovelPowerSystem system) {
+        List<NovelPowerSystemLevel> levels = levelMapper.selectList(
+            new LambdaQueryWrapper<NovelPowerSystemLevel>()
+                .eq(NovelPowerSystemLevel::getPowerSystemId, system.getId())
+                .orderByAsc(NovelPowerSystemLevel::getLevel)
+        );
+        for (NovelPowerSystemLevel level : levels) {
+            List<NovelPowerSystemLevelStep> steps = stepMapper.selectList(
+                new LambdaQueryWrapper<NovelPowerSystemLevelStep>()
+                    .eq(NovelPowerSystemLevelStep::getPowerSystemLevelId, level.getId())
+                    .orderByAsc(NovelPowerSystemLevelStep::getLevel)
+            );
+            level.setSteps(steps);
+        }
+        system.setLevels(levels);
     }
 
     private void deleteLevelsBySystemId(Long systemId) {

@@ -148,13 +148,42 @@ public class WorldviewTaskStrategy implements TaskStrategy {
             if (hadExisting) {
                 log.info("项目 {} 已有世界观设定，ID={}，将删除并重新生成", projectId, existingWorldview.getId());
 
-                // 1. 删除关联表行
+                // 1. 查找关联的力量体系ID
+                List<NovelWorldviewPowerSystem> associations = worldviewPowerSystemMapper.selectList(
+                    new LambdaQueryWrapper<NovelWorldviewPowerSystem>()
+                        .eq(NovelWorldviewPowerSystem::getWorldviewId, existingWorldview.getId())
+                );
+
+                // 2. 级联删除力量体系（等级→境界→体系）
+                for (NovelWorldviewPowerSystem assoc : associations) {
+                    Long psId = assoc.getPowerSystemId();
+                    // 删除境界
+                    List<NovelPowerSystemLevel> levels = levelMapper.selectList(
+                        new LambdaQueryWrapper<NovelPowerSystemLevel>()
+                            .eq(NovelPowerSystemLevel::getPowerSystemId, psId)
+                    );
+                    for (NovelPowerSystemLevel level : levels) {
+                        stepMapper.delete(
+                            new LambdaQueryWrapper<NovelPowerSystemLevelStep>()
+                                .eq(NovelPowerSystemLevelStep::getPowerSystemLevelId, level.getId())
+                        );
+                    }
+                    // 删除等级
+                    levelMapper.delete(
+                        new LambdaQueryWrapper<NovelPowerSystemLevel>()
+                            .eq(NovelPowerSystemLevel::getPowerSystemId, psId)
+                    );
+                    // 删除力量体系
+                    powerSystemMapper.deleteById(psId);
+                }
+
+                // 3. 删除关联表行
                 worldviewPowerSystemMapper.delete(
                     new LambdaQueryWrapper<NovelWorldviewPowerSystem>()
                         .eq(NovelWorldviewPowerSystem::getWorldviewId, existingWorldview.getId())
                 );
 
-                // 2. 删除旧世界观
+                // 4. 删除旧世界观
                 worldviewMapper.deleteById(existingWorldview.getId());
             } else {
                 log.info("项目 {} 没有世界观设定，需要生成", projectId);
@@ -300,15 +329,15 @@ public class WorldviewTaskStrategy implements TaskStrategy {
             worldview.setGeography(worldSetting.getGeography());
             worldview.setForces(worldSetting.getForces());
             worldview.setTimeline(worldSetting.getTimeline());
-            worldview.setRules(worldview.getRules());
+            worldview.setRules(worldSetting.getRules());
             worldview.setCreateTime(now);
             worldview.setUpdateTime(now);
 
             worldviewMapper.insert(worldview);
             log.info("世界观基本信息保存成功，ID: {}", worldview.getId());
 
-            // Step 4: 解析并保存结构化力量体系  todo
-            WorldSettingXmlDto.Systems systems = worldSetting.getSystems();
+            // Step 4: 解析并保存结构化力量体系
+            savePowerSystems(projectId, worldview.getId(), worldSetting.getSystems(), now);
 
             return worldview;
 
@@ -317,6 +346,84 @@ public class WorldviewTaskStrategy implements TaskStrategy {
             log.error("AI响应: {}", aiResponse);
             return null;
         }
+    }
+
+    // ======================== savePowerSystems ========================
+
+    /**
+     * 解析并保存结构化力量体系
+     * <p>
+     * 流程：
+     * 1. 遍历每个 <system>，插入 novel_power_system
+     * 2. 遍历 <levels>/<level>，插入 novel_power_system_level
+     * 3. 遍历 <steps>/<step>，插入 novel_power_system_level_step
+     * 4. 建立 novel_worldview_power_system 关联
+     */
+    private void savePowerSystems(Long projectId, Long worldviewId, WorldSettingXmlDto.Systems systems, LocalDateTime now) {
+        if (systems == null || systems.getSystemList() == null || systems.getSystemList().isEmpty()) {
+            log.info("无力量体系数据，跳过入库");
+            return;
+        }
+
+        for (WorldSettingXmlDto.CultivationSystem cs : systems.getSystemList()) {
+            // 1. 插入力量体系主记录
+            NovelPowerSystem powerSystem = new NovelPowerSystem();
+            powerSystem.setProjectId(projectId);
+            powerSystem.setName(cs.getName());
+            powerSystem.setSourceFrom(cs.getSourceFrom());
+            powerSystem.setCoreResource(cs.getCoreResource());
+            powerSystem.setCultivationMethod(cs.getCultivationMethod());
+            powerSystem.setDescription(cs.getDescription());
+            powerSystem.setCreateTime(now);
+            powerSystem.setUpdateTime(now);
+            powerSystemMapper.insert(powerSystem);
+            log.info("力量体系保存成功，ID={}, name={}", powerSystem.getId(), cs.getName());
+
+            // 2. 插入等级记录
+            if (cs.getLevels() != null && cs.getLevels().getLevelList() != null) {
+                int levelIndex = 1;
+                for (WorldSettingXmlDto.CultivationLevel cl : cs.getLevels().getLevelList()) {
+                    NovelPowerSystemLevel level = new NovelPowerSystemLevel();
+                    level.setPowerSystemId(powerSystem.getId());
+                    level.setLevel(levelIndex++);
+                    level.setLevelName(cl.getLevelName());
+                    level.setDescription(cl.getDescription());
+                    level.setBreakthroughCondition(cl.getBreakthroughCondition());
+                    level.setLifespan(cl.getLifespan());
+                    level.setPowerRange(cl.getPowerRange());
+                    level.setLandmarkAbility(cl.getLandmarkAbility());
+                    level.setCreateTime(now);
+                    level.setUpdateTime(now);
+                    levelMapper.insert(level);
+                    log.debug("等级保存成功，ID={}, name={}", level.getId(), cl.getLevelName());
+
+                    // 3. 插入境界记录
+                    if (cl.getSteps() != null && cl.getSteps().getStepList() != null) {
+                        int stepIndex = 1;
+                        for (String stepName : cl.getSteps().getStepList()) {
+                            NovelPowerSystemLevelStep step = new NovelPowerSystemLevelStep();
+                            step.setPowerSystemLevelId(level.getId());
+                            step.setLevel(stepIndex++);
+                            step.setLevelName(stepName);
+                            step.setCreateTime(now);
+                            step.setUpdateTime(now);
+                            stepMapper.insert(step);
+                        }
+                        log.debug("已保存 {} 个境界", cl.getSteps().getStepList().size());
+                    }
+                }
+                log.info("已保存 {} 个等级", cs.getLevels().getLevelList().size());
+            }
+
+            // 4. 建立世界观-力量体系关联
+            NovelWorldviewPowerSystem association = new NovelWorldviewPowerSystem();
+            association.setWorldviewId(worldviewId);
+            association.setPowerSystemId(powerSystem.getId());
+            worldviewPowerSystemMapper.insert(association);
+            log.info("世界观-力量体系关联已建立，worldviewId={}, powerSystemId={}", worldviewId, powerSystem.getId());
+        }
+
+        log.info("力量体系入库完成，共 {} 套体系", systems.getSystemList().size());
     }
 
     // ======================== updateProjectSetupStage ========================
