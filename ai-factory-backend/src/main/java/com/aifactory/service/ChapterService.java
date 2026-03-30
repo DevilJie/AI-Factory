@@ -1,6 +1,7 @@
 package com.aifactory.service;
 
 import com.aifactory.common.UserContext;
+import com.aifactory.common.XmlParser;
 import com.aifactory.enums.AIRole;
 import com.aifactory.dto.ChapterContext;
 import com.aifactory.dto.ChapterDto;
@@ -1666,7 +1667,7 @@ public class ChapterService {
      * 解析并保存记忆XML（使用通用XmlParser）
      */
     @Autowired
-    private com.aifactory.common.XmlParser xmlParser;
+    private XmlParser xmlParser;
 
     private void parseAndSaveMemoryXml(Long projectId, Chapter chapter, NovelChapterPlan plan,
                                        String memoryXml, String plotSummary, String content) {

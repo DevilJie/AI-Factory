@@ -5,6 +5,7 @@ import com.aifactory.dto.AIGenerateResponse;
 import com.aifactory.entity.*;
 import com.aifactory.enums.AIRole;
 import com.aifactory.mapper.*;
+import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptTemplateService;
 import com.aifactory.service.task.TaskStrategy;
@@ -51,7 +52,7 @@ public class VolumeOptimizeTaskStrategy implements TaskStrategy {
     private PromptTemplateService promptTemplateService;
 
     @Autowired
-    private com.aifactory.service.PowerSystemService powerSystemService;
+    private PowerSystemService powerSystemService;
 
     @Override
     public String getTaskType() {

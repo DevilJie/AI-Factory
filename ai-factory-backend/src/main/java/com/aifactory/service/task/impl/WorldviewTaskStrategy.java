@@ -1,10 +1,8 @@
 package com.aifactory.service.task.impl;
 
-import com.aifactory.dto.AIGenerateRequest;
-import com.aifactory.dto.AIGenerateResponse;
-import com.aifactory.dto.PowerSystemLevelSaveRequest;
-import com.aifactory.dto.PowerSystemLevelStepSaveRequest;
-import com.aifactory.dto.PowerSystemSaveRequest;
+import com.aifactory.common.XmlParser;
+import com.aifactory.constants.BasicSettingsDictionary;
+import com.aifactory.dto.*;
 import com.aifactory.entity.*;
 import com.aifactory.enums.AIRole;
 import com.aifactory.mapper.*;
@@ -12,7 +10,6 @@ import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptTemplateService;
 import com.aifactory.service.task.TaskStrategy;
-import com.aifactory.util.XmlParser;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -77,6 +74,9 @@ public class WorldviewTaskStrategy implements TaskStrategy {
 
     @Autowired
     private NovelWorldviewPowerSystemMapper worldviewPowerSystemMapper;
+
+    @Autowired
+    private XmlParser xmlParser;
 
     @Override
     public String getTaskType() {
@@ -179,18 +179,17 @@ public class WorldviewTaskStrategy implements TaskStrategy {
             Project project = projectMapper.selectById(context.getProjectId());
             String projectDescription = project.getDescription();
             String storyTone = project.getStoryTone();
-            String storyGenre = project.getStoryGenre();
+            String novelType = project.getNovelType();
             String tags = project.getTags();
 
             // 构建提示词（模板已包含 XML 格式要求，不再手动追加）
-            String prompt = buildWorldviewPrompt(projectDescription, storyTone, storyGenre, tags);
+            String prompt = buildWorldviewPrompt(projectDescription, storyTone, novelType, tags);
 
             AIGenerateRequest aiRequest = new AIGenerateRequest();
             aiRequest.setProjectId(context.getProjectId());
             aiRequest.setRequestType("llm_worldview_create");
             aiRequest.setRole(AIRole.NOVEL_WRITER);
             aiRequest.setTask(prompt);
-            aiRequest.setMaxTokens(8000);
 
             AIGenerateResponse aiResponse = llmProviderFactory.getDefaultProvider().generate(aiRequest);
             String responseContent = aiResponse.getContent();
@@ -250,11 +249,11 @@ public class WorldviewTaskStrategy implements TaskStrategy {
      * 模板（llm_worldview_create）已包含完整的 XML 格式要求，
      * 这里只负责准备模板变量和补充 tags 信息。
      */
-    private String buildWorldviewPrompt(String projectDescription, String storyTone, String storyGenre, String tags) {
+    private String buildWorldviewPrompt(String projectDescription, String storyTone, String novelType, String tags) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("projectDescription", projectDescription != null && !projectDescription.isEmpty() ? projectDescription : "待补充");
-        variables.put("storyTone", storyTone != null && !storyTone.isEmpty() ? storyTone : "待补充");
-        variables.put("storyGenre", storyGenre != null && !storyGenre.isEmpty() ? storyGenre : "待补充");
+        variables.put("storyTone", storyTone != null && !storyTone.isEmpty() ? BasicSettingsDictionary.getStoryTone(storyTone) : "待补充");
+        variables.put("novelType", novelType != null && !novelType.isEmpty() ? BasicSettingsDictionary.getNovelType(novelType) : "待补充");
 
         // tags 是可选的，模板中使用 {tagsSection} 占位
         if (tags != null && !tags.isEmpty()) {
@@ -264,9 +263,8 @@ public class WorldviewTaskStrategy implements TaskStrategy {
         }
 
         String templateCode = "llm_worldview_create";
-        String prompt = promptTemplateService.executeTemplate(templateCode, variables);
 
-        return prompt;
+        return promptTemplateService.executeTemplate(templateCode, variables);
     }
 
     // ======================== parseAndSaveWorldview ========================
@@ -282,17 +280,8 @@ public class WorldviewTaskStrategy implements TaskStrategy {
      */
     private NovelWorldview parseAndSaveWorldview(Long projectId, String aiResponse, String storyGenre) {
         try {
-            // Step 1: 解析顶层 XML 字段
-            Map<String, String> worldviewData = XmlParser.parseXml(
-                aiResponse,
-                "w",
-                "t", "b", "p", "g", "f", "l", "r"
-            );
 
-            if (worldviewData.isEmpty()) {
-                log.warn("解析世界观XML失败，数据为空");
-                return null;
-            }
+            WorldSettingXmlDto worldSetting = xmlParser.parse(aiResponse, WorldSettingXmlDto.class);
 
             // Step 2: 获取项目信息
             Project project = projectMapper.selectById(projectId);
@@ -307,25 +296,19 @@ public class WorldviewTaskStrategy implements TaskStrategy {
             NovelWorldview worldview = new NovelWorldview();
             worldview.setUserId(project.getUserId());
             worldview.setProjectId(projectId);
-            worldview.setWorldType(worldviewData.getOrDefault("t", storyGenre));
-            worldview.setWorldBackground(worldviewData.getOrDefault("b", ""));
-            worldview.setGeography(worldviewData.getOrDefault("g", ""));
-            worldview.setForces(worldviewData.getOrDefault("f", ""));
-            worldview.setTimeline(worldviewData.getOrDefault("l", ""));
-            worldview.setRules(worldviewData.getOrDefault("r", ""));
+            worldview.setWorldBackground(worldSetting.getBackground());
+            worldview.setGeography(worldSetting.getGeography());
+            worldview.setForces(worldSetting.getForces());
+            worldview.setTimeline(worldSetting.getTimeline());
+            worldview.setRules(worldview.getRules());
             worldview.setCreateTime(now);
             worldview.setUpdateTime(now);
 
             worldviewMapper.insert(worldview);
             log.info("世界观基本信息保存成功，ID: {}", worldview.getId());
 
-            // Step 4: 解析并保存结构化力量体系
-            String powerSystemXml = worldviewData.get("p");
-            if (powerSystemXml != null && !powerSystemXml.trim().isEmpty()) {
-                savePowerSystemsFromXml(projectId, worldview.getId(), powerSystemXml, now);
-            } else {
-                log.info("未检测到力量体系内容，跳过");
-            }
+            // Step 4: 解析并保存结构化力量体系  todo
+            WorldSettingXmlDto.Systems systems = worldSetting.getSystems();
 
             return worldview;
 
@@ -334,232 +317,6 @@ public class WorldviewTaskStrategy implements TaskStrategy {
             log.error("AI响应: {}", aiResponse);
             return null;
         }
-    }
-
-    // ======================== 力量体系 XML 解析 & 入库 ========================
-
-    /**
-     * 从 <p> 标签内容中解析 <system> 列表并入库
-     * <p>
-     * 支持的格式：
-     * <pre>
-     * &lt;system&gt;
-     *   &lt;name&gt;修仙体系&lt;/name&gt;
-     *   &lt;sourceFrom&gt;天地灵气&lt;/sourceFrom&gt;
-     *   &lt;coreResource&gt;灵石&lt;/coreResource&gt;
-     *   &lt;cultivationMethod&gt;打坐冥想&lt;/cultivationMethod&gt;
-     *   &lt;description&gt;...&lt;/description&gt;
-     *   &lt;levels&gt;
-     *     &lt;level&gt;
-     *       &lt;levelName&gt;练气期&lt;/levelName&gt;
-     *       &lt;description&gt;...&lt;/description&gt;
-     *       &lt;breakthroughCondition&gt;...&lt;/breakthroughCondition&gt;
-     *       &lt;lifespan&gt;150年&lt;/lifespan&gt;
-     *       &lt;powerRange&gt;...&lt;/powerRange&gt;
-     *       &lt;landmarkAbility&gt;灵气外放&lt;/landmarkAbility&gt;
-     *       &lt;steps&gt;
-     *         &lt;step&gt;前期&lt;/step&gt;
-     *         &lt;step&gt;中期&lt;/step&gt;
-     *       &lt;/steps&gt;
-     *     &lt;/level&gt;
-     *   &lt;/levels&gt;
-     * &lt;/system&gt;
-     * </pre>
-     */
-    private void savePowerSystemsFromXml(Long projectId, Long worldviewId, String powerSystemXml, LocalDateTime now) {
-        // 将 <p> 包裹内容构造成完整的 XML 以便 DOM 解析
-        String wrappedXml = "<p>" + powerSystemXml + "</p>";
-
-        try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            factory.setNamespaceAware(false);
-
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(new org.xml.sax.InputSource(new StringReader(wrappedXml)));
-
-            NodeList systemNodes = doc.getElementsByTagName("system");
-            log.info("解析到 {} 个力量体系", systemNodes.getLength());
-
-            for (int i = 0; i < systemNodes.getLength(); i++) {
-                Element systemEl = (Element) systemNodes.item(i);
-                try {
-                    saveOneSystem(projectId, worldviewId, systemEl, now);
-                } catch (Exception e) {
-                    log.warn("保存第 {} 个力量体系失败，跳过: {}", i + 1, e.getMessage());
-                }
-            }
-
-        } catch (Exception e) {
-            log.warn("力量体系 XML DOM 解析失败，尝试正则回退: {}", e.getMessage());
-            savePowerSystemsWithRegex(projectId, worldviewId, powerSystemXml, now);
-        }
-    }
-
-    /**
-     * 保存单个 <system> 节点
-     */
-    private void saveOneSystem(Long projectId, Long worldviewId, Element systemEl, LocalDateTime now) {
-        String name = getTextContent(systemEl, "name");
-        String sourceFrom = getTextContent(systemEl, "sourceFrom");
-        String coreResource = getTextContent(systemEl, "coreResource");
-        String cultivationMethod = getTextContent(systemEl, "cultivationMethod");
-        String description = getTextContent(systemEl, "description");
-
-        if (name == null || name.trim().isEmpty()) {
-            name = "未命名体系";
-        }
-
-        // 构建保存请求
-        PowerSystemSaveRequest request = new PowerSystemSaveRequest();
-        request.setProjectId(projectId);
-        request.setName(name);
-        request.setSourceFrom(sourceFrom);
-        request.setCoreResource(coreResource);
-        request.setCultivationMethod(cultivationMethod);
-        request.setDescription(description);
-
-        // 解析 levels
-        NodeList levelNodes = systemEl.getElementsByTagName("level");
-        List<PowerSystemLevelSaveRequest> levels = new ArrayList<>();
-
-        for (int i = 0; i < levelNodes.getLength(); i++) {
-            Element levelEl = (Element) levelNodes.item(i);
-            // 跳过嵌套在其他 level 内的 level（避免重复）
-            if (levelEl.getParentNode() != null
-                && "levels".equals(levelEl.getParentNode().getNodeName())) {
-                levels.add(parseLevel(levelEl, i));
-            }
-        }
-
-        request.setLevels(levels);
-
-        // 调用 PowerSystemService 保存
-        NovelPowerSystem saved = powerSystemService.savePowerSystem(request);
-        log.info("力量体系入库成功，ID={}, name={}", saved.getId(), saved.getName());
-
-        // 建立关联
-        NovelWorldviewPowerSystem rel = new NovelWorldviewPowerSystem();
-        rel.setWorldviewId(worldviewId);
-        rel.setPowerSystemId(saved.getId());
-        worldviewPowerSystemMapper.insert(rel);
-        log.info("世界观-力量体系关联已建立，worldviewId={}, powerSystemId={}", worldviewId, saved.getId());
-    }
-
-    /**
-     * 解析单个 <level> 元素
-     */
-    private PowerSystemLevelSaveRequest parseLevel(Element levelEl, int index) {
-        PowerSystemLevelSaveRequest levelReq = new PowerSystemLevelSaveRequest();
-        levelReq.setLevel(index + 1);
-        levelReq.setLevelName(getTextContent(levelEl, "levelName"));
-        levelReq.setDescription(getTextContent(levelEl, "description"));
-        levelReq.setBreakthroughCondition(getTextContent(levelEl, "breakthroughCondition"));
-        levelReq.setLifespan(getTextContent(levelEl, "lifespan"));
-        levelReq.setPowerRange(getTextContent(levelEl, "powerRange"));
-        levelReq.setLandmarkAbility(getTextContent(levelEl, "landmarkAbility"));
-
-        // 解析 steps
-        NodeList stepNodes = levelEl.getElementsByTagName("step");
-        List<PowerSystemLevelStepSaveRequest> steps = new ArrayList<>();
-
-        for (int j = 0; j < stepNodes.getLength(); j++) {
-            // 只取直接子节点的 step，避免嵌套
-            if (stepNodes.item(j).getParentNode() != null
-                && "steps".equals(stepNodes.item(j).getParentNode().getNodeName())) {
-                PowerSystemLevelStepSaveRequest stepReq = new PowerSystemLevelStepSaveRequest();
-                stepReq.setLevel(j + 1);
-                stepReq.setLevelName(stepNodes.item(j).getTextContent().trim());
-                steps.add(stepReq);
-            }
-        }
-
-        levelReq.setSteps(steps);
-        return levelReq;
-    }
-
-    /**
-     * 安全获取子元素文本内容
-     */
-    private String getTextContent(Element parent, String tagName) {
-        NodeList nodes = parent.getElementsByTagName(tagName);
-        if (nodes.getLength() > 0) {
-            String text = nodes.item(0).getTextContent();
-            return text != null ? text.trim() : null;
-        }
-        return null;
-    }
-
-    /**
-     * 正则表达式回退方案：当 DOM 解析失败时使用
-     * 从 <system>...</system> 块中提取基本信息
-     */
-    private void savePowerSystemsWithRegex(Long projectId, Long worldviewId, String powerSystemXml, LocalDateTime now) {
-        Pattern systemPattern = Pattern.compile("<system>(.*?)</system>", Pattern.DOTALL);
-        Matcher systemMatcher = systemPattern.matcher(powerSystemXml);
-
-        int count = 0;
-        while (systemMatcher.find()) {
-            count++;
-            String systemBlock = systemMatcher.group(1);
-
-            try {
-                String name = extractTag(systemBlock, "name");
-                String sourceFrom = extractTag(systemBlock, "sourceFrom");
-                String coreResource = extractTag(systemBlock, "coreResource");
-                String cultivationMethod = extractTag(systemBlock, "cultivationMethod");
-                String description = extractTag(systemBlock, "description");
-
-                if (name == null || name.trim().isEmpty()) {
-                    name = "未命名体系" + count;
-                }
-
-                PowerSystemSaveRequest request = new PowerSystemSaveRequest();
-                request.setProjectId(projectId);
-                request.setName(name);
-                request.setSourceFrom(sourceFrom);
-                request.setCoreResource(coreResource);
-                request.setCultivationMethod(cultivationMethod);
-                request.setDescription(description);
-                // 正则回退不解析 levels，保持简单
-
-                NovelPowerSystem saved = powerSystemService.savePowerSystem(request);
-                log.info("力量体系入库成功（正则回退），ID={}, name={}", saved.getId(), saved.getName());
-
-                NovelWorldviewPowerSystem rel = new NovelWorldviewPowerSystem();
-                rel.setWorldviewId(worldviewId);
-                rel.setPowerSystemId(saved.getId());
-                worldviewPowerSystemMapper.insert(rel);
-
-            } catch (Exception e) {
-                log.warn("正则回退：保存第 {} 个力量体系失败: {}", count, e.getMessage());
-            }
-        }
-
-        if (count == 0) {
-            log.info("正则回退：未提取到 <system> 块");
-        }
-    }
-
-    /**
-     * 从 XML 片段中提取标签内容（支持 CDATA）
-     */
-    private String extractTag(String xml, String tagName) {
-        // 先尝试 CDATA
-        Pattern cdataPattern = Pattern.compile(
-            "<" + tagName + ">\\s*<!\\[CDATA\\[([^]]*?)\\]\\]>\\s*</" + tagName + ">", Pattern.DOTALL);
-        Matcher m = cdataPattern.matcher(xml);
-        if (m.find()) return m.group(1).trim();
-
-        // 普通标签
-        Pattern normalPattern = Pattern.compile(
-            "<" + tagName + ">(.*?)</" + tagName + ">", Pattern.DOTALL);
-        m = normalPattern.matcher(xml);
-        if (m.find()) return m.group(1).trim();
-
-        return null;
     }
 
     // ======================== updateProjectSetupStage ========================

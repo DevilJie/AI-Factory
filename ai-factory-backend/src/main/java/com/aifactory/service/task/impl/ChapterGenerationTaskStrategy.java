@@ -11,6 +11,7 @@ import com.aifactory.enums.AIRole;
 import com.aifactory.mapper.NovelChapterPlanMapper;
 import com.aifactory.mapper.NovelVolumePlanMapper;
 import com.aifactory.mapper.NovelWorldviewMapper;
+import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptTemplateService;
 import com.aifactory.service.task.TaskStrategy;
@@ -61,7 +62,7 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
     private PromptTemplateService promptTemplateService;
 
     @Autowired
-    private com.aifactory.service.PowerSystemService powerSystemService;
+    private PowerSystemService powerSystemService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 

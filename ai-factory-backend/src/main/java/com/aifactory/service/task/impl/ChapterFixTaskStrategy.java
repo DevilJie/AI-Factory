@@ -10,6 +10,7 @@ import com.aifactory.mapper.ChapterMapper;
 import com.aifactory.mapper.ChapterPlotMemoryMapper;
 import com.aifactory.mapper.NovelWorldviewMapper;
 import com.aifactory.mapper.ProjectMapper;
+import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptTemplateService;
 import com.aifactory.service.task.TaskStrategy;
@@ -63,7 +64,7 @@ public class ChapterFixTaskStrategy implements TaskStrategy {
     private XmlParser xmlParser;
 
     @Autowired
-    private com.aifactory.service.PowerSystemService powerSystemService;
+    private PowerSystemService powerSystemService;
 
     @Override
     public String getTaskType() {

@@ -4,6 +4,7 @@ import com.aifactory.constants.BasicSettingsDictionary;
 import com.aifactory.entity.NovelWorldview;
 import com.aifactory.entity.ProjectBasicSettings;
 import com.aifactory.mapper.NovelWorldviewMapper;
+import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.ProjectBasicSettingsService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -35,7 +36,7 @@ public class PromptContextBuilder {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private com.aifactory.service.PowerSystemService powerSystemService;
+    private PowerSystemService powerSystemService;
 
     /**
      * 构建基础设置上下文（叙事结构、写作视角、叙事节奏等）

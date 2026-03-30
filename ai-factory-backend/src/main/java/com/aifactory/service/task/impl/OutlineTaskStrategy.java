@@ -17,6 +17,7 @@ import com.aifactory.mapper.NovelOutlineMapper;
 import com.aifactory.mapper.NovelVolumePlanMapper;
 import com.aifactory.mapper.NovelWorldviewMapper;
 import com.aifactory.mapper.ProjectMapper;
+import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptContextBuilder;
 import com.aifactory.service.prompt.PromptTemplateService;
@@ -77,7 +78,7 @@ public class OutlineTaskStrategy implements TaskStrategy {
     private com.aifactory.service.chapter.prompt.PromptTemplateBuilder promptTemplateBuilder;
 
     @Autowired
-    private com.aifactory.service.PowerSystemService powerSystemService;
+    private PowerSystemService powerSystemService;
 
     @Override
     public String getTaskType() {

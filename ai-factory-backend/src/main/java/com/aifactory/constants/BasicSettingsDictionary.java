@@ -11,6 +11,26 @@ import java.util.*;
  */
 public class BasicSettingsDictionary {
 
+    public static final Map<String, String> STORY_TONE = Map.ofEntries(
+        Map.entry("relaxed", "轻松"),
+        Map.entry("serious", "严肃"),
+        Map.entry("suspense", "悬疑"),
+        Map.entry("adventure", "冒险")
+    );
+
+    // 小说类型选项
+    public static final Map<String, String> NOVEL_TYPE = Map.ofEntries(
+        Map.entry("fantasy", "玄幻"),
+        Map.entry("urban", "都市"),
+        Map.entry("scifi", "科幻"),
+        Map.entry("history", "历史"),
+        Map.entry("military", "军事"),
+        Map.entry("mystery", "悬疑"),
+        Map.entry("romance", "言情"),
+        Map.entry("gaming", "游戏")
+    );
+
+
     /**
      * 叙事结构字典
      */
@@ -119,6 +139,15 @@ public class BasicSettingsDictionary {
     }
 
     /**
+     * 获取小说类型
+     * @param key
+     * @return
+     */
+    public static String getNovelType(String key){
+        return NOVEL_TYPE.getOrDefault(key, key);
+    }
+
+    /**
      * 获取结局类型中文描述
      */
     public static String getEndingType(String key) {
@@ -158,6 +187,13 @@ public class BasicSettingsDictionary {
      */
     public static String getWritingPerspective(String key) {
         return WRITING_PERSPECTIVE.getOrDefault(key, key);
+    }
+
+    /**
+     * 获取故事基调
+     */
+    public static String getStoryTone(String key){
+        return STORY_TONE.getOrDefault(key, key);
     }
 
     /**

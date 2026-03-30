@@ -6,14 +6,12 @@ import com.aifactory.entity.Chapter;
 import com.aifactory.entity.NovelChapterPlan;
 import com.aifactory.entity.NovelCharacter;
 import com.aifactory.entity.NovelCharacterChapter;
-import com.aifactory.service.NovelCharacterChapterService;
+import com.aifactory.service.*;
 import com.aifactory.mapper.NovelCharacterChapterMapper;
 import com.aifactory.entity.NovelVolumePlan;
 import com.aifactory.entity.NovelWorldview;
 import com.aifactory.entity.ProjectBasicSettings;
-import com.aifactory.service.NovelCharacterService;
 import com.aifactory.service.NovelCharacterChapterService;
-import com.aifactory.service.ProjectBasicSettingsService;
 import com.aifactory.service.prompt.PromptTemplateService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,7 +56,7 @@ public class PromptTemplateBuilder {
     private NovelCharacterChapterService novelCharacterChapterService;
 
     @Autowired
-    private com.aifactory.service.PowerSystemService powerSystemService;
+    private PowerSystemService powerSystemService;
 
     /**
      * 构建章节生成提示词
