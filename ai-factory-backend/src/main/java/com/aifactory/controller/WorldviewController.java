@@ -1,21 +1,14 @@
 package com.aifactory.controller;
 
-import com.aifactory.dto.AIGenerateRequest;
-import com.aifactory.dto.AIGenerateResponse;
 import com.aifactory.dto.CreateTaskRequest;
 import com.aifactory.dto.TaskDto;
 import com.aifactory.entity.NovelWorldview;
 import com.aifactory.entity.Project;
-import com.aifactory.enums.AIRole;
 import com.aifactory.mapper.NovelWorldviewMapper;
 import com.aifactory.mapper.ProjectMapper;
 import com.aifactory.response.Result;
 import com.aifactory.service.TaskService;
-import com.aifactory.service.llm.LLMProviderFactory;
-import com.aifactory.util.XmlParser;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -51,12 +44,7 @@ public class WorldviewController {
     private ProjectMapper projectMapper;
 
     @Autowired
-    private LLMProviderFactory llmProviderFactory;
-
-    @Autowired
     private TaskService taskService;
-
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * 获取项目的世界观设定
@@ -264,112 +252,4 @@ public class WorldviewController {
         }
     }
 
-    /**
-     * 构建生成世界观的提示词
-     */
-    private String buildWorldviewPrompt(String projectDescription, String storyTone, String storyGenre, String tags) {
-        StringBuilder prompt = new StringBuilder();
-        prompt.append("你是一位资深的网络小说作家和世界观构建师。\n\n");
-        prompt.append("请根据以下故事信息，构建一个完整的世界观设定：\n\n");
-
-        prompt.append("【故事背景】\n").append(projectDescription != null && !projectDescription.isEmpty() ? projectDescription : "待补充").append("\n\n");
-        prompt.append("【故事基调】").append(storyTone != null && !storyTone.isEmpty() ? storyTone : "待补充").append("\n");
-        prompt.append("【故事类型】").append(storyGenre != null && !storyGenre.isEmpty() ? storyGenre : "待补充").append("\n");
-
-        // 添加标签信息
-        if (tags != null && !tags.isEmpty()) {
-            prompt.append("【标签】").append(tags).append("\n\n");
-        }
-
-        prompt.append("【重要】请严格按照以下XML格式返回世界观设定：\n");
-        prompt.append("<worldview>\n");
-        prompt.append("  <worldType>世界类型（如：架空/现代/古代/未来/玄幻/仙侠等）</worldType>\n");
-        prompt.append("  <worldBackground><![CDATA[世界背景描述（200-300字）]]></worldBackground>\n");
-        prompt.append("  <powerSystem><![CDATA[力量体系或修炼体系（如有），包括等级划分、能力来源等]]></powerSystem>\n");
-        prompt.append("  <geography><![CDATA[地理环境描述，包括重要地点、国家、区域等]]></geography>\n");
-        prompt.append("  <forces><![CDATA[势力分布，包括主要组织、国家、门派等]]></forces>\n");
-        prompt.append("  <timeline><![CDATA[时间线设定（如适用）]]></timeline>\n");
-        prompt.append("  <rules><![CDATA[世界的基本规则和限制]]></rules>\n");
-        prompt.append("</worldview>\n\n");
-
-        prompt.append("【XML格式要求】\n");
-        prompt.append("1. 对于长文本内容（可能包含特殊字符），请使用CDATA标签包裹：<![CDATA[内容]]>\n");
-        prompt.append("2. 不要包含markdown代码块标记（```xml），直接返回XML\n");
-        prompt.append("3. 不要包含任何解释或说明文字，只返回XML数据\n\n");
-
-        prompt.append("内容要求：\n");
-        prompt.append("1. 世界观要符合故事类型和基调\n");
-        prompt.append("2. 力量体系要清晰、合理，有可发展性\n");
-        prompt.append("3. 各个要素之间要相互关联，形成完整的世界\n");
-        prompt.append("4. 返回的必须是纯XML格式，不要有任何其他说明文字\n");
-
-        return prompt.toString();
-    }
-
-    /**
-     * 解析AI响应并保存世界观设定
-     */
-    private NovelWorldview parseAndSaveWorldview(Long projectId, String aiResponse, String storyGenre) {
-        try {
-            // 使用XML工具类解析
-            Map<String, String> worldviewData = XmlParser.parseXml(
-                aiResponse,
-                "worldview",
-                "worldType", "worldBackground", "powerSystem", "geography", "forces", "timeline", "rules"
-            );
-
-            if (worldviewData.isEmpty()) {
-                log.warn("解析世界观XML失败，数据为空");
-                return null;
-            }
-
-            // 获取项目信息以获取userId
-            Project project = projectMapper.selectById(projectId);
-            if (project == null) {
-                log.error("项目不存在，projectId={}", projectId);
-                return null;
-            }
-
-            log.info("项目信息: projectId={}, userId={}", project.getId(), project.getUserId());
-
-            LocalDateTime now = LocalDateTime.now();
-            NovelWorldview worldview = new NovelWorldview();
-            worldview.setUserId(project.getUserId());
-            worldview.setProjectId(projectId);
-
-            worldview.setWorldType(worldviewData.getOrDefault("worldType", storyGenre));
-            worldview.setWorldBackground(worldviewData.getOrDefault("worldBackground", ""));
-            worldview.setPowerSystem(worldviewData.getOrDefault("powerSystem", ""));
-            worldview.setGeography(worldviewData.getOrDefault("geography", ""));
-            worldview.setForces(worldviewData.getOrDefault("forces", ""));
-            worldview.setTimeline(worldviewData.getOrDefault("timeline", ""));
-            worldview.setRules(worldviewData.getOrDefault("rules", ""));
-            worldview.setCreateTime(now);
-            worldview.setUpdateTime(now);
-
-            worldviewMapper.insert(worldview);
-            log.info("世界观设定保存成功，ID: {}", worldview.getId());
-
-            return worldview;
-
-        } catch (Exception e) {
-            log.error("解析世界观失败", e);
-            log.error("AI响应: {}", aiResponse);
-            return null;
-        }
-    }
-
-    /**
-     * 获取值或默认值（处理空字符串情况）
-     *
-     * @param value 请求中的值
-     * @param defaultValue 默认值（通常来自项目配置）
-     * @return 如果value为null或空字符串，返回defaultValue；否则返回value
-     */
-    private String getValueOrDefault(String value, String defaultValue) {
-        if (value == null || value.trim().isEmpty()) {
-            return defaultValue;
-        }
-        return value;
-    }
 }

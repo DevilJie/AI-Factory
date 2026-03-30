@@ -60,6 +60,9 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
     @Autowired
     private PromptTemplateService promptTemplateService;
 
+    @Autowired
+    private com.aifactory.service.PowerSystemService powerSystemService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -404,8 +407,9 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
             if (context.getSharedData().containsKey("worldview")) {
                 NovelWorldview worldview = (NovelWorldview) context.getSharedData().get("worldview");
                 worldviewBuilder.append("- 世界类型：").append(worldview.getWorldType()).append("\n");
-                if (worldview.getPowerSystem() != null && !worldview.getPowerSystem().isEmpty()) {
-                    worldviewBuilder.append("- 力量体系：").append(worldview.getPowerSystem()).append("\n");
+                String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
+                if (powerConstraint != null && !powerConstraint.trim().isEmpty()) {
+                    worldviewBuilder.append("- 力量体系：").append(powerConstraint).append("\n");
                 }
                 if (worldview.getGeography() != null && !worldview.getGeography().isEmpty()) {
                     worldviewBuilder.append("- 地理环境：").append(worldview.getGeography()).append("\n");
@@ -537,8 +541,9 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
             NovelWorldview worldview = (NovelWorldview) context.getSharedData().get("worldview");
             prompt.append("世界观设定：\n");
             prompt.append("- 世界类型：").append(worldview.getWorldType()).append("\n");
-            if (worldview.getPowerSystem() != null && !worldview.getPowerSystem().isEmpty()) {
-                prompt.append("- 力量体系：").append(worldview.getPowerSystem()).append("\n");
+            String powerConstraint2 = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
+            if (powerConstraint2 != null && !powerConstraint2.trim().isEmpty()) {
+                prompt.append("- 力量体系：").append(powerConstraint2).append("\n");
             }
             if (worldview.getGeography() != null && !worldview.getGeography().isEmpty()) {
                 prompt.append("- 地理环境：").append(worldview.getGeography()).append("\n");

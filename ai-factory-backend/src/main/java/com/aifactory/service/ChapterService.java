@@ -108,6 +108,9 @@ public class ChapterService {
     private ForeshadowingService foreshadowingService;
 
     @Autowired
+    private PowerSystemService powerSystemService;
+
+    @Autowired
     private ProjectBasicSettingsService projectBasicSettingsService;
 
     @Autowired
@@ -992,8 +995,9 @@ public class ChapterService {
             if (worldview.getWorldBackground() != null) {
                 prompt.append("- 世界背景：").append(worldview.getWorldBackground()).append("\n");
             }
-            if (worldview.getPowerSystem() != null) {
-                prompt.append("- 力量体系：").append(worldview.getPowerSystem()).append("\n");
+            String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
+            if (powerConstraint != null && !powerConstraint.trim().isEmpty()) {
+                prompt.append("- 力量体系：").append(powerConstraint).append("\n");
             }
             if (worldview.getForces() != null) {
                 prompt.append("- 势力分布：").append(worldview.getForces()).append("\n");

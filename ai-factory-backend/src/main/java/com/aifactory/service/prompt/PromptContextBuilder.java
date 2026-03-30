@@ -34,6 +34,9 @@ public class PromptContextBuilder {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private com.aifactory.service.PowerSystemService powerSystemService;
+
     /**
      * 构建基础设置上下文（叙事结构、写作视角、叙事节奏等）
      *
@@ -158,8 +161,9 @@ public class PromptContextBuilder {
                 sb.append("- 世界背景：").append(worldview.getWorldBackground()).append("\n");
             }
 
-            if (worldview.getPowerSystem() != null && !worldview.getPowerSystem().isEmpty()) {
-                sb.append("- 力量体系：").append(worldview.getPowerSystem()).append("\n");
+            String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
+            if (powerConstraint != null && !powerConstraint.trim().isEmpty()) {
+                sb.append("- 力量体系：").append(powerConstraint).append("\n");
             }
 
             if (worldview.getGeography() != null && !worldview.getGeography().isEmpty()) {

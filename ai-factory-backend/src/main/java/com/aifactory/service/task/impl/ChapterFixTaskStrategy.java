@@ -62,6 +62,9 @@ public class ChapterFixTaskStrategy implements TaskStrategy {
     @Autowired
     private XmlParser xmlParser;
 
+    @Autowired
+    private com.aifactory.service.PowerSystemService powerSystemService;
+
     @Override
     public String getTaskType() {
         return "chapter_fix";
@@ -400,8 +403,9 @@ public class ChapterFixTaskStrategy implements TaskStrategy {
         if (worldview.getWorldBackground() != null && !worldview.getWorldBackground().isEmpty()) {
             sb.append("**世界背景**：").append(worldview.getWorldBackground()).append("\n");
         }
-        if (worldview.getPowerSystem() != null && !worldview.getPowerSystem().isEmpty()) {
-            sb.append("**力量体系**：").append(worldview.getPowerSystem()).append("\n");
+        String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
+        if (powerConstraint != null && !powerConstraint.trim().isEmpty()) {
+            sb.append("**力量体系**：").append(powerConstraint).append("\n");
         }
         if (worldview.getGeography() != null && !worldview.getGeography().isEmpty()) {
             sb.append("**地理环境**：").append(worldview.getGeography()).append("\n");

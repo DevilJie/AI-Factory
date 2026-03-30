@@ -76,6 +76,9 @@ public class OutlineTaskStrategy implements TaskStrategy {
     @Autowired
     private com.aifactory.service.chapter.prompt.PromptTemplateBuilder promptTemplateBuilder;
 
+    @Autowired
+    private com.aifactory.service.PowerSystemService powerSystemService;
+
     @Override
     public String getTaskType() {
         return "outline";
@@ -888,11 +891,12 @@ public class OutlineTaskStrategy implements TaskStrategy {
                 if (worldview.getWorldBackground() != null && !worldview.getWorldBackground().isEmpty()) {
                     worldviewBuilder.append("- 世界背景：").append(worldview.getWorldBackground()).append("\n");
                 }
-                if (worldview.getPowerSystem() != null && !worldview.getPowerSystem().isEmpty()) {
-                    worldviewBuilder.append("- 力量体系：").append(worldview.getPowerSystem()).append("\n");
-                }
                 if (worldview.getGeography() != null && !worldview.getGeography().isEmpty()) {
                     worldviewBuilder.append("- 地理环境：").append(worldview.getGeography()).append("\n");
+                }
+                String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
+                if (powerConstraint != null && !powerConstraint.trim().isEmpty()) {
+                    worldviewBuilder.append("- 力量体系：").append(powerConstraint).append("\n");
                 }
                 if (worldview.getForces() != null && !worldview.getForces().isEmpty()) {
                     worldviewBuilder.append("- 势力分布：").append(worldview.getForces()).append("\n");
@@ -956,8 +960,9 @@ public class OutlineTaskStrategy implements TaskStrategy {
                 (com.aifactory.entity.NovelWorldview) context.getSharedData().get("worldview");
             prompt.append("【世界观设定】\n");
             prompt.append("- 世界类型：").append(worldview.getWorldType()).append("\n");
-            if (worldview.getPowerSystem() != null && !worldview.getPowerSystem().isEmpty()) {
-                prompt.append("- 力量体系：").append(worldview.getPowerSystem()).append("\n");
+            String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
+            if (powerConstraint != null && !powerConstraint.trim().isEmpty()) {
+                prompt.append("- 力量体系：").append(powerConstraint).append("\n");
             }
             if (worldview.getGeography() != null && !worldview.getGeography().isEmpty()) {
                 prompt.append("- 地理环境：").append(worldview.getGeography()).append("\n");
@@ -1376,7 +1381,8 @@ public class OutlineTaskStrategy implements TaskStrategy {
             String worldviewContent = worldviewMatcher.group(1);
 
             // 提取各个字段（简化标签）
-            // t=worldType, b=worldBackground, p=powerSystem, g=geography, f=forces, l=timeline, r=rules
+            // t=worldType, b=worldBackground, p=powerSystemXml, g=geography, f=forces, l=timeline, r=rules
+            // p (powerSystem) is parsed separately by WorldviewTaskStrategy into novel_power_system tables
             extractXmlFieldCData(worldviewContent, "t", result);
             extractXmlFieldCData(worldviewContent, "b", result);
             extractXmlFieldCData(worldviewContent, "p", result);
@@ -1392,9 +1398,7 @@ public class OutlineTaskStrategy implements TaskStrategy {
             if (result.containsKey("b")) {
                 result.put("worldBackground", result.get("b"));
             }
-            if (result.containsKey("p")) {
-                result.put("powerSystem", result.get("p"));
-            }
+            // p (powerSystem) kept as-is for reference; not written to novel_worldview
             if (result.containsKey("g")) {
                 result.put("geography", result.get("g"));
             }
@@ -1656,7 +1660,7 @@ public class OutlineTaskStrategy implements TaskStrategy {
             worldview.setProjectId(projectId);
             worldview.setWorldType(worldviewData.containsKey("worldType") ? worldviewData.get("worldType") : storyGenre);
             worldview.setWorldBackground(worldviewData.getOrDefault("worldBackground", ""));
-            worldview.setPowerSystem(worldviewData.getOrDefault("powerSystem", ""));
+            // powerSystem 已迁移到 novel_power_system 表，不再写入 worldview
             worldview.setGeography(worldviewData.getOrDefault("geography", ""));
             worldview.setForces(worldviewData.getOrDefault("forces", ""));
             worldview.setTimeline(worldviewData.getOrDefault("timeline", ""));
@@ -1701,8 +1705,9 @@ public class OutlineTaskStrategy implements TaskStrategy {
                 NovelWorldview worldview = (NovelWorldview) context.getSharedData().get("worldview");
                 worldviewBuilder.append("【世界观设定】\n");
                 worldviewBuilder.append("- 世界类型：").append(worldview.getWorldType()).append("\n");
-                if (worldview.getPowerSystem() != null && !worldview.getPowerSystem().isEmpty()) {
-                    worldviewBuilder.append("- 力量体系：").append(worldview.getPowerSystem()).append("\n");
+                String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
+                if (powerConstraint != null && !powerConstraint.trim().isEmpty()) {
+                    worldviewBuilder.append("- 力量体系：").append(powerConstraint).append("\n");
                 }
                 if (worldview.getGeography() != null && !worldview.getGeography().isEmpty()) {
                     worldviewBuilder.append("- 地理环境：").append(worldview.getGeography()).append("\n");
@@ -1746,8 +1751,9 @@ public class OutlineTaskStrategy implements TaskStrategy {
                 (com.aifactory.entity.NovelWorldview) context.getSharedData().get("worldview");
             prompt.append("【世界观设定】\n");
             prompt.append("- 世界类型：").append(worldview.getWorldType()).append("\n");
-            if (worldview.getPowerSystem() != null && !worldview.getPowerSystem().isEmpty()) {
-                prompt.append("- 力量体系：").append(worldview.getPowerSystem()).append("\n");
+            String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
+            if (powerConstraint != null && !powerConstraint.trim().isEmpty()) {
+                prompt.append("- 力量体系：").append(powerConstraint).append("\n");
             }
             if (worldview.getGeography() != null && !worldview.getGeography().isEmpty()) {
                 prompt.append("- 地理环境：").append(worldview.getGeography()).append("\n");

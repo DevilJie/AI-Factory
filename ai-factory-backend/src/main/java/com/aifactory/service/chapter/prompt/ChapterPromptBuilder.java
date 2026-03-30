@@ -5,6 +5,7 @@ import com.aifactory.entity.NovelChapterPlan;
 import com.aifactory.entity.NovelVolumePlan;
 import com.aifactory.entity.NovelWorldview;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -23,6 +24,9 @@ import java.util.List;
 @Slf4j
 @Component
 public class ChapterPromptBuilder {
+
+    @Autowired
+    private com.aifactory.service.PowerSystemService powerSystemService;
 
     /**
      * 构建单章节生成提示词
@@ -142,8 +146,9 @@ public class ChapterPromptBuilder {
         StringBuilder sb = new StringBuilder();
         sb.append("【世界观】").append(worldview.getWorldType());
 
-        if (worldview.getPowerSystem() != null && !worldview.getPowerSystem().isEmpty()) {
-            sb.append(" | 力量: ").append(worldview.getPowerSystem());
+        String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
+        if (powerConstraint != null && !powerConstraint.trim().isEmpty()) {
+            sb.append(" | 力量: ").append(powerConstraint);
         }
         if (worldview.getGeography() != null && !worldview.getGeography().isEmpty()) {
             sb.append(" | 地理: ").append(worldview.getGeography());

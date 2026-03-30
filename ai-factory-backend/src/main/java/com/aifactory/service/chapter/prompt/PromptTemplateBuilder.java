@@ -57,6 +57,9 @@ public class PromptTemplateBuilder {
     @Autowired
     private NovelCharacterChapterService novelCharacterChapterService;
 
+    @Autowired
+    private com.aifactory.service.PowerSystemService powerSystemService;
+
     /**
      * 构建章节生成提示词
      *
@@ -365,8 +368,9 @@ public class PromptTemplateBuilder {
         if (worldview.getWorldBackground() != null && !worldview.getWorldBackground().isEmpty()) {
             sb.append("- 世界背景：").append(worldview.getWorldBackground()).append("\n");
         }
-        if (worldview.getPowerSystem() != null && !worldview.getPowerSystem().isEmpty()) {
-            sb.append("- 力量体系：").append(worldview.getPowerSystem()).append("\n");
+        String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
+        if (powerConstraint != null && !powerConstraint.trim().isEmpty()) {
+            sb.append("- 力量体系：").append(powerConstraint).append("\n");
         }
         if (worldview.getGeography() != null && !worldview.getGeography().isEmpty()) {
             sb.append("- 地理环境：").append(worldview.getGeography()).append("\n");
@@ -429,34 +433,10 @@ public class PromptTemplateBuilder {
      * @return 修炼体系约束文本
      */
     public String buildPowerSystemConstraint(NovelWorldview worldview) {
-        StringBuilder sb = new StringBuilder();
-
-        if (worldview != null && worldview.getPowerSystem() != null && !worldview.getPowerSystem().isEmpty()) {
-            sb.append("本小说的修炼体系设定如下：\n");
-            sb.append(worldview.getPowerSystem()).append("\n");
-            sb.append("\n**重要约束：**\n");
-            sb.append("1. 角色的修为等级**必须**严格使用上述修炼体系中的等级名称\n");
-            sb.append("2. **不得**随意创造新的修炼体系或等级\n");
-            sb.append("3. 如果章节中没有明确提到角色的修为等级，则不输出V标签\n");
-            sb.append("4. 如果角色修炼多套体系，每套体系分别用一个V标签列出\n");
-            sb.append("\n示例（修仙+武道双修）：\n");
-            sb.append("```xml\n");
-            sb.append("<V>\n");
-            sb.append("  <SYS>修仙体系</SYS>\n");
-            sb.append("  <LV>筑基初期</LV>\n");
-            sb.append("  <CH>无变化</CH>\n");
-            sb.append("</V>\n");
-            sb.append("<V>\n");
-            sb.append("  <SYS>武道体系</SYS>\n");
-            sb.append("  <LV>三流武者</LV>\n");
-            sb.append("  <CH>从末流突破到三流</CH>\n");
-            sb.append("</V>\n");
-            sb.append("```\n");
-        } else {
-            sb.append("本小说未设定修炼体系，所有角色的修为字段留空（不输出V标签）。\n");
+        if (worldview == null) {
+            return "本小说未设定修炼体系，所有角色的修为字段留空（不输出V标签）。\n";
         }
-
-        return sb.toString();
+        return powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
     }
 
     /**

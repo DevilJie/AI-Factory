@@ -405,7 +405,6 @@ CREATE TABLE `novel_worldview`  (
   `outline_id` bigint NULL DEFAULT NULL COMMENT '大纲ID',
   `world_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '世界类型',
   `world_background` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '世界背景描述',
-  `power_system` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '力量体系',
   `geography` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '地理环境',
   `forces` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '势力分布',
   `timeline` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '时间线设定',
