@@ -1,6 +1,5 @@
 import request from '@/utils/request'
 
-import type { PowerSystemLevelStep } from './powerSystem'
 // 力量体系类型
 export interface PowerSystemLevelStep {
   id?: number
