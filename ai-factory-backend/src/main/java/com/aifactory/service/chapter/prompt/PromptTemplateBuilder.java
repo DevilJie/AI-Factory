@@ -58,6 +58,9 @@ public class PromptTemplateBuilder {
     @Autowired
     private PowerSystemService powerSystemService;
 
+    @Autowired
+    private ContinentRegionService continentRegionService;
+
     /**
      * 构建章节生成提示词
      *
@@ -359,6 +362,9 @@ public class PromptTemplateBuilder {
         if (worldview == null) {
             return "暂无世界观设定";
         }
+
+        // 填充 geography 字段（从 novel_continent_region 表构建）
+        continentRegionService.fillGeography(worldview);
 
         StringBuilder sb = new StringBuilder();
         sb.append("- 世界类型：").append(worldview.getWorldType()).append("\n");

@@ -11,6 +11,7 @@ import com.aifactory.enums.AIRole;
 import com.aifactory.mapper.NovelChapterPlanMapper;
 import com.aifactory.mapper.NovelVolumePlanMapper;
 import com.aifactory.mapper.NovelWorldviewMapper;
+import com.aifactory.service.ContinentRegionService;
 import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptTemplateService;
@@ -63,6 +64,9 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
 
     @Autowired
     private PowerSystemService powerSystemService;
+
+    @Autowired
+    private ContinentRegionService continentRegionService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -177,6 +181,7 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
                     .eq(NovelWorldview::getProjectId, projectId)
             );
             if (worldview != null) {
+                continentRegionService.fillGeography(worldview);
                 context.putSharedData("worldview", worldview);
                 log.info("已加载世界观信息到context");
             } else {

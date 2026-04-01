@@ -10,6 +10,7 @@ import com.aifactory.mapper.ChapterMapper;
 import com.aifactory.mapper.ChapterPlotMemoryMapper;
 import com.aifactory.mapper.NovelWorldviewMapper;
 import com.aifactory.mapper.ProjectMapper;
+import com.aifactory.service.ContinentRegionService;
 import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptTemplateService;
@@ -65,6 +66,9 @@ public class ChapterFixTaskStrategy implements TaskStrategy {
 
     @Autowired
     private PowerSystemService powerSystemService;
+
+    @Autowired
+    private ContinentRegionService continentRegionService;
 
     @Override
     public String getTaskType() {
@@ -396,6 +400,9 @@ public class ChapterFixTaskStrategy implements TaskStrategy {
         if (worldview == null) {
             return null;
         }
+
+        // 填充地理信息（从大洲区域表聚合）
+        continentRegionService.fillGeography(worldview);
 
         StringBuilder sb = new StringBuilder();
         if (worldview.getWorldType() != null && !worldview.getWorldType().isEmpty()) {

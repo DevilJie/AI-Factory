@@ -28,6 +28,9 @@ public class ChapterPromptBuilder {
     @Autowired
     private com.aifactory.service.PowerSystemService powerSystemService;
 
+    @Autowired
+    private com.aifactory.service.ContinentRegionService continentRegionService;
+
     /**
      * 构建单章节生成提示词
      *
@@ -68,6 +71,7 @@ public class ChapterPromptBuilder {
 
         // 6. 世界观
         if (worldview != null) {
+            continentRegionService.fillGeography(worldview);
             prompt.append(buildWorldviewInfo(worldview));
         }
 

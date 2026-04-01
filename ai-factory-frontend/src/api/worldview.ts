@@ -7,7 +7,6 @@ export interface Worldview {
   outlineId?: number
   worldType?: string
   worldBackground?: string
-  geography?: string
   forces?: string
   timeline?: string
   rules?: string

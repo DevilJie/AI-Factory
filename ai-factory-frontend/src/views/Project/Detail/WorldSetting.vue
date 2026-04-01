@@ -13,6 +13,7 @@ import { getWorldview, saveWorldview, generateWorldviewAsync, type Worldview } f
 import { getTaskStatus } from '@/api/task'
 import { success, error } from '@/utils/toast'
 import PowerSystemSection from './components/PowerSystemSection.vue'
+import GeographyTree from './components/GeographyTree.vue'
 
 const route = useRoute()
 
@@ -23,13 +24,13 @@ const generating = ref(false)
 const formData = ref<Worldview>({
   worldType: '',
   worldBackground: '',
-  geography: '',
   forces: '',
   timeline: '',
   rules: ''
 })
 
 const powerSystemRef = ref()
+const geographyTreeRef = ref()
 
 // 任务存储键
 const getGenerateTaskKey = (projectId: string) =>
@@ -149,6 +150,7 @@ const handleGenerate = async () => {
     // 刷新数据
     await loadData()
     powerSystemRef.value?.refresh()
+    geographyTreeRef.value?.refresh()
     success('AI生成世界观成功')
   } catch (e: any) {
     error(e.message || 'AI生成失败')
@@ -183,6 +185,7 @@ const restoreGeneratingState = async () => {
       // 生成完成，刷新数据
       await loadData()
       powerSystemRef.value?.refresh()
+      geographyTreeRef.value?.refresh()
       success('AI生成世界观完成')
     } catch (e: any) {
       console.error('恢复生成状态失败:', e)
@@ -319,20 +322,11 @@ onUnmounted(() => {
         <!-- 第二行：力量体系（整行） -->
         <PowerSystemSection ref="powerSystemRef" :project-id="projectId()" :disabled="generating" />
 
-        <!-- 第三行：地理环境 + 势力阵营 -->
-        <div class="grid grid-cols-2 gap-6">
-          <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              地理环境
-            </label>
-            <textarea
-              v-model="formData.geography"
-              rows="4"
-              :disabled="generating"
-              placeholder="描述世界的地理环境、重要地点、区域划分等..."
-              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-            ></textarea>
-          </div>
+        <!-- 第三行：地理环境（整行，树形结构） -->
+        <GeographyTree ref="geographyTreeRef" :project-id="projectId()" :disabled="generating" />
+
+        <!-- 第四行：势力阵营 -->
+        <div class="grid grid-cols-1 gap-6">
           <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
               势力阵营

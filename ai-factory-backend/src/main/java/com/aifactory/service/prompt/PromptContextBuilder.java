@@ -4,6 +4,7 @@ import com.aifactory.constants.BasicSettingsDictionary;
 import com.aifactory.entity.NovelWorldview;
 import com.aifactory.entity.ProjectBasicSettings;
 import com.aifactory.mapper.NovelWorldviewMapper;
+import com.aifactory.service.ContinentRegionService;
 import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.ProjectBasicSettingsService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -37,6 +38,9 @@ public class PromptContextBuilder {
 
     @Autowired
     private PowerSystemService powerSystemService;
+
+    @Autowired
+    private ContinentRegionService continentRegionService;
 
     /**
      * 构建基础设置上下文（叙事结构、写作视角、叙事节奏等）
@@ -200,7 +204,11 @@ public class PromptContextBuilder {
         try {
             LambdaQueryWrapper<NovelWorldview> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.eq(NovelWorldview::getProjectId, projectId);
-            return worldviewMapper.selectOne(queryWrapper);
+            NovelWorldview worldview = worldviewMapper.selectOne(queryWrapper);
+            if (worldview != null) {
+                continentRegionService.fillGeography(worldview);
+            }
+            return worldview;
         } catch (Exception e) {
             log.error("查询世界观设定失败, 项目ID: {}: {}", projectId, e.getMessage(), e);
             return null;

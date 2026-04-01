@@ -6,6 +6,8 @@ import com.aifactory.dto.*;
 import com.aifactory.entity.*;
 import com.aifactory.enums.AIRole;
 import com.aifactory.mapper.*;
+import com.aifactory.entity.NovelContinentRegion;
+import com.aifactory.service.ContinentRegionService;
 import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptTemplateService;
@@ -16,8 +18,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -25,8 +29,6 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 世界观生成任务策略
@@ -77,6 +79,9 @@ public class WorldviewTaskStrategy implements TaskStrategy {
 
     @Autowired
     private XmlParser xmlParser;
+
+    @Autowired
+    private ContinentRegionService continentRegionService;
 
     @Override
     public String getTaskType() {
@@ -183,7 +188,10 @@ public class WorldviewTaskStrategy implements TaskStrategy {
                         .eq(NovelWorldviewPowerSystem::getWorldviewId, existingWorldview.getId())
                 );
 
-                // 4. 删除旧世界观
+                // 4. 删除旧世界观关联的地理区域
+                continentRegionService.deleteByProjectId(projectId);
+
+                // 5. 删除旧世界观
                 worldviewMapper.deleteById(existingWorldview.getId());
             } else {
                 log.info("项目 {} 没有世界观设定，需要生成", projectId);
@@ -321,12 +329,11 @@ public class WorldviewTaskStrategy implements TaskStrategy {
 
             LocalDateTime now = LocalDateTime.now();
 
-            // Step 3: 保存世界观基本信息（不含 powerSystem）
+            // Step 3: 保存世界观基本信息（不含 powerSystem、geography）
             NovelWorldview worldview = new NovelWorldview();
             worldview.setUserId(project.getUserId());
             worldview.setProjectId(projectId);
             worldview.setWorldBackground(worldSetting.getBackground());
-            worldview.setGeography(worldSetting.getGeography());
             worldview.setForces(worldSetting.getForces());
             worldview.setTimeline(worldSetting.getTimeline());
             worldview.setRules(worldSetting.getRules());
@@ -336,7 +343,10 @@ public class WorldviewTaskStrategy implements TaskStrategy {
             worldviewMapper.insert(worldview);
             log.info("世界观基本信息保存成功，ID: {}", worldview.getId());
 
-            // Step 4: 解析并保存结构化力量体系
+            // Step 4: 手动 DOM 解析 <g> 地理区域并保存（Jackson XML 无法处理嵌套同名 <r> 标签）
+            saveGeographyRegionsFromXml(projectId, aiResponse);
+
+            // Step 5: 解析并保存结构化力量体系
             savePowerSystems(projectId, worldview.getId(), worldSetting.getSystems(), now);
 
             return worldview;
@@ -346,6 +356,108 @@ public class WorldviewTaskStrategy implements TaskStrategy {
             log.error("AI响应: {}", aiResponse);
             return null;
         }
+    }
+
+    // ======================== saveGeographyRegions ========================
+
+    /**
+     * 从 AI 响应 XML 中手动 DOM 解析 <g> 地理区域并保存
+     * <p>
+     * 使用 DOM 而非 Jackson XML 是因为嵌套同名 <r> 标签 Jackson 无法正确处理
+     */
+    private void saveGeographyRegionsFromXml(Long projectId, String aiResponse) {
+        try {
+            // 提取 <g>...</g> 片段
+            int start = aiResponse.indexOf("<g>");
+            int end = aiResponse.indexOf("</g>");
+            if (start < 0 || end < 0) {
+                log.info("未找到 <g> 地理区域标签，跳过入库");
+                return;
+            }
+            String geographyXml = "<root>" + aiResponse.substring(start, end + 4) + "</root>";
+
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(false);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(new org.xml.sax.InputSource(new StringReader(geographyXml)));
+
+            Element root = doc.getDocumentElement();
+            NodeList gNodes = root.getElementsByTagName("g");
+            if (gNodes.getLength() == 0) {
+                log.info("<g> 标签内无内容，跳过入库");
+                return;
+            }
+
+            Element gElement = (Element) gNodes.item(0);
+            List<NovelContinentRegion> rootNodes = parseRegionNodes(gElement, projectId);
+
+            if (rootNodes.isEmpty()) {
+                log.info("地理区域解析结果为空，跳过入库");
+                return;
+            }
+
+            continentRegionService.saveTree(projectId, rootNodes);
+            log.info("地理区域入库完成，projectId={}，根节点数={}", projectId, rootNodes.size());
+
+        } catch (Exception e) {
+            log.error("保存地理区域失败，projectId={}", projectId, e);
+        }
+    }
+
+    /**
+     * 递归解析 <r> 节点为 NovelContinentRegion 列表
+     * <p>
+     * XML格式：<r><n>区域名称</n><d><![CDATA[描述]]></d><r>子区域</r></r>
+     */
+    private List<NovelContinentRegion> parseRegionNodes(Element parent, Long projectId) {
+        List<NovelContinentRegion> result = new ArrayList<>();
+        NodeList children = parent.getChildNodes();
+
+        for (int i = 0; i < children.getLength(); i++) {
+            Node node = children.item(i);
+            if (node.getNodeType() == Node.ELEMENT_NODE && "r".equals(node.getNodeName())) {
+                result.add(parseSingleRegion((Element) node, projectId));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 解析单个 <r> 区域节点：读取 <n>（名称）和 <d>（描述），递归解析直接子 <r>
+     */
+    private NovelContinentRegion parseSingleRegion(Element rElement, Long projectId) {
+        NovelContinentRegion region = new NovelContinentRegion();
+        region.setProjectId(projectId);
+
+        // 从 <n> 子标签读取名称（兼容旧格式 name 属性）
+        NodeList nNodes = rElement.getElementsByTagName("n");
+        if (nNodes.getLength() > 0) {
+            region.setName(nNodes.item(0).getTextContent().trim());
+        } else {
+            region.setName(rElement.getAttribute("name"));
+        }
+
+        // 从 <d> 子标签读取描述
+        NodeList dNodes = rElement.getElementsByTagName("d");
+        if (dNodes.getLength() > 0) {
+            region.setDescription(dNodes.item(0).getTextContent().trim());
+        }
+
+        // 递归解析直接子 <r> 节点（避免误取孙子节点）
+        List<NovelContinentRegion> childRegions = new ArrayList<>();
+        NodeList children = rElement.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            Node child = children.item(i);
+            if (child.getNodeType() == Node.ELEMENT_NODE && "r".equals(child.getNodeName())) {
+                childRegions.add(parseSingleRegion((Element) child, projectId));
+            }
+        }
+        if (!childRegions.isEmpty()) {
+            region.setChildren(childRegions);
+        }
+
+        return region;
     }
 
     // ======================== savePowerSystems ========================

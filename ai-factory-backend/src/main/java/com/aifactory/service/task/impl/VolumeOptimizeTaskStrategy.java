@@ -5,6 +5,7 @@ import com.aifactory.dto.AIGenerateResponse;
 import com.aifactory.entity.*;
 import com.aifactory.enums.AIRole;
 import com.aifactory.mapper.*;
+import com.aifactory.service.ContinentRegionService;
 import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptTemplateService;
@@ -53,6 +54,9 @@ public class VolumeOptimizeTaskStrategy implements TaskStrategy {
 
     @Autowired
     private PowerSystemService powerSystemService;
+
+    @Autowired
+    private ContinentRegionService continentRegionService;
 
     @Override
     public String getTaskType() {
@@ -342,6 +346,9 @@ public class VolumeOptimizeTaskStrategy implements TaskStrategy {
         if (worldview == null) {
             return "";
         }
+
+        // 填充地理环境信息
+        continentRegionService.fillGeography(worldview);
 
         StringBuilder info = new StringBuilder();
         info.append("【世界观设定】\n");
