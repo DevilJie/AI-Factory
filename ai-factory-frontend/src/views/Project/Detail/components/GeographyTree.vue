@@ -32,9 +32,6 @@ const loadData = async () => {
   loading.value = true
   try {
     treeData.value = await getGeographyTreeApi(props.projectId)
-    treeData.value.forEach(node => {
-      if (node.id) expandedNodes.value.add(node.id)
-    })
   } catch (e: any) {
     if (e.response?.status !== 404) console.error('加载地理区域失败:', e)
   } finally {
