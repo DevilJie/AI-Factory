@@ -20,7 +20,10 @@ public class NovelWorldview {
     private Long outlineId;
     private String worldType;
     private String worldBackground;
-    /** 势力分布 */
+    /**
+     * 势力分布（非数据库字段，由 FactionService 从 novel_faction 表构建）
+     */
+    @TableField(exist = false)
     private String forces;
     /** 时间线设定 */
     private String timeline;
