@@ -50,7 +50,7 @@
 
 ### 前端
 
-- [ ] **UI-01**: FactionTree.vue 递归树组件，支持展开/折叠/增删改/描述编辑，类型标签（正派/反派/中立颜色区分），力量体系标签
+- [x] **UI-01**: FactionTree.vue 递归树组件，支持展开/折叠/增删改/描述编辑，类型标签（正派/反派/中立颜色区分），力量体系标签
 - [ ] **UI-02**: faction.ts API 客户端（CRUD 接口）
 - [x] **UI-03**: WorldSetting.vue 中替换势力 textarea 为 FactionTree 组件
 - [ ] **UI-04**: 势力-势力关系管理界面（选择两个势力、关系类型、描述）
@@ -110,7 +110,7 @@
 | PROMPT-04 | Phase 3 | Complete |
 | PROMPT-05 | Phase 3 | Complete |
 | PROMPT-06 | Phase 3 | Complete |
-| UI-01 | Phase 4 | Pending |
+| UI-01 | Phase 4 | Complete |
 | UI-02 | Phase 4 | Pending |
 | UI-03 | Phase 4 | Complete |
 | UI-04 | Phase 5 | Pending |
