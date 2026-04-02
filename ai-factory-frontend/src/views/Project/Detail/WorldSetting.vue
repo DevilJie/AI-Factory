@@ -14,6 +14,7 @@ import { getTaskStatus } from '@/api/task'
 import { success, error } from '@/utils/toast'
 import PowerSystemSection from './components/PowerSystemSection.vue'
 import GeographyTree from './components/GeographyTree.vue'
+import FactionTree from './components/FactionTree.vue'
 
 const route = useRoute()
 
@@ -31,6 +32,7 @@ const formData = ref<Worldview>({
 
 const powerSystemRef = ref()
 const geographyTreeRef = ref()
+const factionTreeRef = ref()
 
 // 任务存储键
 const getGenerateTaskKey = (projectId: string) =>
@@ -151,6 +153,7 @@ const handleGenerate = async () => {
     await loadData()
     powerSystemRef.value?.refresh()
     geographyTreeRef.value?.refresh()
+    factionTreeRef.value?.refresh()
     success('AI生成世界观成功')
   } catch (e: any) {
     error(e.message || 'AI生成失败')
@@ -186,6 +189,7 @@ const restoreGeneratingState = async () => {
       await loadData()
       powerSystemRef.value?.refresh()
       geographyTreeRef.value?.refresh()
+      factionTreeRef.value?.refresh()
       success('AI生成世界观完成')
     } catch (e: any) {
       console.error('恢复生成状态失败:', e)
@@ -325,21 +329,8 @@ onUnmounted(() => {
         <!-- 第三行：地理环境（整行，树形结构） -->
         <GeographyTree ref="geographyTreeRef" :project-id="projectId()" :disabled="generating" />
 
-        <!-- 第四行：势力阵营 -->
-        <div class="grid grid-cols-1 gap-6">
-          <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              势力阵营
-            </label>
-            <textarea
-              v-model="formData.forces"
-              rows="4"
-              :disabled="generating"
-              placeholder="描述世界中的主要势力、组织、阵营及其相互关系..."
-              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-            ></textarea>
-          </div>
-        </div>
+        <!-- 第四行：势力阵营（树形组件） -->
+        <FactionTree ref="factionTreeRef" :project-id="projectId()" :disabled="generating" />
 
         <!-- 第四行：时间线 + 世界规则 -->
         <div class="grid grid-cols-2 gap-6">
