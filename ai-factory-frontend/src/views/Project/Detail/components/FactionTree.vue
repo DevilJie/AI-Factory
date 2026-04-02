@@ -77,7 +77,9 @@ const loadData = async () => {
   }
 }
 
-const refresh = () => loadData()
+const refresh = () => {
+  if (isRoot.value) { loadData() } else { emit('refresh') }
+}
 
 const toggleExpand = (id: number) => {
   expandedNodes.value.has(id) ? expandedNodes.value.delete(id) : expandedNodes.value.add(id)
