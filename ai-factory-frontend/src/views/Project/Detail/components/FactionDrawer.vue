@@ -3,6 +3,8 @@ import { ref, watch } from 'vue'
 import { X, Swords, Users, MapPin } from 'lucide-vue-next'
 import type { Faction } from '@/api/faction'
 import FactionRelationTab from './FactionRelationTab.vue'
+import FactionCharacterTab from './FactionCharacterTab.vue'
+import FactionRegionTab from './FactionRegionTab.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -116,8 +118,16 @@ watch(() => props.modelValue, (open) => {
             :faction-id="faction.id"
             :project-id="projectId"
           />
-          <div v-else-if="activeTab === 'character'" class="text-center py-8 text-gray-400">开发中</div>
-          <div v-else-if="activeTab === 'region'" class="text-center py-8 text-gray-400">开发中</div>
+          <FactionCharacterTab
+            v-if="activeTab === 'character' && faction?.id"
+            :faction-id="faction.id"
+            :project-id="projectId"
+          />
+          <FactionRegionTab
+            v-if="activeTab === 'region' && faction?.id"
+            :faction-id="faction.id"
+            :project-id="projectId"
+          />
         </div>
       </div>
     </Transition>
