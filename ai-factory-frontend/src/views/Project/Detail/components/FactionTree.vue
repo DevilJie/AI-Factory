@@ -2,8 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import {
   Plus, Loader2, ChevronRight, ChevronDown,
-  Trash2, Edit3, Shield
+  Trash2, Edit3, Shield, Link2
 } from 'lucide-vue-next'
+import FactionDrawer from './FactionDrawer.vue'
 import {
   getFactionTree,
   addFaction,
@@ -32,6 +33,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   refresh: []
   delete: [node: Faction]
+  openDrawer: [node: Faction]
 }>()
 
 // Root component state (only meaningful when nodes prop is undefined)
@@ -171,6 +173,19 @@ const countNodes = (nodes: Faction[]): number => {
 
 const isAdding = (parentId: number | null) => addingParentId.value === parentId
 
+// Drawer state (root only)
+const drawerOpen = ref(false)
+const drawerFaction = ref<Faction | null>(null)
+
+const openDrawer = (node: Faction) => {
+  if (isRoot.value) {
+    drawerFaction.value = node
+    drawerOpen.value = true
+  } else {
+    emit('openDrawer', node)
+  }
+}
+
 const paddingLeft = (deep: number) => `${20 + deep * 20}px`
 
 onMounted(() => { if (isRoot.value) loadData() })
@@ -290,6 +305,7 @@ defineExpose({ refresh })
             </div>
             <!-- Action buttons -->
             <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+              <button @click="openDrawer(node)" :disabled="disabled" class="p-1 text-gray-400 hover:text-blue-500 disabled:opacity-50" title="关联管理"><Link2 class="w-3.5 h-3.5" /></button>
               <button @click="showAddForm(node.id!)" :disabled="disabled" class="p-1 text-gray-400 hover:text-blue-500 disabled:opacity-50"><Plus class="w-3.5 h-3.5" /></button>
               <button @click="startEdit(node)" :disabled="disabled" class="p-1 text-gray-400 hover:text-amber-500 disabled:opacity-50"><Edit3 class="w-3.5 h-3.5" /></button>
               <button @click="handleDelete(node)" :disabled="disabled" class="p-1 text-gray-400 hover:text-red-500 disabled:opacity-50"><Trash2 class="w-3.5 h-3.5" /></button>
@@ -315,9 +331,18 @@ defineExpose({ refresh })
             :disabled="disabled"
             @refresh="refresh"
             @delete="(n: Faction) => handleDelete(n)"
+            @openDrawer="(n: Faction) => openDrawer(n)"
           />
         </div>
       </template>
     </div>
+
+    <!-- FactionDrawer (root instance only) -->
+    <FactionDrawer
+      v-if="isRoot"
+      v-model="drawerOpen"
+      :faction="drawerFaction"
+      :project-id="projectId"
+    />
   </div>
 </template>
