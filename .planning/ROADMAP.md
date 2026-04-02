@@ -97,8 +97,8 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [x] 05-01-PLAN.md -- Association management API layer + Drawer with tabs + bidirectional relation CRUD
-- [x] 05-02-PLAN.md -- Character tab (search + role datalist + CRUD) and Region tab (tree selector + batch add + CRUD)
+- [ ] 05-01-PLAN.md -- API extension + FactionDrawer + FactionRelationTab (bidirectional relations)
+- [ ] 05-02-PLAN.md -- FactionCharacterTab + FactionRegionTab + Drawer wiring (character search, tree region selector)
 
 ## 进度
 
@@ -111,5 +111,5 @@ Plans:
 | 1. 数据基础 | 2/2 | Planning complete | - |
 | 2. 后端服务与 API | 1/2 | In progress | - |
 | 3. AI 集成与提示词迁移 | 3/3 | Complete   | 2026-04-02 |
-| 4. 前端树组件 | 1/2 | In progress | - |
-| 5. 关联管理界面 | 2/2 | Complete | 2026-04-03 |
+| 4. 前端树组件 | 3/3 | Complete   | 2026-04-02 |
+| 5. 关联管理界面 | 0/2 | Planning complete | - |
