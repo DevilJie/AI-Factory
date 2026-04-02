@@ -30,8 +30,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  add: []
-  edit: []
+  refresh: []
   delete: [node: Faction]
 }>()
 
@@ -85,7 +84,6 @@ const toggleExpand = (id: number) => {
 }
 
 const showAddForm = (parentId: number | null) => {
-  if (!isRoot.value) { emit('add'); return }
   addingParentId.value = parentId
   newNodeName.value = ''
   newNodeDesc.value = ''
@@ -94,7 +92,6 @@ const showAddForm = (parentId: number | null) => {
 const hideAddForm = () => { addingParentId.value = undefined }
 
 const handleAdd = async () => {
-  if (!isRoot.value) { emit('add'); return }
   if (!newNodeName.value.trim()) { error('请输入势力名称'); return }
   try {
     await addFaction(props.projectId, {
@@ -104,12 +101,15 @@ const handleAdd = async () => {
     })
     success('添加成功')
     hideAddForm()
-    await loadData()
+    if (isRoot.value) {
+      await loadData()
+    } else {
+      emit('refresh')
+    }
   } catch (e: any) { error('添加失败') }
 }
 
 const startEdit = (node: Faction) => {
-  if (!isRoot.value) { emit('edit'); return }
   editingNode.value = node
   editingName.value = node.name
   editingDesc.value = node.description || ''
@@ -128,7 +128,6 @@ const cancelEdit = () => {
 }
 
 const handleEdit = async () => {
-  if (!isRoot.value) { emit('edit'); return }
   if (!editingNode.value?.id || !editingName.value.trim()) return
   try {
     const isTopLevel = (editingNode.value.deep ?? 0) === 0
@@ -142,7 +141,11 @@ const handleEdit = async () => {
     })
     success('更新成功')
     cancelEdit()
-    await loadData()
+    if (isRoot.value) {
+      await loadData()
+    } else {
+      emit('refresh')
+    }
   } catch (e: any) { error('更新失败') }
 }
 
@@ -293,7 +296,7 @@ defineExpose({ refresh })
         </div>
 
         <!-- Add child form for this node -->
-        <div v-if="isRoot && isAdding(node.id ?? -1)" class="p-2 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg" :style="{ marginLeft: paddingLeft((node.deep ?? 0) + 1) }">
+        <div v-if="isAdding(node.id ?? -1)" class="p-2 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg" :style="{ marginLeft: paddingLeft((node.deep ?? 0) + 1) }">
           <div class="flex items-center gap-2">
             <input v-model="newNodeName" class="flex-1 px-2 py-1 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="输入势力名称" @keyup.enter="handleAdd" @keyup.escape="hideAddForm" />
             <button @click="handleAdd" class="px-2 py-1 text-xs text-white bg-blue-500 rounded hover:bg-blue-600">添加</button>
@@ -308,8 +311,7 @@ defineExpose({ refresh })
             :nodes="node.children"
             :project-id="projectId"
             :disabled="disabled"
-            @add="handleAdd"
-            @edit="handleEdit"
+            @refresh="refresh"
             @delete="(n: Faction) => handleDelete(n)"
           />
         </div>
