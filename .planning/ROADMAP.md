@@ -78,12 +78,12 @@ Plans:
   2. 用户可在树中新增势力节点、编辑名称/描述/类型、删除节点，所有操作实时持久化到后端
   3. 势力类型（正派/反派/中立）通过颜色标签直观区分，关联的力量体系显示为标签
   4. WorldSetting.vue 中原有势力 textarea 已替换为 FactionTree 组件，页面功能完整
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 04-01: 待规划
-- [ ] 04-02: 待规划
+- [x] 04-01-PLAN.md -- Faction API client + recursive FactionTree component (type badges, power system labels, CRUD)
+- [x] 04-02-PLAN.md -- WorldSetting.vue integration (replace forces textarea, add refresh calls)
 
 ### Phase 5: 关联管理界面
 **Goal**: 用户可手动管理势力间关系、势力-人物关联、势力-地区关联，完成势力数据的完整管理闭环
@@ -93,7 +93,7 @@ Plans:
   1. 用户可选择两个势力并设置关系类型（盟友/敌对/中立）和描述，关系列表可查看和删除
   2. 用户可将已有角色关联到势力并设置职位（如掌门、长老、弟子），关联列表可管理
   3. 用户可将已有地区关联到势力，关联列表可查看和移除
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
 
 Plans:
@@ -111,5 +111,5 @@ Plans:
 | 1. 数据基础 | 2/2 | Planning complete | - |
 | 2. 后端服务与 API | 1/2 | In progress | - |
 | 3. AI 集成与提示词迁移 | 3/3 | Complete   | 2026-04-02 |
-| 4. 前端树组件 | 0/2 | Not started | - |
+| 4. 前端树组件 | 1/2 | In progress | - |
 | 5. 关联管理界面 | 0/2 | Not started | - |
