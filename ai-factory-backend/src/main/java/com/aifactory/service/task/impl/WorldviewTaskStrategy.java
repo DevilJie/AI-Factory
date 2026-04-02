@@ -8,6 +8,7 @@ import com.aifactory.enums.AIRole;
 import com.aifactory.mapper.*;
 import com.aifactory.entity.NovelContinentRegion;
 import com.aifactory.service.ContinentRegionService;
+import com.aifactory.service.FactionService;
 import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptTemplateService;
@@ -29,6 +30,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 世界观生成任务策略
@@ -82,6 +84,15 @@ public class WorldviewTaskStrategy implements TaskStrategy {
 
     @Autowired
     private ContinentRegionService continentRegionService;
+
+    @Autowired
+    private FactionService factionService;
+
+    @Autowired
+    private NovelFactionRegionMapper factionRegionMapper;
+
+    @Autowired
+    private NovelFactionRelationMapper factionRelationMapper;
 
     @Override
     public String getTaskType() {
@@ -190,6 +201,9 @@ public class WorldviewTaskStrategy implements TaskStrategy {
 
                 // 4. 删除旧世界观关联的地理区域
                 continentRegionService.deleteByProjectId(projectId);
+
+                // 4.5. 删除旧势力数据
+                factionService.deleteByProjectId(projectId);
 
                 // 5. 删除旧世界观
                 worldviewMapper.deleteById(existingWorldview.getId());
@@ -348,6 +362,9 @@ public class WorldviewTaskStrategy implements TaskStrategy {
 
             // Step 5: 解析并保存结构化力量体系
             savePowerSystems(projectId, worldview.getId(), worldSetting.getSystems(), now);
+
+            // Step 6: DOM 解析 <f> 势力阵营并保存（在地理和力量体系之后，因为势力引用它们的名称）
+            saveFactionsFromXml(projectId, aiResponse);
 
             return worldview;
 
@@ -537,6 +554,350 @@ public class WorldviewTaskStrategy implements TaskStrategy {
 
         log.info("力量体系入库完成，共 {} 套体系", systems.getSystemList().size());
     }
+
+    // ======================== saveFactions ========================
+
+    /**
+     * 从 AI 响应 XML 中手动 DOM 解析 <f> 势力阵营并保存
+     * <p>
+     * 使用 DOM 而非 Jackson XML 是因为嵌套同名 <faction> 标签 Jackson 无法正确处理。
+     * 两遍插入策略：第一遍存所有势力构建名称→ID映射，第二遍建立势力-地区和势力-势力关联。
+     */
+    private void saveFactionsFromXml(Long projectId, String aiResponse) {
+        try {
+            // 提取 <f>...</f> 片段
+            int start = aiResponse.indexOf("<f>");
+            int end = aiResponse.indexOf("</f>");
+            if (start < 0 || end < 0) {
+                log.info("未找到 <f> 势力标签，跳过入库");
+                return;
+            }
+            String factionXml = "<root>" + aiResponse.substring(start, end + 4) + "</root>";
+
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(false);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(new org.xml.sax.InputSource(new StringReader(factionXml)));
+
+            Element root = doc.getDocumentElement();
+
+            // Per D-08: Use getChildNodes() to find the <f> element, NOT getElementsByTagName
+            // <f> is the only element child of our synthetic <root> wrapper
+            Element fElement = null;
+            NodeList rootChildren = root.getChildNodes();
+            for (int i = 0; i < rootChildren.getLength(); i++) {
+                Node node = rootChildren.item(i);
+                if (node.getNodeType() == Node.ELEMENT_NODE && "f".equals(node.getNodeName())) {
+                    fElement = (Element) node;
+                    break;
+                }
+            }
+            if (fElement == null) {
+                log.info("<f> 标签内无内容，跳过入库");
+                return;
+            }
+
+            // Two-pass data structures
+            Map<String, Long> nameToIdMap = new LinkedHashMap<>();
+            List<PendingFactionAssociations> pendingAssociations = new ArrayList<>();
+
+            // Parse all faction nodes recursively (Pass 1 data collection)
+            List<NovelFaction> rootFactions = parseFactionNodes(fElement, projectId, nameToIdMap, pendingAssociations);
+
+            if (rootFactions.isEmpty()) {
+                log.info("势力解析结果为空，跳过入库");
+                return;
+            }
+
+            // Pass 1: Insert all factions via saveTree (builds name->ID map)
+            factionService.saveTree(projectId, rootFactions);
+
+            // After saveTree, populate nameToIdMap from the inserted factions
+            buildNameToIdMap(rootFactions, nameToIdMap);
+
+            // Pass 2: Create associations using nameToIdMap
+            for (PendingFactionAssociations pending : pendingAssociations) {
+                Long factionId = nameToIdMap.get(pending.factionName());
+                if (factionId == null) {
+                    log.warn("未找到势力ID，跳过关联，factionName={}", pending.factionName());
+                    continue;
+                }
+
+                // Region associations
+                for (String regionName : pending.regionNames()) {
+                    Long regionId = findRegionIdByName(projectId, regionName);
+                    if (regionId != null) {
+                        NovelFactionRegion assoc = new NovelFactionRegion();
+                        assoc.setFactionId(factionId);
+                        assoc.setRegionId(regionId);
+                        factionRegionMapper.insert(assoc);
+                    } else {
+                        log.warn("三级匹配均失败，未找到地区: {}，跳过关联", regionName);
+                    }
+                }
+
+                // Faction-faction relations
+                for (PendingRelation rel : pending.relations()) {
+                    Long targetId = nameToIdMap.get(rel.targetName());
+                    if (targetId != null) {
+                        NovelFactionRelation relation = new NovelFactionRelation();
+                        relation.setFactionId(factionId);
+                        relation.setTargetFactionId(targetId);
+                        relation.setRelationType(mapRelationType(rel.type()));
+                        factionRelationMapper.insert(relation);
+                    } else {
+                        log.warn("未匹配到势力名称: {}，跳过关系", rel.targetName());
+                    }
+                }
+            }
+
+            log.info("势力入库完成，projectId={}，根节点数={}", projectId, rootFactions.size());
+
+        } catch (Exception e) {
+            log.error("保存势力失败，projectId={}", projectId, e);
+        }
+    }
+
+    /**
+     * 解析 <f> 下的直接子 <faction> 节点
+     */
+    private List<NovelFaction> parseFactionNodes(Element parent, Long projectId,
+                                                  Map<String, Long> nameToIdMap,
+                                                  List<PendingFactionAssociations> pendingAssociations) {
+        List<NovelFaction> result = new ArrayList<>();
+        NodeList children = parent.getChildNodes();
+
+        for (int i = 0; i < children.getLength(); i++) {
+            Node node = children.item(i);
+            if (node.getNodeType() == Node.ELEMENT_NODE && "faction".equals(node.getNodeName())) {
+                try {
+                    result.add(parseFactionNode((Element) node, projectId, nameToIdMap, pendingAssociations));
+                } catch (Exception e) {
+                    log.warn("解析势力节点失败，跳过: {}", e.getMessage());
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 递归解析单个 <faction> 节点
+     * <p>
+     * 使用 getChildNodes() 直接子元素迭代（per D-08），不用 getElementsByTagName
+     */
+    private NovelFaction parseFactionNode(Element factionElement, Long projectId,
+                                           Map<String, Long> nameToIdMap,
+                                           List<PendingFactionAssociations> pendingAssociations) {
+        NovelFaction faction = new NovelFaction();
+        faction.setProjectId(projectId);
+
+        NodeList children = factionElement.getChildNodes();
+        List<String> regionNames = new ArrayList<>();
+        List<PendingRelation> relations = new ArrayList<>();
+
+        for (int i = 0; i < children.getLength(); i++) {
+            Node child = children.item(i);
+            if (child.getNodeType() != Node.ELEMENT_NODE) continue;
+            String tag = child.getNodeName();
+
+            switch (tag) {
+                case "n" -> faction.setName(child.getTextContent().trim());
+                case "d" -> faction.setDescription(child.getTextContent().trim());
+                case "type" -> faction.setType(mapFactionType(child.getTextContent().trim()));
+                case "power" -> {
+                    String powerName = child.getTextContent().trim();
+                    Long powerId = findPowerSystemIdByName(projectId, powerName);
+                    if (powerId != null) {
+                        faction.setCorePowerSystem(powerId);
+                    } else {
+                        log.warn("未匹配到力量体系: {}", powerName);
+                    }
+                }
+                case "regions" -> {
+                    String regionsText = child.getTextContent().trim();
+                    regionNames = Arrays.stream(regionsText.split("[,，]"))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(Collectors.toList());
+                }
+                case "relation" -> {
+                    PendingRelation rel = parseRelationElement((Element) child);
+                    if (rel != null) relations.add(rel);
+                }
+            }
+        }
+
+        // Parse nested child factions using getChildNodes() (NOT getElementsByTagName)
+        List<NovelFaction> childFactions = new ArrayList<>();
+        for (int i = 0; i < children.getLength(); i++) {
+            Node child = children.item(i);
+            if (child.getNodeType() == Node.ELEMENT_NODE && "faction".equals(child.getNodeName())) {
+                try {
+                    childFactions.add(parseFactionNode((Element) child, projectId, nameToIdMap, pendingAssociations));
+                } catch (Exception e) {
+                    log.warn("解析子势力节点失败，跳过: {}", e.getMessage());
+                }
+            }
+        }
+        if (!childFactions.isEmpty()) {
+            faction.setChildren(childFactions);
+        }
+
+        // Register pending associations for Pass 2
+        String factionName = faction.getName();
+        if (factionName != null && (!regionNames.isEmpty() || !relations.isEmpty())) {
+            pendingAssociations.add(new PendingFactionAssociations(factionName, regionNames, relations));
+        }
+
+        return faction;
+    }
+
+    /**
+     * 解析 <relation> 元素
+     */
+    private PendingRelation parseRelationElement(Element relationElement) {
+        String target = null;
+        String type = null;
+        NodeList children = relationElement.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            Node child = children.item(i);
+            if (child.getNodeType() != Node.ELEMENT_NODE) continue;
+            String tag = child.getNodeName();
+            if ("target".equals(tag)) {
+                target = child.getTextContent().trim();
+            } else if ("type".equals(tag)) {
+                type = child.getTextContent().trim();
+            }
+        }
+        if (target != null && type != null) {
+            return new PendingRelation(target, type);
+        }
+        return null;
+    }
+
+    /**
+     * Chinese faction type label -> English DB value
+     * 正派->ally, 反派->hostile, 中立->neutral
+     */
+    private String mapFactionType(String chineseType) {
+        if (chineseType == null) return null;
+        return switch (chineseType) {
+            case "正派" -> "ally";
+            case "反派" -> "hostile";
+            case "中立" -> "neutral";
+            default -> chineseType; // fallback: store as-is
+        };
+    }
+
+    /**
+     * Chinese relation type label -> English DB value
+     * 盟友->ally, 敌对->hostile, 中立->neutral
+     */
+    private String mapRelationType(String chineseType) {
+        if (chineseType == null) return null;
+        return switch (chineseType) {
+            case "盟友" -> "ally";
+            case "敌对" -> "hostile";
+            case "中立" -> "neutral";
+            default -> chineseType;
+        };
+    }
+
+    /**
+     * Build name->ID map from saved faction tree (recursive)
+     */
+    private void buildNameToIdMap(List<NovelFaction> factions, Map<String, Long> nameToIdMap) {
+        if (factions == null) return;
+        for (NovelFaction f : factions) {
+            if (f.getName() != null && f.getId() != null) {
+                nameToIdMap.put(f.getName(), f.getId());
+            }
+            if (f.getChildren() != null) {
+                buildNameToIdMap(f.getChildren(), nameToIdMap);
+            }
+        }
+    }
+
+    /**
+     * Three-tier name matching for regions (per D-06):
+     * Uses continentRegionService.listByProjectId() to query regions (service-oriented pattern).
+     * Tier 1: Exact match
+     * Tier 2: Strip suffix (宗/派/门/殿/阁/会/帮/谷/山/城/族/教/院/宫/楼/庄/寨/盟) then compare
+     * Tier 3: Contains match (either direction)
+     */
+    private Long findRegionIdByName(Long projectId, String name) {
+        if (name == null || name.isEmpty()) return null;
+
+        List<NovelContinentRegion> regions = continentRegionService.listByProjectId(projectId);
+
+        // Tier 1: Exact match
+        for (NovelContinentRegion r : regions) {
+            if (name.equals(r.getName())) return r.getId();
+        }
+
+        // Tier 2: Strip common suffixes and compare
+        String stripped = name.replaceAll("[宗派门殿阁会帮谷山城族教院宫楼庄寨盟]$", "");
+        for (NovelContinentRegion r : regions) {
+            String rStripped = r.getName().replaceAll("[宗派门殿阁会帮谷山城族教院宫楼庄寨盟]$", "");
+            if (!stripped.isEmpty() && stripped.equals(rStripped)) return r.getId();
+        }
+
+        // Tier 3: Contains match
+        for (NovelContinentRegion r : regions) {
+            if (r.getName().contains(name) || name.contains(r.getName())) return r.getId();
+        }
+
+        log.warn("三级匹配均失败，未找到地区: {}", name);
+        return null;
+    }
+
+    /**
+     * Three-tier name matching for power systems (same strategy as regions).
+     * Uses powerSystemService.listByProjectId() for service-oriented consistency.
+     */
+    private Long findPowerSystemIdByName(Long projectId, String name) {
+        if (name == null || name.isEmpty()) return null;
+
+        List<NovelPowerSystem> systems = powerSystemService.listByProjectId(projectId);
+
+        // Tier 1: Exact match
+        for (NovelPowerSystem ps : systems) {
+            if (name.equals(ps.getName())) return ps.getId();
+        }
+
+        // Tier 2: Strip suffixes and compare
+        String stripped = name.replaceAll("[宗派门殿阁会帮谷山城族教院宫楼庄寨盟]$", "");
+        for (NovelPowerSystem ps : systems) {
+            String psStripped = ps.getName().replaceAll("[宗派门殿阁会帮谷山城族教院宫楼庄寨盟]$", "");
+            if (!stripped.isEmpty() && stripped.equals(psStripped)) return ps.getId();
+        }
+
+        // Tier 3: Contains match
+        for (NovelPowerSystem ps : systems) {
+            if (ps.getName().contains(name) || name.contains(ps.getName())) return ps.getId();
+        }
+
+        log.warn("三级匹配均失败，未找到力量体系: {}", name);
+        return null;
+    }
+
+    /**
+     * Pending region and relation associations for Pass 2
+     */
+    private record PendingFactionAssociations(
+        String factionName,
+        List<String> regionNames,
+        List<PendingRelation> relations
+    ) {}
+
+    /**
+     * Pending inter-faction relation
+     */
+    private record PendingRelation(
+        String targetName,
+        String type
+    ) {}
 
     // ======================== updateProjectSetupStage ========================
 
