@@ -117,6 +117,9 @@ public class ChapterService {
     @Autowired
     private PromptTemplateService promptTemplateService;
 
+    @Autowired
+    private FactionService factionService;
+
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     // 剧情记忆配置：保留前N章的详细记忆
@@ -989,6 +992,7 @@ public class ChapterService {
 
         // 添加世界观信息
         if (worldview != null) {
+            factionService.fillForces(worldview);
             prompt.append("## 世界观设定\n");
             if (worldview.getWorldType() != null) {
                 prompt.append("- 世界类型：").append(worldview.getWorldType()).append("\n");

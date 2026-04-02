@@ -18,6 +18,7 @@ import com.aifactory.mapper.NovelVolumePlanMapper;
 import com.aifactory.mapper.NovelWorldviewMapper;
 import com.aifactory.mapper.ProjectMapper;
 import com.aifactory.service.ContinentRegionService;
+import com.aifactory.service.FactionService;
 import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptContextBuilder;
@@ -83,6 +84,9 @@ public class OutlineTaskStrategy implements TaskStrategy {
 
     @Autowired
     private ContinentRegionService continentRegionService;
+
+    @Autowired
+    private FactionService factionService;
 
     @Override
     public String getTaskType() {
@@ -893,6 +897,7 @@ public class OutlineTaskStrategy implements TaskStrategy {
             if (context.getSharedData().containsKey("worldview")) {
                 NovelWorldview worldview = (NovelWorldview) context.getSharedData().get("worldview");
                 continentRegionService.fillGeography(worldview);
+                factionService.fillForces(worldview);
                 worldviewBuilder.append("- 世界类型：").append(worldview.getWorldType()).append("\n");
                 if (worldview.getWorldBackground() != null && !worldview.getWorldBackground().isEmpty()) {
                     worldviewBuilder.append("- 世界背景：").append(worldview.getWorldBackground()).append("\n");
@@ -965,6 +970,7 @@ public class OutlineTaskStrategy implements TaskStrategy {
             com.aifactory.entity.NovelWorldview worldview =
                 (com.aifactory.entity.NovelWorldview) context.getSharedData().get("worldview");
             continentRegionService.fillGeography(worldview);
+            factionService.fillForces(worldview);
             prompt.append("【世界观设定】\n");
             prompt.append("- 世界类型：").append(worldview.getWorldType()).append("\n");
             String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
@@ -1711,6 +1717,7 @@ public class OutlineTaskStrategy implements TaskStrategy {
             if (context.getSharedData().containsKey("worldview")) {
                 NovelWorldview worldview = (NovelWorldview) context.getSharedData().get("worldview");
                 continentRegionService.fillGeography(worldview);
+                factionService.fillForces(worldview);
                 worldviewBuilder.append("【世界观设定】\n");
                 worldviewBuilder.append("- 世界类型：").append(worldview.getWorldType()).append("\n");
                 String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());
@@ -1758,6 +1765,7 @@ public class OutlineTaskStrategy implements TaskStrategy {
             com.aifactory.entity.NovelWorldview worldview =
                 (com.aifactory.entity.NovelWorldview) context.getSharedData().get("worldview");
             continentRegionService.fillGeography(worldview);
+            factionService.fillForces(worldview);
             prompt.append("【世界观设定】\n");
             prompt.append("- 世界类型：").append(worldview.getWorldType()).append("\n");
             String powerConstraint = powerSystemService.buildPowerSystemConstraint(worldview.getProjectId());

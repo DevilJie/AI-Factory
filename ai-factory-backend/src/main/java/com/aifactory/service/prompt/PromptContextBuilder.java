@@ -5,6 +5,7 @@ import com.aifactory.entity.NovelWorldview;
 import com.aifactory.entity.ProjectBasicSettings;
 import com.aifactory.mapper.NovelWorldviewMapper;
 import com.aifactory.service.ContinentRegionService;
+import com.aifactory.service.FactionService;
 import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.ProjectBasicSettingsService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -41,6 +42,9 @@ public class PromptContextBuilder {
 
     @Autowired
     private ContinentRegionService continentRegionService;
+
+    @Autowired
+    private FactionService factionService;
 
     /**
      * 构建基础设置上下文（叙事结构、写作视角、叙事节奏等）
@@ -207,6 +211,7 @@ public class PromptContextBuilder {
             NovelWorldview worldview = worldviewMapper.selectOne(queryWrapper);
             if (worldview != null) {
                 continentRegionService.fillGeography(worldview);
+                factionService.fillForces(worldview);
             }
             return worldview;
         } catch (Exception e) {
