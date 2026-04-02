@@ -54,8 +54,8 @@
 - [ ] **UI-02**: faction.ts API 客户端（CRUD 接口）
 - [x] **UI-03**: WorldSetting.vue 中替换势力 textarea 为 FactionTree 组件
 - [x] **UI-04**: 势力-势力关系管理界面（选择两个势力、关系类型、描述）
-- [ ] **UI-05**: 势力-人物手动关联界面（选择人物、分配职位）
-- [ ] **UI-06**: 势力-地区关联界面（选择已有地区关联到势力）
+- [x] **UI-05**: 势力-人物手动关联界面（选择人物、分配职位）
+- [x] **UI-06**: 势力-地区关联界面（选择已有地区关联到势力）
 
 ## v2 需求
 
@@ -114,8 +114,8 @@
 | UI-02 | Phase 4 | Pending |
 | UI-03 | Phase 4 | Complete |
 | UI-04 | Phase 5 | Complete |
-| UI-05 | Phase 5 | Pending |
-| UI-06 | Phase 5 | Pending |
+| UI-05 | Phase 5 | Complete |
+| UI-06 | Phase 5 | Complete |
 
 **覆盖率：**
 - v1 需求：36 条

@@ -98,7 +98,7 @@ Plans:
 
 Plans:
 - [x] 05-01-PLAN.md -- Association management API layer + Drawer with tabs + bidirectional relation CRUD
-- [ ] 05-02: 待规划
+- [x] 05-02-PLAN.md -- Character tab (search + role datalist + CRUD) and Region tab (tree selector + batch add + CRUD)
 
 ## 进度
 
@@ -112,4 +112,4 @@ Plans:
 | 2. 后端服务与 API | 1/2 | In progress | - |
 | 3. AI 集成与提示词迁移 | 3/3 | Complete   | 2026-04-02 |
 | 4. 前端树组件 | 1/2 | In progress | - |
-| 5. 关联管理界面 | 1/2 | In progress | - |
+| 5. 关联管理界面 | 2/2 | Complete | 2026-04-03 |
