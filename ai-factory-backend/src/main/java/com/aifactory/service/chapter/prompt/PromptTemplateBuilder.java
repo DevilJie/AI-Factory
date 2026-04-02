@@ -61,6 +61,9 @@ public class PromptTemplateBuilder {
     @Autowired
     private ContinentRegionService continentRegionService;
 
+    @Autowired
+    private FactionService factionService;
+
     /**
      * 构建章节生成提示词
      *
@@ -365,6 +368,8 @@ public class PromptTemplateBuilder {
 
         // 填充 geography 字段（从 novel_continent_region 表构建）
         continentRegionService.fillGeography(worldview);
+        // 填充 forces 字段（从 novel_faction 表构建）
+        factionService.fillForces(worldview);
 
         StringBuilder sb = new StringBuilder();
         sb.append("- 世界类型：").append(worldview.getWorldType()).append("\n");
