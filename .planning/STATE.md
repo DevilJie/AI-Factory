@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
+milestone: v1.0.2
+milestone_name: 势力阵营结构化重构
 status: completed
-last_updated: "2026-04-02T16:20:16.629Z"
-last_activity: 2026-04-02
+last_updated: "2026-04-03T00:30:00.000Z"
+last_activity: 2026-04-03
 progress:
   total_phases: 5
   completed_phases: 5
@@ -17,61 +17,23 @@ progress:
 
 ## 项目引用
 
-参见: .planning/PROJECT.md (更新于 2026-04-01)
+参见: .planning/PROJECT.md (更新于 2026-04-03)
 
 **核心价值:** 势力的结构化数据能让 AI 生成章节时准确引用势力关系，也让用户方便地查看、编辑、管理势力体系
-**当前焦点:** Phase 4 - 前端树组件
+**当前焦点:** Milestone v1.0.2 complete — planning next milestone
 
 ## 当前位置
 
-Phase: 05 of 5 (关联管理界面)
-Plan: Not started
-Status: Phase 04 complete - all plans done (including gap closure 04-03)
-Last activity: 2026-04-02
+Milestone: v1.0.2 势力阵营结构化重构 — SHIPPED 2026-04-03
+Status: All 5 phases, 12 plans complete
 
 Progress: [██████████] 100%
-
-## 性能指标
-
-**速度:**
-
-- 已完成计划数: 10
-- 平均耗时: 4min
-- 总执行时间: 1 hours
-
-**按阶段:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 01-数据基础 | 2 | 6min | 3min |
-| 02-api | 1 | 4min | 4min |
-| 03-ai | 3 | 20min | 7min |
-| 04-前端树组件 | 3/3 | 12min | 4min |
-
-**近期趋势:**
-
-- 最近 5 个计划: -
-- 趋势: -
-
-*每次计划完成后更新*
 
 ## 累积上下文
 
 ### 决策
 
-决策记录在 PROJECT.md 的 Key Decisions 表中。
-影响当前工作的近期决策：
-
-- 树形表模式复用地理重构方案
-- 势力-人物仅手动关联（AI 生成时人物可能未创建）
-- AI 输出名称而非 ID，后端按名称回查
-- type 和 core_power_system 仅顶级设置，下级继承
-- Forces 字段保留 String 类型并标记 @TableField(exist=false)，复用 geography 的 transient 模式
-- Two-pass insert: saveTree first, buildNameToIdMap, then insert associations with resolved IDs
-- Three-tier name matching: exact -> strip suffix -> contains, using service methods not mappers
-- getChildNodes() exclusively for all DOM operations per D-08, avoiding getElementsByTagName
-- ChapterGenerationTaskStrategy: single fillForces at worldview load covers both getForces sites via shared context object
-- Child instances handle add/edit locally with own state, emit refresh to root for data reload
+决策记录在 PROJECT.md 的 Key Decisions 表中（8 项，全部 ✓ Good）。
 
 ### 待办事项
 
@@ -80,10 +42,9 @@ Progress: [██████████] 100%
 ### 阻塞/关注
 
 - AI 提示词模板的结构化 XML 格式已更新，需通过实际 LLM 输出验证
-- 中文名称模糊匹配规则需要用实际 AI 输出样本验证（Plan 03-02 已实现解析逻辑，待实际 LLM 测试）
+- 中文名称模糊匹配规则需要用实际 AI 输出样本验证
 
 ## 会话连续性
 
-上次会话: 2026-04-02
-停止于: Completed 04-03-PLAN.md
-恢复文件: .planning/phases/04-前端树组件/04-03-SUMMARY.md
+上次会话: 2026-04-03
+停止于: Milestone v1.0.2 complete

@@ -2,7 +2,7 @@
 
 ## What This Is
 
-将 AI Factory 世界观模块中的势力阵营（forces）从纯文本字段重构为结构化树形数据表，参照已完成的力量体系和地理环境重构模式。新增势力表、势力-地区关联表、势力-人物关联表、势力-势力关系表，配套前端树形编辑组件和 AI 生成逻辑重构。
+AI Factory 世界观模块中的势力阵营已完成从纯文本到结构化树形数据的重构。新增 4 张数据库表（势力主表 + 3 张关联表），配套完整的后端 CRUD 服务、14 个 REST 端点、AI 提示词模板迁移（DOM XML 解析入库）、以及前端递归树组件和关联管理 Drawer。参照力量体系和地理环境的已验证模式完成。
 
 ## Core Value
 
@@ -18,45 +18,37 @@
 - ✓ 世界观 AI 生成流程（WorldviewTaskStrategy） — existing
 - ✓ 人物管理（novel_character 实体及 CRUD） — existing
 - ✓ JWT 认证、项目管理体系 — existing
+- ✓ novel_faction 树形表（parent_id + deep + type + core_power_system） — v1.0.2 Phase 01
+- ✓ 3 张关联表（faction_region, faction_character, faction_relation） — v1.0.2 Phase 01
+- ✓ NovelWorldview.forces 标记 transient — v1.0.2 Phase 01
+- ✓ FactionService 树形 CRUD + 级联删除 + fillForces() — v1.0.2 Phase 02
+- ✓ FactionController 14 REST 端点 — v1.0.2 Phase 02
+- ✓ AI 提示词模板更新（结构化 XML） — v1.0.2 Phase 03
+- ✓ DOM 解析两遍插入 + 三级名称匹配 — v1.0.2 Phase 03
+- ✓ 11 处 getForces() → fillForces() 迁移 — v1.0.2 Phase 03
+- ✓ FactionTree.vue 递归树组件 — v1.0.2 Phase 04
+- ✓ faction.ts API 客户端 — v1.0.2 Phase 04
+- ✓ WorldSetting.vue 集成 — v1.0.2 Phase 04
+- ✓ FactionDrawer + 关联管理 Tabs — v1.0.2 Phase 05
 
 ### Active
 
-- [ ] WorldviewTaskStrategy 重构：AI 生成后 DOM 解析势力 XML 并结构化入库
-- [ ] AI 提示词模板更新：势力部分从纯文本改为结构化 XML 格式输出
-- [ ] 提示词中通过名称引用力量体系和地理区域，后端解析时按名称回查 ID
-- ✓ type 和 core_power_system 仅顶级势力设置，下级势力继承顶级势力值 — Validated in Phase 02: 后端服务与 API
-- ✓ 后端 FactionService CRUD（参照 ContinentRegionService 模式） — Validated in Phase 02: 后端服务与 API
-- ✓ fillForces() 方法供 PromptBuilder 使用 — Validated in Phase 02: 后端服务与 API
-- ✓ 前端 FactionTree.vue 组件（参照 GeographyTree.vue），支持树形查看、编辑、新增、删除 — Validated in Phase 04: 前端树组件
-- ✓ 前端势力关系管理界面 — Validated in Phase 05: 关联管理界面
-- ✓ 前端势力-人物手动关联界面 — Validated in Phase 05: 关联管理界面
-- ✓ 前端势力-地区关联界面 — Validated in Phase 05: 关联管理界面
-
-- ✓ 新增势力表（novel_faction），树形结构支持多层级嵌套 — Validated in Phase 01: 数据基础
-- ✓ 新增势力-地区关联表（novel_faction_region） — Validated in Phase 01: 数据基础
-- ✓ 新增势力-人物关联表（novel_faction_character） — Validated in Phase 01: 数据基础
-- ✓ 新增势力-势力关系表（novel_faction_relation） — Validated in Phase 01: 数据基础
-- ✓ novel_worldview.forces 字段改为 transient — Validated in Phase 01: 数据基础
-- ✓ SQL 迁移脚本（建表） — Validated in Phase 01: 数据基础
+(No active requirements — all v1.0.2 requirements shipped)
 
 ### Out of Scope
 
 - 时间线（timeline）结构化 — 本次只做势力，时间线保持文本
 - 世界规则（rules）结构化 — 本次只做势力，规则保持文本
-- 势力-人物 AI 自动关联 — 仅手动操作
-- 势力地图可视化 — 简单关联即可，不做地图展示
+- 势力-人物 AI 自动关联 — 世界观生成时人物可能未创建
+- 势力地图可视化 — 前端成本高，简单关联即可
 
 ## Context
 
-- 这是继力量体系重构、地理环境重构之后的第三轮世界观结构化改造
-- 已有的重构模式（树形表 + transient 字段 + DOM 解析 + 前端树组件）已验证可行，直接复用
-- AI 生成时先存地理和力量体系，后存势力，确保按名称匹配 ID 时目标数据已存在
-- 势力-人物关联在 AI 生成时不处理，因为世界观生成阶段人物可能还未创建
-- 现有代码位置参考：
-  - 势力核心生成逻辑：`WorldviewTaskStrategy#savePowerSystems` 后面新增
-  - 地理重构参考：`ContinentRegionService` / `ContinentRegionServiceImpl` / `GeographyTree.vue`
-  - 力量体系参考：`PowerSystemService` / `PowerSystemSection.vue`
-  - 提示词模板：`ai_prompt_template_version` 表 id=3
+Shipped v1.0.2 with ~8,900 LOC added across Java, TypeScript, Vue, SQL.
+Tech stack: Spring Boot 3.2 + MyBatis-Plus + Vue 3 + Vite + Tailwind CSS.
+Timeline: 6 days (2026-03-28 → 2026-04-03), 5 phases, 12 plans.
+All 37 v1 requirements verified complete.
+Recursive tree CRUD at all depths works via child-instance-local state + refresh emit pattern.
 
 ## Constraints
 
@@ -69,10 +61,14 @@
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 树形表模式复用地理重构方案 | 同类数据（多层级嵌套），已验证可行 | — Pending |
-| 势力-人物仅手动关联 | 世界观生成时人物可能未创建，AI 无法准确关联 | — Pending |
-| AI 输出名称而非 ID，后端按名称回查 | AI 不知道数据库 ID，名称是最可靠的自然键 | — Pending |
-| type 和 core_power_system 仅顶级设置 | 下级势力继承上级，避免数据冗余和不一致 | — Pending |
+| 树形表模式复用地理重构方案 | 同类数据（多层级嵌套），已验证可行 | ✓ Good — 零偏差复用 |
+| 势力-人物仅手动关联 | 世界观生成时人物可能未创建，AI 无法准确关联 | ✓ Good — 简化 AI 流程 |
+| AI 输出名称而非 ID，后端按名称回查 | AI 不知道数据库 ID，名称是最可靠的自然键 | ✓ Good — 三级匹配容错 |
+| type/core_power_system 仅顶级设置 | 下级势力继承上级，避免数据冗余和不一致 | ✓ Good — inheritRootValues() |
+| getChildNodes() 替代 getElementsByTagName | 避免 DOM 解析取到所有后代节点 | ✓ Good — 精确控制 |
+| 两遍插入策略 | 先存势力获取 ID，再建关联 | ✓ Good — saveTree→buildNameToIdMap |
+| 子实例本地 CRUD + refresh emit | 递归组件子节点独立管理状态 | ✓ Good — 解决所有深度 CRUD |
+| Direct mapper injection for associations | 简单关联表无需 service 层 | ✓ Good — 减少样板代码 |
 
 ## Evolution
 
@@ -92,4 +88,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-02 after Phase 05 completion*
+*Last updated: 2026-04-03 after v1.0.2 milestone completion*
