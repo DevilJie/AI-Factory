@@ -33,3 +33,24 @@ export const deleteWorldview = (projectId: string) => {
 export const generateWorldviewAsync = (projectId: string) => {
   return request.post<{ taskId: string; message: string }>(`/api/novel/${projectId}/worldview/generate-async`, {})
 }
+
+// AI异步生成地理环境
+export const generateGeographyAsync = (projectId: string) => {
+  return request.post<{ taskId: string; message: string }>(
+    `/api/novel/${projectId}/worldview/generate-geography`, {}
+  )
+}
+
+// AI异步生成力量体系
+export const generatePowerSystemAsync = (projectId: string) => {
+  return request.post<{ taskId: string; message: string }>(
+    `/api/novel/${projectId}/worldview/generate-power-system`, {}
+  )
+}
+
+// AI异步生成势力阵营
+export const generateFactionAsync = (projectId: string) => {
+  return request.post<{ taskId: string; message: string }>(
+    `/api/novel/${projectId}/worldview/generate-faction`, {}
+  )
+}

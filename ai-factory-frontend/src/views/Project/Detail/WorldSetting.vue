@@ -9,7 +9,7 @@ import {
   ChevronDown
 } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
-import { getWorldview, saveWorldview, generateWorldviewAsync, type Worldview } from '@/api/worldview'
+import { getWorldview, saveWorldview, generateWorldviewAsync, generateGeographyAsync, generatePowerSystemAsync, generateFactionAsync, type Worldview } from '@/api/worldview'
 import { getTaskStatus } from '@/api/task'
 import { success, error } from '@/utils/toast'
 import PowerSystemSection from './components/PowerSystemSection.vue'
@@ -22,6 +22,7 @@ const route = useRoute()
 const loading = ref(false)
 const saving = ref(false)
 const generating = ref(false)
+const generatingModule = ref<'geography' | 'powerSystem' | 'faction' | null>(null)
 const formData = ref<Worldview>({
   worldType: '',
   worldBackground: '',
@@ -133,6 +134,21 @@ const clearGeneratingTask = () => {
   localStorage.removeItem(getGenerateTaskKey(projectId()))
 }
 
+// 独立模块生成任务 localStorage 辅助
+const getModuleTaskKey = (module: string) =>
+  `ai-factory-${module}-generate-${projectId()}`
+
+const saveModuleTask = (module: string, taskId: string) => {
+  localStorage.setItem(
+    getModuleTaskKey(module),
+    JSON.stringify({ taskId, startTime: Date.now() })
+  )
+}
+
+const clearModuleTask = (module: string) => {
+  localStorage.removeItem(getModuleTaskKey(module))
+}
+
 // AI生成
 const handleGenerate = async () => {
   generating.value = true
@@ -161,6 +177,72 @@ const handleGenerate = async () => {
   } finally {
     generating.value = false
     clearGeneratingTask()
+  }
+}
+
+// 独立模块生成处理
+const moduleNames: Record<string, string> = {
+  geography: '地理环境',
+  powerSystem: '力量体系',
+  faction: '势力阵营'
+}
+
+const handleGenerateGeography = async () => {
+  generatingModule.value = 'geography'
+  try {
+    const result = await generateGeographyAsync(projectId())
+    saveModuleTask('geography', result.taskId)
+    await pollTaskStatus(result.taskId)
+    clearModuleTask('geography')
+    geographyTreeRef.value?.refresh()
+    success('地理环境生成成功')
+  } catch (e: any) {
+    // Do NOT call error() for API-level errors -- Axios interceptor already shows toast.
+    // Only call error() for poll-level failures (task failed/cancelled/timeout).
+    if (e.message && (e.message.includes('超时') || e.message.includes('失败'))) {
+      error(e.message)
+    }
+  } finally {
+    generatingModule.value = null
+    clearModuleTask('geography')
+  }
+}
+
+const handleGeneratePowerSystem = async () => {
+  generatingModule.value = 'powerSystem'
+  try {
+    const result = await generatePowerSystemAsync(projectId())
+    saveModuleTask('powerSystem', result.taskId)
+    await pollTaskStatus(result.taskId)
+    clearModuleTask('powerSystem')
+    powerSystemRef.value?.refresh()
+    success('力量体系生成成功')
+  } catch (e: any) {
+    if (e.message && (e.message.includes('超时') || e.message.includes('失败'))) {
+      error(e.message)
+    }
+  } finally {
+    generatingModule.value = null
+    clearModuleTask('powerSystem')
+  }
+}
+
+const handleGenerateFaction = async () => {
+  generatingModule.value = 'faction'
+  try {
+    const result = await generateFactionAsync(projectId())
+    saveModuleTask('faction', result.taskId)
+    await pollTaskStatus(result.taskId)
+    clearModuleTask('faction')
+    factionTreeRef.value?.refresh()
+    success('势力阵营生成成功')
+  } catch (e: any) {
+    if (e.message && (e.message.includes('超时') || e.message.includes('失败'))) {
+      error(e.message)
+    }
+  } finally {
+    generatingModule.value = null
+    clearModuleTask('faction')
   }
 }
 
@@ -205,11 +287,52 @@ const restoreGeneratingState = async () => {
   }
 }
 
+// 恢复独立模块生成任务状态（页面刷新后调用）
+const restoreModuleState = async (module: 'geography' | 'powerSystem' | 'faction') => {
+  try {
+    const taskData = localStorage.getItem(getModuleTaskKey(module))
+    if (!taskData) return
+
+    const { taskId, startTime } = JSON.parse(taskData)
+
+    if (Date.now() - startTime > 10 * 60 * 1000) {
+      clearModuleTask(module)
+      return
+    }
+
+    generatingModule.value = module
+    try {
+      await pollTaskStatus(taskId)
+      clearModuleTask(module)
+      const refMap: Record<string, any> = {
+        geography: geographyTreeRef,
+        powerSystem: powerSystemRef,
+        faction: factionTreeRef
+      }
+      refMap[module].value?.refresh()
+      success(`${moduleNames[module]}生成完成`)
+    } catch (e: any) {
+      if (e.message && (e.message.includes('超时') || e.message.includes('失败'))) {
+        error(e.message)
+      }
+    } finally {
+      generatingModule.value = null
+      clearModuleTask(module)
+    }
+  } catch (e) {
+    generatingModule.value = null
+    clearModuleTask(module)
+  }
+}
+
 // Lifecycle
 onMounted(() => {
   loadData()
   // 恢复生成任务状态
   restoreGeneratingState()
+  restoreModuleState('geography')
+  restoreModuleState('powerSystem')
+  restoreModuleState('faction')
 })
 
 // Watch route changes
@@ -254,7 +377,7 @@ onUnmounted(() => {
         <div class="flex items-center gap-2">
           <button
             @click="handleGenerate"
-            :disabled="generating"
+            :disabled="generating || !!generatingModule"
             class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-teal-500 rounded-lg hover:from-green-600 hover:to-teal-600 transition-colors disabled:opacity-50"
           >
             <Loader2 v-if="generating" class="w-4 h-4 animate-spin" />
@@ -324,13 +447,13 @@ onUnmounted(() => {
         </div>
 
         <!-- 第二行：力量体系（整行） -->
-        <PowerSystemSection ref="powerSystemRef" :project-id="projectId()" :disabled="generating" />
+        <PowerSystemSection ref="powerSystemRef" :project-id="projectId()" :disabled="generating || !!generatingModule" :generating-self="generatingModule === 'powerSystem'" @generate="handleGeneratePowerSystem" />
 
         <!-- 第三行：地理环境（整行，树形结构） -->
-        <GeographyTree ref="geographyTreeRef" :project-id="projectId()" :disabled="generating" />
+        <GeographyTree ref="geographyTreeRef" :project-id="projectId()" :disabled="generating || !!generatingModule" :generating-self="generatingModule === 'geography'" @generate="handleGenerateGeography" />
 
         <!-- 第四行：势力阵营（树形组件） -->
-        <FactionTree ref="factionTreeRef" :project-id="projectId()" :disabled="generating" />
+        <FactionTree ref="factionTreeRef" :project-id="projectId()" :disabled="generating || !!generatingModule" :generating-self="generatingModule === 'faction'" @generate="handleGenerateFaction" />
 
         <!-- 第四行：时间线 + 世界规则 -->
         <div class="grid grid-cols-2 gap-6">
