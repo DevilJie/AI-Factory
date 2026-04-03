@@ -2,11 +2,15 @@ package com.aifactory.controller;
 
 import com.aifactory.dto.CreateTaskRequest;
 import com.aifactory.dto.TaskDto;
+import com.aifactory.entity.NovelContinentRegion;
+import com.aifactory.entity.NovelPowerSystem;
 import com.aifactory.entity.NovelWorldview;
 import com.aifactory.entity.Project;
 import com.aifactory.mapper.NovelWorldviewMapper;
 import com.aifactory.mapper.ProjectMapper;
 import com.aifactory.response.Result;
+import com.aifactory.service.ContinentRegionService;
+import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.TaskService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -45,6 +50,12 @@ public class WorldviewController {
 
     @Autowired
     private TaskService taskService;
+
+    @Autowired
+    private ContinentRegionService continentRegionService;
+
+    @Autowired
+    private PowerSystemService powerSystemService;
 
     /**
      * 获取项目的世界观设定
@@ -249,6 +260,163 @@ public class WorldviewController {
         } catch (Exception e) {
             log.error("删除世界观设定失败，projectId={}", projectId, e);
             return Result.error("删除世界观设定失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * AI 异步生成地理环境设定
+     */
+    @Operation(
+            summary = "AI异步生成地理环境",
+            description = "使用AI异步独立生成地理环境设定。系统会根据项目的描述、故事基调、故事类型和标签，使用独立的地理环境提示词模板生成地理环境数据并入库。返回任务ID，可通过任务接口查询进度"
+    )
+    @PostMapping("/generate-geography")
+    public Result<Map<String, Object>> generateGeography(
+            @Parameter(description = "项目ID", required = true, example = "1")
+            @PathVariable Long projectId,
+            @RequestBody(required = false) Map<String, String> request) {
+        try {
+            log.info("开始AI异步生成地理环境，projectId={}", projectId);
+            Project project = projectMapper.selectById(projectId);
+            if (project == null) {
+                return Result.error("项目不存在");
+            }
+
+            Map<String, Object> config = new HashMap<>();
+            config.put("projectDescription", project.getDescription());
+            config.put("storyTone", project.getStoryTone());
+            config.put("storyGenre", project.getNovelType());
+            config.put("tags", project.getTags());
+
+            CreateTaskRequest taskRequest = new CreateTaskRequest();
+            taskRequest.setProjectId(projectId);
+            taskRequest.setTaskType("geography");
+            taskRequest.setTaskName("AI生成地理环境");
+            taskRequest.setConfig(config);
+
+            Result<TaskDto> result = taskService.createTask(taskRequest);
+            if (result.getOk() == null || !result.getOk()) {
+                return Result.error(result.getMsg());
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("taskId", result.getData().getId());
+            response.put("message", "地理环境生成任务已创建，正在后台执行");
+            return Result.ok(response);
+        } catch (Exception e) {
+            log.error("创建地理环境生成任务失败，projectId={}", projectId, e);
+            return Result.error("创建任务失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * AI 异步生成力量体系设定
+     */
+    @Operation(
+            summary = "AI异步生成力量体系",
+            description = "使用AI异步独立生成力量体系设定。系统会根据项目的描述、故事基调、故事类型和标签，使用独立的力量体系提示词模板生成力量体系数据并入库。返回任务ID，可通过任务接口查询进度"
+    )
+    @PostMapping("/generate-power-system")
+    public Result<Map<String, Object>> generatePowerSystem(
+            @Parameter(description = "项目ID", required = true, example = "1")
+            @PathVariable Long projectId,
+            @RequestBody(required = false) Map<String, String> request) {
+        try {
+            log.info("开始AI异步生成力量体系，projectId={}", projectId);
+            Project project = projectMapper.selectById(projectId);
+            if (project == null) {
+                return Result.error("项目不存在");
+            }
+
+            Map<String, Object> config = new HashMap<>();
+            config.put("projectDescription", project.getDescription());
+            config.put("storyTone", project.getStoryTone());
+            config.put("storyGenre", project.getNovelType());
+            config.put("tags", project.getTags());
+
+            CreateTaskRequest taskRequest = new CreateTaskRequest();
+            taskRequest.setProjectId(projectId);
+            taskRequest.setTaskType("power_system");
+            taskRequest.setTaskName("AI生成力量体系");
+            taskRequest.setConfig(config);
+
+            Result<TaskDto> result = taskService.createTask(taskRequest);
+            if (result.getOk() == null || !result.getOk()) {
+                return Result.error(result.getMsg());
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("taskId", result.getData().getId());
+            response.put("message", "力量体系生成任务已创建，正在后台执行");
+            return Result.ok(response);
+        } catch (Exception e) {
+            log.error("创建力量体系生成任务失败，projectId={}", projectId, e);
+            return Result.error("创建任务失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * AI 异步生成阵营势力设定
+     * <p>
+     * 需要已先生成地理环境和力量体系数据，系统会注入这些依赖上下文到提示词模板。
+     */
+    @Operation(
+            summary = "AI异步生成阵营势力",
+            description = "使用AI异步独立生成阵营势力设定。需要已先生成地理环境和力量体系数据。系统会根据项目的描述、故事基调、故事类型和标签，以及已生成的地理环境和力量体系数据，使用独立的阵营势力提示词模板生成阵营势力数据并入库。返回任务ID，可通过任务接口查询进度"
+    )
+    @PostMapping("/generate-faction")
+    public Result<Map<String, Object>> generateFaction(
+            @Parameter(description = "项目ID", required = true, example = "1")
+            @PathVariable Long projectId,
+            @RequestBody(required = false) Map<String, String> request) {
+        try {
+            log.info("开始AI异步生成阵营势力，projectId={}", projectId);
+            Project project = projectMapper.selectById(projectId);
+            if (project == null) {
+                return Result.error("项目不存在");
+            }
+
+            // Dependency validation (synchronous, in controller)
+            List<NovelContinentRegion> regions = continentRegionService.listByProjectId(projectId);
+            if (regions.isEmpty()) {
+                return Result.error("请先生成地理环境数据");
+            }
+
+            List<NovelPowerSystem> powerSystems = powerSystemService.listByProjectId(projectId);
+            if (powerSystems.isEmpty()) {
+                return Result.error("请先生成力量体系数据");
+            }
+
+            // Build config including dependency context
+            String geographyContext = continentRegionService.buildGeographyText(projectId);
+            String powerSystemContext = powerSystemService.buildPowerSystemConstraint(projectId);
+
+            Map<String, Object> config = new HashMap<>();
+            config.put("projectDescription", project.getDescription());
+            config.put("storyTone", project.getStoryTone());
+            config.put("storyGenre", project.getNovelType());
+            config.put("tags", project.getTags());
+            config.put("geographyContext", geographyContext);
+            config.put("powerSystemContext", powerSystemContext);
+
+            CreateTaskRequest taskRequest = new CreateTaskRequest();
+            taskRequest.setProjectId(projectId);
+            taskRequest.setTaskType("faction");
+            taskRequest.setTaskName("AI生成阵营势力");
+            taskRequest.setConfig(config);
+
+            Result<TaskDto> result = taskService.createTask(taskRequest);
+            if (result.getOk() == null || !result.getOk()) {
+                return Result.error(result.getMsg());
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("taskId", result.getData().getId());
+            response.put("message", "阵营势力生成任务已创建，正在后台执行");
+            return Result.ok(response);
+        } catch (Exception e) {
+            log.error("创建阵营势力生成任务失败，projectId={}", projectId, e);
+            return Result.error("创建任务失败：" + e.getMessage());
         }
     }
 
