@@ -1,50 +1,73 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0.2
-milestone_name: 势力阵营结构化重构
-status: completed
-last_updated: "2026-04-03T00:30:00.000Z"
+milestone: v1.0.3
+milestone_name: 世界观生成任务拆分
+status: verifying
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-04-03T03:38:06.393Z"
 last_activity: 2026-04-03
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 12
-  completed_plans: 12
-  percent: 100
+  total_phases: 4
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 0
 ---
 
 # 项目状态
 
 ## 项目引用
 
-参见: .planning/PROJECT.md (更新于 2026-04-03)
+See: .planning/PROJECT.md (updated 2026-04-03)
 
-**核心价值:** 势力的结构化数据能让 AI 生成章节时准确引用势力关系，也让用户方便地查看、编辑、管理势力体系
-**当前焦点:** Milestone v1.0.2 complete — planning next milestone
+**Core value:** 势力的结构化数据能让 AI 生成章节时准确引用势力关系，也让用户方便地查看、编辑、管理势力体系
+**Current focus:** Phase 06 — 独立提示词模板
 
-## 当前位置
+## Current Position
 
-Milestone: v1.0.2 势力阵营结构化重构 — SHIPPED 2026-04-03
-Status: All 5 phases, 12 plans complete
+Phase: 06 (独立提示词模板) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-04-03
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
-## 累积上下文
+## Performance Metrics
 
-### 决策
+**Velocity:**
 
-决策记录在 PROJECT.md 的 Key Decisions 表中（8 项，全部 ✓ Good）。
+- Total plans completed: 12 (v1.0.2)
+- Total execution time: v1.0.2 shipped in 6 days
 
-### 待办事项
+**By Phase:**
 
-暂无。
+| Phase | Plans | Status |
+|-------|-------|--------|
+| 1-5 (v1.0.2) | 12 | Complete |
+| 6-9 (v1.0.3) | TBD | Not started |
+| Phase 06-独立提示词模板 P01 | 5min | 2 tasks | 1 files |
 
-### 阻塞/关注
+## Accumulated Context
+
+### Decisions
+
+Decisions are logged in PROJECT.md Key Decisions table (8 items from v1.0.2, all Good).
+
+- [Phase 06]: Geography template uses <r><n>/<d> sub-tag format exclusively (not old name attribute)
+- [Phase 06]: Faction template wraps context data in <existing_geography>/<existing_power_systems> to differentiate input from output
+- [Phase 06]: All SQL WHERE clauses use template_code column, fixing V3 incorrect code column reference
+
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
 
 - AI 提示词模板的结构化 XML 格式已更新，需通过实际 LLM 输出验证
 - 中文名称模糊匹配规则需要用实际 AI 输出样本验证
 
-## 会话连续性
+## Session Continuity
 
-上次会话: 2026-04-03
-停止于: Milestone v1.0.2 complete
+Last session: 2026-04-03T03:38:06.386Z
+Stopped at: Completed 06-01-PLAN.md
+Resume file: None

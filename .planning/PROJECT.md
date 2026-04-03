@@ -33,7 +33,11 @@ AI Factory 世界观模块中的势力阵营已完成从纯文本到结构化树
 
 ### Active
 
-(No active requirements — all v1.0.2 requirements shipped)
+- [ ] 地理环境独立生成（独立提示词模板 + REST API）
+- [ ] 力量体系独立生成（独立提示词模板 + REST API）
+- [ ] 阵营势力独立生成（独立提示词模板 + REST API + 依赖校验）
+- [ ] 原有世界观生成逻辑重构（剔除三模块，改为组合调用）
+- [ ] 前端独立生成按钮（地理环境、力量体系、阵营势力各一个）
 
 ### Out of Scope
 
@@ -70,6 +74,17 @@ Recursive tree CRUD at all depths works via child-instance-local state + refresh
 | 子实例本地 CRUD + refresh emit | 递归组件子节点独立管理状态 | ✓ Good — 解决所有深度 CRUD |
 | Direct mapper injection for associations | 简单关联表无需 service 层 | ✓ Good — 减少样板代码 |
 
+## Current Milestone: v1.0.3 世界观生成任务拆分
+
+**Goal:** 将地理环境、力量体系、阵营势力的 AI 生成从单一提示词拆分为 3 个独立任务，各配独立提示词模板和 REST API，前端增加独立生成按钮。
+
+**Target features:**
+- 地理环境独立生成（提示词模板 + API）
+- 力量体系独立生成（提示词模板 + API）
+- 阵营势力独立生成（提示词模板 + API + 依赖校验）
+- 原有世界观整体生成重构为组合调用
+- 前端独立生成按钮
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -88,4 +103,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03 after v1.0.2 milestone completion*
+*Last updated: 2026-04-03 after starting milestone v1.0.3*
