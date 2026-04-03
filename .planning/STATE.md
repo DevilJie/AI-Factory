@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.3
 milestone_name: 世界观生成任务拆分
-status: completed
-stopped_at: Phase 8 context gathered
-last_updated: "2026-04-03T08:34:33.926Z"
+status: executing
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-04-03T10:05:44.469Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 5
+  completed_plans: 4
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-03)
 
 **Core value:** 势力的结构化数据能让 AI 生成章节时准确引用势力关系，也让用户方便地查看、编辑、管理势力体系
-**Current focus:** Phase 07 — api
+**Current focus:** Phase 08 — 原有逻辑重构
 
 ## Current Position
 
-Phase: 8
-Plan: Not started
-Status: Completed 07-02-PLAN.md
+Phase: 08 (原有逻辑重构) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-03
 
 Progress: [░░░░░░░░░░] 0%
@@ -48,6 +48,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 06-独立提示词模板 P01 | 5min | 2 tasks | 1 files |
 | Phase 07 P01 | 7min | 2 tasks | 2 files |
 | Phase 07 P02 | 9min | 2 tasks | 2 files |
+| Phase 08 P01 | 11min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,8 @@ Decisions are logged in PROJECT.md Key Decisions table (8 items from v1.0.2, all
 - [Phase 07]: Both strategies use @Component annotation matching WorldviewTaskStrategy pattern for AsyncTaskExecutor auto-discovery
 - [Phase 07]: Controller injects dependency context into task config (geographyContext/powerSystemContext), strategy reads from config - avoids DB queries in strategy
 - [Phase 07]: Faction endpoint validates both geography and power system dependencies synchronously before task creation
+- [Phase 08]: WorldviewXmlParser as @Component (not pure utility) because name matching needs DB access
+- [Phase 08]: parseFactionXml returns ParsedFactions record separating parsing from persistence; caller handles saveTree + Pass 2
 
 ### Pending Todos
 
@@ -75,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T08:34:33.919Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-原有逻辑重构/08-CONTEXT.md
+Last session: 2026-04-03T10:05:44.461Z
+Stopped at: Completed 08-01-PLAN.md
+Resume file: None
