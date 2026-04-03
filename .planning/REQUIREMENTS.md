@@ -14,15 +14,15 @@
 
 ### 独立生成 API
 
-- [ ] **API-01**: 提供地理环境独立生成 REST 接口，接收项目 ID，调用独立提示词模板生成地理环境并入库
-- [ ] **API-02**: 提供力量体系独立生成 REST 接口，接收项目 ID，调用独立提示词模板生成力量体系并入库
-- [ ] **API-03**: 提供阵营势力独立生成 REST 接口，接收项目 ID，调用独立提示词模板生成阵营势力并入库
+- [x] **API-01**: 提供地理环境独立生成 REST 接口，接收项目 ID，调用独立提示词模板生成地理环境并入库
+- [x] **API-02**: 提供力量体系独立生成 REST 接口，接收项目 ID，调用独立提示词模板生成力量体系并入库
+- [x] **API-03**: 提供阵营势力独立生成 REST 接口，接收项目 ID，调用独立提示词模板生成阵营势力并入库
 
 ### 依赖校验
 
-- [ ] **DEP-01**: 阵营势力生成接口增加前置校验 — 若该项目未生成地理环境数据则拒绝并返回提示
-- [ ] **DEP-02**: 阵营势力生成接口增加前置校验 — 若该项目未生成力量体系数据则拒绝并返回提示
-- [ ] **DEP-03**: 阵营势力独立提示词模板中自动注入已生成的地理环境和力量体系结构化数据作为上下文
+- [x] **DEP-01**: 阵营势力生成接口增加前置校验 — 若该项目未生成地理环境数据则拒绝并返回提示
+- [x] **DEP-02**: 阵营势力生成接口增加前置校验 — 若该项目未生成力量体系数据则拒绝并返回提示
+- [x] **DEP-03**: 阵营势力独立提示词模板中自动注入已生成的地理环境和力量体系结构化数据作为上下文
 
 ### 原有逻辑重构
 
@@ -52,12 +52,12 @@
 | PROMPT-02 | Phase 6 | Complete |
 | PROMPT-03 | Phase 6 | Complete |
 | PROMPT-04 | Phase 6 | Complete |
-| API-01 | Phase 7 | Pending |
-| API-02 | Phase 7 | Pending |
-| API-03 | Phase 7 | Pending |
-| DEP-01 | Phase 7 | Pending |
-| DEP-02 | Phase 7 | Pending |
-| DEP-03 | Phase 7 | Pending |
+| API-01 | Phase 7 | Complete |
+| API-02 | Phase 7 | Complete |
+| API-03 | Phase 7 | Complete |
+| DEP-01 | Phase 7 | Complete |
+| DEP-02 | Phase 7 | Complete |
+| DEP-03 | Phase 7 | Complete |
 | REFACT-01 | Phase 8 | Pending |
 | REFACT-02 | Phase 8 | Pending |
 | UI-01 | Phase 9 | Pending |
