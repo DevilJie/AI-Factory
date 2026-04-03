@@ -53,11 +53,11 @@ Plans:
   3. 调用阵营势力独立生成接口时，若该项目尚未生成地理环境数据，接口返回明确的错误提示而非空数据
   4. 调用阵营势力独立生成接口时，若该项目尚未生成力量体系数据，接口返回明确的错误提示而非空数据
   5. 阵营势力独立生成成功时，提示词中自动包含该项目已生成的地理环境和力量体系结构化数据作为上下文
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
+- [x] 07-01-PLAN.md — 创建 GeographyTaskStrategy + PowerSystemTaskStrategy（API-01, API-02）
+- [x] 07-02-PLAN.md — 创建 FactionTaskStrategy + WorldviewController 3个端点（API-03, DEP-01, DEP-02, DEP-03）
 
 ### Phase 8: 原有逻辑重构
 **Goal**: 世界观整体生成流程内部改为组合调用三个独立生成任务，对外行为不变
@@ -94,6 +94,6 @@ Phases execute in numeric order: 6 → 7 → 8 → 9
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 6. 独立提示词模板 | v1.0.3 | 0/? | Planning complete | - |
-| 7. 独立生成 API + 依赖校验 | v1.0.3 | 0/? | Not started | - |
+| 7. 独立生成 API + 依赖校验 | v1.0.3 | 2/2 | Complete | 2026-04-03 |
 | 8. 原有逻辑重构 | v1.0.3 | 0/? | Not started | - |
 | 9. 前端独立生成按钮 | v1.0.3 | 0/? | Not started | - |
