@@ -70,7 +70,7 @@ Plans:
 
 Plans:
 - [x] 08-01-PLAN.md — 提取 WorldviewXmlParser 公共工具类 + 重构 GeographyTaskStrategy/FactionTaskStrategy 调用它（REFACT-01 重复代码清理）
-- [ ] 08-02-PLAN.md — 重构 WorldviewTaskStrategy 为 9 步骤编排 + 最终结果回查拼装（REFACT-01, REFACT-02）
+- [x] 08-02-PLAN.md — 重构 WorldviewTaskStrategy 为 9 步骤编排 + 最终结果回查拼装（REFACT-01, REFACT-02）
 
 ### Phase 9: 前端独立生成按钮
 **Goal**: 用户可在各世界观子模块区域点击独立按钮单独重新生成，无需重新生成整个世界观

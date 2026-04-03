@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.3
 milestone_name: 世界观生成任务拆分
-status: executing
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-04-03T10:05:44.469Z"
+status: verifying
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-04-03T10:25:15.433Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 Phase: 08 (原有逻辑重构) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-03
 
 Progress: [░░░░░░░░░░] 0%
@@ -49,6 +49,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 07 P01 | 7min | 2 tasks | 2 files |
 | Phase 07 P02 | 9min | 2 tasks | 2 files |
 | Phase 08 P01 | 11min | 2 tasks | 4 files |
+| Phase 08 P02 | 5min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,9 @@ Decisions are logged in PROJECT.md Key Decisions table (8 items from v1.0.2, all
 - [Phase 07]: Faction endpoint validates both geography and power system dependencies synchronously before task creation
 - [Phase 08]: WorldviewXmlParser as @Component (not pure utility) because name matching needs DB access
 - [Phase 08]: parseFactionXml returns ParsedFactions record separating parsing from persistence; caller handles saveTree + Pass 2
+- [Phase 08]: generate_geography/generate_power_system combine generate+save into one orchestrator step by calling Strategy executeStep twice with step stubs
+- [Phase 08]: generate_faction builds dependency context (geography + power system) after steps 3+5 have saved data to DB
+- [Phase 08]: createStepStub(String stepType) creates minimal AiTaskStep because Strategy methods only dispatch on stepType
 
 ### Pending Todos
 
@@ -78,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T10:05:44.461Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-04-03T10:25:15.426Z
+Stopped at: Completed 08-02-PLAN.md
 Resume file: None

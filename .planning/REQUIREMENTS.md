@@ -27,7 +27,7 @@
 ### 原有逻辑重构
 
 - [x] **REFACT-01**: WorldviewTaskStrategy 整体生成流程重构为：先调用三个独立生成任务，再调用剔除后的世界观提示词生成剩余内容
-- [ ] **REFACT-02**: 整体生成流程中三个模块的生成结果汇总后仍作为完整世界观数据返回给前端
+- [x] **REFACT-02**: 整体生成流程中三个模块的生成结果汇总后仍作为完整世界观数据返回给前端
 
 ### 前端生成按钮
 
@@ -59,7 +59,7 @@
 | DEP-02 | Phase 7 | Complete |
 | DEP-03 | Phase 7 | Complete |
 | REFACT-01 | Phase 8 | Complete |
-| REFACT-02 | Phase 8 | Pending |
+| REFACT-02 | Phase 8 | Complete |
 | UI-01 | Phase 9 | Pending |
 | UI-02 | Phase 9 | Pending |
 | UI-03 | Phase 9 | Pending |
