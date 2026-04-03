@@ -2,13 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import {
   Plus, Loader2, ChevronRight, ChevronDown,
-  Trash2, Edit3, Shield, Link2, Sparkles
+  Trash2, Edit3, Shield, Link2, Sparkles, Users, Swords
 } from 'lucide-vue-next'
 import FactionDrawer from './FactionDrawer.vue'
 import {
   getFactionTree,
   addFaction,
-  updateFaction,
   deleteFaction,
   type Faction
 } from '@/api/faction'
@@ -42,16 +41,9 @@ const emit = defineEmits<{
 const rootTreeData = ref<Faction[]>([])
 const loading = ref(false)
 const expandedNodes = ref<Set<number>>(new Set())
-const editingNode = ref<Faction | null>(null)
 const addingParentId = ref<number | null | undefined>(undefined)
 const newNodeName = ref('')
 const newNodeDesc = ref('')
-const editingName = ref('')
-const editingDesc = ref('')
-const editingTypeValue = ref('')
-const editingPowerSystemValue = ref<number | null>(null)
-const showTypeSelector = ref(false)
-const showPowerSystemSelector = ref(false)
 const powerSystemMap = ref<Map<number, string>>(new Map())
 
 const isRoot = computed(() => props.nodes === undefined)
@@ -115,46 +107,6 @@ const handleAdd = async () => {
   } catch (e: any) { error('添加失败') }
 }
 
-const startEdit = (node: Faction) => {
-  editingNode.value = node
-  editingName.value = node.name
-  editingDesc.value = node.description || ''
-  if ((node.deep ?? 0) === 0) {
-    editingTypeValue.value = node.type || ''
-    editingPowerSystemValue.value = node.corePowerSystem || null
-    showTypeSelector.value = false
-    showPowerSystemSelector.value = false
-  }
-}
-
-const cancelEdit = () => {
-  editingNode.value = null
-  showTypeSelector.value = false
-  showPowerSystemSelector.value = false
-}
-
-const handleEdit = async () => {
-  if (!editingNode.value?.id || !editingName.value.trim()) return
-  try {
-    const isTopLevel = (editingNode.value.deep ?? 0) === 0
-    await updateFaction(props.projectId, {
-      id: editingNode.value.id,
-      name: editingName.value.trim(),
-      description: editingDesc.value.trim() || undefined,
-      parentId: editingNode.value.parentId,
-      type: isTopLevel ? editingTypeValue.value || undefined : undefined,
-      corePowerSystem: isTopLevel ? editingPowerSystemValue.value || undefined : undefined
-    })
-    success('更新成功')
-    cancelEdit()
-    if (isRoot.value) {
-      await loadData()
-    } else {
-      emit('refresh')
-    }
-  } catch (e: any) { error('更新失败') }
-}
-
 const handleDelete = async (node: Faction) => {
   if (!node.id) return
   if (!isRoot.value) { emit('delete', node); return }
@@ -178,14 +130,20 @@ const isAdding = (parentId: number | null) => addingParentId.value === parentId
 // Drawer state (root only)
 const drawerOpen = ref(false)
 const drawerFaction = ref<Faction | null>(null)
+const drawerTab = ref('edit')
 
-const openDrawer = (node: Faction) => {
+const openDrawer = (node: Faction, tab?: string) => {
   if (isRoot.value) {
     drawerFaction.value = node
+    drawerTab.value = tab || 'edit'
     drawerOpen.value = true
   } else {
     emit('openDrawer', node)
   }
+}
+
+const handleDrawerSaved = () => {
+  loadData()
 }
 
 const paddingLeft = (deep: number) => `${20 + deep * 20}px`
@@ -257,73 +215,35 @@ defineExpose({ refresh })
           </button>
           <span v-else class="w-5 flex-shrink-0" />
 
-          <!-- Shield icon for top-level nodes -->
+          <!-- Node icon: Shield for top-level, Swords for sub-factions -->
           <Shield v-if="(node.deep ?? 0) === 0" class="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-500 dark:text-blue-400" />
+          <Swords v-else class="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500 dark:text-amber-400" />
 
-          <!-- EDIT mode -->
-          <template v-if="editingNode?.id === node.id">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <input v-model="editingName" class="flex-1 px-2 py-1 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" @keyup.enter="handleEdit" @keyup.escape="cancelEdit" />
-                <button @click="handleEdit" class="px-2 py-1 text-xs text-white bg-blue-500 rounded hover:bg-blue-600">保存</button>
-                <button @click="cancelEdit" class="px-2 py-1 text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200">取消</button>
-              </div>
-              <textarea v-model="editingDesc" class="mt-1 w-full px-2 py-1 text-xs bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded resize-none focus:outline-none focus:ring-1 focus:ring-blue-500" rows="2" placeholder="势力描述（可选）" @keyup.escape="cancelEdit"></textarea>
-
-              <!-- Type selector (top-level only) -->
-              <div v-if="(node.deep ?? 0) === 0" class="mt-1">
-                <button @click="showTypeSelector = !showTypeSelector" class="text-xs text-blue-500 hover:text-blue-600">
-                  {{ showTypeSelector ? '收起类型' : '修改类型' }}
-                </button>
-                <div v-if="showTypeSelector" class="flex items-center gap-2 mt-1">
-                  <button v-for="(config, key) in typeConfig" :key="key" @click="editingTypeValue = key"
-                    :class="['px-2 py-1 text-xs rounded', editingTypeValue === key ? config.bg + ' ' + config.text : 'bg-gray-100 dark:bg-gray-700 text-gray-500']">
-                    {{ config.label }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- Power system selector (top-level only) -->
-              <div v-if="(node.deep ?? 0) === 0" class="mt-1">
-                <button @click="showPowerSystemSelector = !showPowerSystemSelector" class="text-xs text-blue-500 hover:text-blue-600">
-                  {{ showPowerSystemSelector ? '收起力量体系' : '修改力量体系' }}
-                </button>
-                <div v-if="showPowerSystemSelector" class="mt-1">
-                  <select v-model="editingPowerSystemValue" class="px-2 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
-                    <option :value="null">无</option>
-                    <option v-for="[id, name] in powerSystemMap" :key="id" :value="id">{{ name }}</option>
-                  </select>
-                </div>
-              </div>
+          <!-- DISPLAY mode (always - editing is done in drawer) -->
+          <div class="flex-1 min-w-0 cursor-pointer" @click="openDrawer(node, 'edit')">
+            <div class="flex items-center gap-1.5">
+              <!-- Type badge (top-level only) -->
+              <span v-if="(node.deep ?? 0) === 0 && node.type && typeConfig[node.type]"
+                :class="['px-1.5 py-0.5 text-xs rounded', typeConfig[node.type].bg, typeConfig[node.type].text]">
+                {{ typeConfig[node.type].label }}
+              </span>
+              <!-- Name -->
+              <span :class="(node.deep ?? 0) === 0 ? 'text-sm font-medium text-gray-800 dark:text-gray-200' : 'text-sm text-gray-700 dark:text-gray-300'">{{ node.name }}</span>
+              <!-- Children count -->
+              <span v-if="node.children?.length" class="text-xs text-gray-400">({{ node.children.length }})</span>
+              <!-- Power system label (top-level only) -->
+              <span v-if="(node.deep ?? 0) === 0 && node.corePowerSystem && powerSystemMap.get(node.corePowerSystem)" class="text-xs text-gray-400">
+                · {{ powerSystemMap.get(node.corePowerSystem) }}
+              </span>
             </div>
-          </template>
-
-          <!-- DISPLAY mode -->
-          <template v-else>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-1.5">
-                <!-- Type badge (top-level only) -->
-                <span v-if="(node.deep ?? 0) === 0 && node.type && typeConfig[node.type]"
-                  :class="['px-1.5 py-0.5 text-xs rounded', typeConfig[node.type].bg, typeConfig[node.type].text]">
-                  {{ typeConfig[node.type].label }}
-                </span>
-                <!-- Name -->
-                <span :class="(node.deep ?? 0) === 0 ? 'text-sm font-medium text-gray-800 dark:text-gray-200' : 'text-sm text-gray-700 dark:text-gray-300'">{{ node.name }}</span>
-                <!-- Power system label (top-level only) -->
-                <span v-if="(node.deep ?? 0) === 0 && node.corePowerSystem && powerSystemMap.get(node.corePowerSystem)" class="text-xs text-gray-400">
-                  · {{ powerSystemMap.get(node.corePowerSystem) }}
-                </span>
-              </div>
-              <p v-if="node.description" class="text-xs text-gray-400 dark:text-gray-500 mt-0.5 whitespace-pre-line">{{ node.description }}</p>
-            </div>
-            <!-- Action buttons -->
-            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-              <button @click="openDrawer(node)" :disabled="disabled" class="p-1 text-gray-400 hover:text-blue-500 disabled:opacity-50" title="关联管理"><Link2 class="w-3.5 h-3.5" /></button>
-              <button @click="showAddForm(node.id!)" :disabled="disabled" class="p-1 text-gray-400 hover:text-blue-500 disabled:opacity-50"><Plus class="w-3.5 h-3.5" /></button>
-              <button @click="startEdit(node)" :disabled="disabled" class="p-1 text-gray-400 hover:text-amber-500 disabled:opacity-50"><Edit3 class="w-3.5 h-3.5" /></button>
-              <button @click="handleDelete(node)" :disabled="disabled" class="p-1 text-gray-400 hover:text-red-500 disabled:opacity-50"><Trash2 class="w-3.5 h-3.5" /></button>
-            </div>
-          </template>
+            <p v-if="node.description" class="text-xs text-gray-400 dark:text-gray-500 mt-0.5 whitespace-pre-line">{{ node.description }}</p>
+          </div>
+          <!-- Action buttons (always visible on mobile, hover on desktop) -->
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button @click.stop="openDrawer(node)" :disabled="disabled" class="p-1 text-gray-400 hover:text-blue-500 disabled:opacity-50" title="关联管理"><Link2 class="w-3.5 h-3.5" /></button>
+            <button @click.stop="showAddForm(node.id!)" :disabled="disabled" class="p-1 text-gray-400 hover:text-blue-500 disabled:opacity-50" title="添加子势力"><Plus class="w-3.5 h-3.5" /></button>
+            <button @click.stop="handleDelete(node)" :disabled="disabled" class="p-1 text-gray-400 hover:text-red-500 disabled:opacity-50" title="删除"><Trash2 class="w-3.5 h-3.5" /></button>
+          </div>
         </div>
 
         <!-- Add child form for this node -->
@@ -356,6 +276,8 @@ defineExpose({ refresh })
       v-model="drawerOpen"
       :faction="drawerFaction"
       :project-id="projectId"
+      :initial-tab="drawerTab"
+      @saved="handleDrawerSaved"
     />
   </div>
 </template>
