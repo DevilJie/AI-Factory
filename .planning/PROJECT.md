@@ -34,12 +34,12 @@ AI Factory 世界观模块中的势力阵营已完成从纯文本到结构化树
 - ✓ 力量体系独立提示词模板 (llm_power_system_create) — v1.0.3 Phase 06
 - ✓ 阵营势力独立提示词模板 (llm_faction_create, 含 geographyContext/powerSystemContext) — v1.0.3 Phase 06
 - ✓ 统一世界观模板精简（仅保留 t/b/l/r） — v1.0.3 Phase 06
+- ✓ GeographyTaskStrategy + PowerSystemTaskStrategy 独立生成策略 — v1.0.3 Phase 07
+- ✓ FactionTaskStrategy 依赖上下文注入策略 — v1.0.3 Phase 07
+- ✓ 3 个独立生成 REST 端点 + 依赖校验 — v1.0.3 Phase 07
 
 ### Active
 
-- [ ] 地理环境独立生成 REST API（提示词模板已在 Phase 06 创建）
-- [ ] 力量体系独立生成 REST API（提示词模板已在 Phase 06 创建）
-- [ ] 阵营势力独立生成 REST API + 依赖校验（提示词模板已在 Phase 06 创建）
 - [ ] 原有世界观生成逻辑重构（剔除三模块，改为组合调用）
 - [ ] 前端独立生成按钮（地理环境、力量体系、阵营势力各一个）
 
@@ -107,4 +107,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03 after Phase 06 completion*
+*Last updated: 2026-04-03 after Phase 07 completion*
