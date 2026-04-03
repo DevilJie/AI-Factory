@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import {
   Plus, Loader2, ChevronRight, ChevronDown, MapPin,
-  Trash2, Edit3, Globe2, Mountain, Trees
+  Trash2, Edit3, Globe2, Mountain, Trees, Sparkles
 } from 'lucide-vue-next'
 import {
   getGeographyTree as getGeographyTreeApi,
@@ -16,6 +16,11 @@ import { success, error } from '@/utils/toast'
 const props = defineProps<{
   projectId: string
   disabled: boolean
+  generatingSelf?: boolean
+}>()
+
+const emit = defineEmits<{
+  generate: []
 }>()
 
 const treeData = ref<ContinentRegion[]>([])
@@ -139,14 +144,27 @@ defineExpose({ refresh })
           {{ treeData.length }} 个顶级区域，{{ countNodes(treeData) }} 个节点
         </span>
       </div>
-      <button
-        @click="showAddForm(null)"
-        :disabled="disabled"
-        class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-800/30 transition-colors disabled:opacity-50"
-      >
-        <Plus class="w-3 h-3" />
-        添加区域
-      </button>
+      <div class="flex items-center gap-2">
+        <!-- AI Generate Button -->
+        <button
+          @click="emit('generate')"
+          :disabled="disabled"
+          class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-green-500 to-teal-500 rounded-lg hover:from-green-600 hover:to-teal-600 transition-colors disabled:opacity-50"
+        >
+          <Loader2 v-if="generatingSelf" class="w-3 h-3 animate-spin" />
+          <Sparkles v-else class="w-3 h-3" />
+          {{ generatingSelf ? '生成中...' : 'AI生成' }}
+        </button>
+        <!-- Add Button -->
+        <button
+          @click="showAddForm(null)"
+          :disabled="disabled"
+          class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-800/30 transition-colors disabled:opacity-50"
+        >
+          <Plus class="w-3 h-3" />
+          添加区域
+        </button>
+      </div>
     </div>
 
     <!-- Add root form -->
