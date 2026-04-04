@@ -11,10 +11,13 @@ import com.aifactory.entity.Project;
 import com.aifactory.enums.AIRole;
 import com.aifactory.mapper.ProjectMapper;
 import com.aifactory.service.ContinentRegionService;
+import com.aifactory.service.FactionService;
+import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptTemplateService;
 import com.aifactory.service.task.TaskStrategy;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -24,10 +27,12 @@ import java.util.*;
 /**
  * 地理环境独立生成任务策略
  * <p>
- * 三步流程：
+ * 五步流程：
  * 1. 清理旧地理环境数据 — 删除项目下所有 continent_region
  * 2. AI生成地理环境 — 调用 llm_geography_create 独立提示词模板
  * 3. 保存地理环境 — 委托 WorldviewXmlParser 解析 XML，调用 ContinentRegionService.saveTree 入库
+ * 4. 级联清理旧阵营势力 — 委托 FactionTaskStrategy 清理
+ * 5. 级联生成+保存阵营势力 — 构建依赖上下文（新地理环境 + 现有力量体系），委托 FactionTaskStrategy 生成并保存
  *
  * @Author AI Factory
  * @Date 2026-04-03
@@ -49,7 +54,13 @@ public class GeographyTaskStrategy implements TaskStrategy {
     private ContinentRegionService continentRegionService;
 
     @Autowired
+    private PowerSystemService powerSystemService;
+
+    @Autowired
     private WorldviewXmlParser worldviewXmlParser;
+
+    @Autowired
+    private FactionTaskStrategy factionTaskStrategy;
 
     @Override
     public String getTaskType() {
@@ -62,6 +73,8 @@ public class GeographyTaskStrategy implements TaskStrategy {
         steps.add(new StepConfig(1, "清理旧地理环境数据", "clean_geography", new HashMap<>()));
         steps.add(new StepConfig(2, "AI生成地理环境", "generate_geography", new HashMap<>()));
         steps.add(new StepConfig(3, "保存地理环境", "save_geography", new HashMap<>()));
+        steps.add(new StepConfig(4, "级联清理旧阵营势力", "cascade_clean_faction", new HashMap<>()));
+        steps.add(new StepConfig(5, "级联生成阵营势力", "cascade_generate_faction", new HashMap<>()));
         return steps;
     }
 
@@ -75,6 +88,10 @@ public class GeographyTaskStrategy implements TaskStrategy {
                 return generateGeography(step, context);
             case "save_geography":
                 return saveGeography(step, context);
+            case "cascade_clean_faction":
+                return factionTaskStrategy.executeStep(createStepStub("clean_faction"), context);
+            case "cascade_generate_faction":
+                return cascadeGenerateFaction(step, context);
             default:
                 return StepResult.failure("未知的步骤类型: " + stepType);
         }
@@ -174,6 +191,57 @@ public class GeographyTaskStrategy implements TaskStrategy {
             log.error("保存地理环境失败", e);
             return StepResult.failure("保存地理环境失败: " + e.getMessage());
         }
+    }
+
+    // ======================== 级联阵营势力 ========================
+
+    /**
+     * 级联生成+保存阵营势力 — 在地理环境已保存后，构建依赖上下文
+     * （新保存的地理环境 + 现有力量体系），委托 FactionTaskStrategy 完成生成和保存
+     */
+    private StepResult cascadeGenerateFaction(AiTaskStep step, TaskContext context) {
+        try {
+            Long projectId = context.getProjectId();
+
+            // 构建依赖上下文：新保存的地理环境 + 现有力量体系
+            String geographyContext = continentRegionService.buildGeographyText(projectId);
+            String powerSystemContext = powerSystemService.buildPowerSystemConstraint(projectId);
+
+            // 合并 config：保留原有字段 + 添加依赖上下文
+            Map<String, Object> configMap = new HashMap<>();
+            JsonNode config = context.getConfig();
+            if (config != null) {
+                config.fields().forEachRemaining(entry ->
+                    configMap.put(entry.getKey(), entry.getValue().asText()));
+            }
+            configMap.put("geographyContext", geographyContext);
+            configMap.put("powerSystemContext", powerSystemContext);
+
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode factionConfig = mapper.valueToTree(configMap);
+
+            TaskContext factionContext = new TaskContext(
+                context.getTaskId(), projectId, context.getTaskType(),
+                factionConfig, context.getSharedData()
+            );
+
+            // 委托 FactionTaskStrategy 执行 generate_faction + save_faction
+            StepResult genResult = factionTaskStrategy.executeStep(createStepStub("generate_faction"), factionContext);
+            if (!genResult.isSuccess()) return genResult;
+            return factionTaskStrategy.executeStep(createStepStub("save_faction"), factionContext);
+        } catch (Exception e) {
+            log.error("级联生成阵营势力失败", e);
+            return StepResult.failure("级联生成阵营势力失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 创建 AiTaskStep 桩对象 — 仅设置 stepType 用于 Strategy 内部 switch 分发
+     */
+    private AiTaskStep createStepStub(String stepType) {
+        AiTaskStep stub = new AiTaskStep();
+        stub.setStepType(stepType);
+        return stub;
     }
 
     // ======================== 工具方法 ========================
