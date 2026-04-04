@@ -15,6 +15,7 @@ import { success, error } from '@/utils/toast'
 import PowerSystemSection from './components/PowerSystemSection.vue'
 import GeographyTree from './components/GeographyTree.vue'
 import FactionTree from './components/FactionTree.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 
 const route = useRoute()
 
@@ -34,6 +35,19 @@ const formData = ref<Worldview>({
 const powerSystemRef = ref()
 const geographyTreeRef = ref()
 const factionTreeRef = ref()
+const cascadeConfirmRef = ref()
+const cascadeConfirmMessage = ref('')
+const cascadeConfirmAction = ref<(() => void) | null>(null)
+
+const showCascadeConfirm = (message: string, action: () => void) => {
+  cascadeConfirmMessage.value = message
+  cascadeConfirmAction.value = action
+  cascadeConfirmRef.value?.show()
+}
+
+const onCascadeConfirm = () => {
+  cascadeConfirmAction.value?.()
+}
 
 // 任务存储键
 const getGenerateTaskKey = (projectId: string) =>
@@ -188,9 +202,9 @@ const moduleNames: Record<string, string> = {
 }
 
 const handleGenerateGeography = async () => {
-  if (!confirm('重新生成地理环境将同时重新生成势力阵营数据，是否继续？')) {
-    return
-  }
+  showCascadeConfirm('重新生成地理环境将同时重新生成势力阵营数据（因为势力依赖地理环境），是否继续？', confirmGeographyGenerate)
+}
+const confirmGeographyGenerate = async () => {
   generatingModule.value = 'geography'
   try {
     const result = await generateGeographyAsync(projectId())
@@ -213,9 +227,9 @@ const handleGenerateGeography = async () => {
 }
 
 const handleGeneratePowerSystem = async () => {
-  if (!confirm('重新生成力量体系将同时重新生成势力阵营数据，是否继续？')) {
-    return
-  }
+  showCascadeConfirm('重新生成力量体系将同时重新生成势力阵营数据（因为势力依赖力量体系数据），是否继续？', confirmPowerSystemGenerate)
+}
+const confirmPowerSystemGenerate = async () => {
   generatingModule.value = 'powerSystem'
   try {
     const result = await generatePowerSystemAsync(projectId())
@@ -492,5 +506,15 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+    <!-- 级联确认弹窗 -->
+    <ConfirmDialog
+      ref="cascadeConfirmRef"
+      title="确认操作"
+      :message="cascadeConfirmMessage"
+      variant="warning"
+      confirm-text="确认生成"
+      cancel-text="取消"
+      @confirm="onCascadeConfirm"
+    />
   </div>
 </template>
