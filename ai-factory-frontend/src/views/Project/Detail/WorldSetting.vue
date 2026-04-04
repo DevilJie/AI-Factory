@@ -188,6 +188,9 @@ const moduleNames: Record<string, string> = {
 }
 
 const handleGenerateGeography = async () => {
+  if (!confirm('重新生成地理环境将同时重新生成势力阵营数据，是否继续？')) {
+    return
+  }
   generatingModule.value = 'geography'
   try {
     const result = await generateGeographyAsync(projectId())
@@ -195,6 +198,7 @@ const handleGenerateGeography = async () => {
     await pollTaskStatus(result.taskId)
     clearModuleTask('geography')
     geographyTreeRef.value?.refresh()
+    factionTreeRef.value?.refresh()
     success('地理环境生成成功')
   } catch (e: any) {
     // Do NOT call error() for API-level errors -- Axios interceptor already shows toast.
@@ -209,6 +213,9 @@ const handleGenerateGeography = async () => {
 }
 
 const handleGeneratePowerSystem = async () => {
+  if (!confirm('重新生成力量体系将同时重新生成势力阵营数据，是否继续？')) {
+    return
+  }
   generatingModule.value = 'powerSystem'
   try {
     const result = await generatePowerSystemAsync(projectId())
@@ -216,6 +223,7 @@ const handleGeneratePowerSystem = async () => {
     await pollTaskStatus(result.taskId)
     clearModuleTask('powerSystem')
     powerSystemRef.value?.refresh()
+    factionTreeRef.value?.refresh()
     success('力量体系生成成功')
   } catch (e: any) {
     if (e.message && (e.message.includes('超时') || e.message.includes('失败'))) {
