@@ -63,9 +63,7 @@ const loadData = async () => {
       if (ps.id) map.set(ps.id, ps.name)
     }
     powerSystemMap.value = map
-    rootTreeData.value.forEach(node => {
-      if (node.id) expandedNodes.value.add(node.id)
-    })
+    // Default collapsed — don't expand nodes on load
   } catch (e: any) {
     if (e.response?.status !== 404) console.error('加载势力阵营失败:', e)
   } finally {
