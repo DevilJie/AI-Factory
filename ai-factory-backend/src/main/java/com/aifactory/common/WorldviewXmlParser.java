@@ -3,6 +3,8 @@ package com.aifactory.common;
 import com.aifactory.entity.NovelContinentRegion;
 import com.aifactory.entity.NovelFaction;
 import com.aifactory.entity.NovelPowerSystem;
+import com.aifactory.entity.NovelPowerSystemLevel;
+import com.aifactory.entity.NovelPowerSystemLevelStep;
 import com.aifactory.service.ContinentRegionService;
 import com.aifactory.service.PowerSystemService;
 import lombok.extern.slf4j.Slf4j;
@@ -73,6 +75,13 @@ public class WorldviewXmlParser {
         String type
     ) {}
 
+    /**
+     * Parsed power system result: list of NovelPowerSystem with nested levels and steps
+     */
+    public record ParsedPowerSystems(
+        List<NovelPowerSystem> systems
+    ) {}
+
     // ======================== Geography Parsing ========================
 
     /**
@@ -94,6 +103,9 @@ public class WorldviewXmlParser {
                 return Collections.emptyList();
             }
             String geographyXml = "<root>" + aiResponse.substring(start, end + 4) + "</root>";
+
+            // Sanitize XML to fix common LLM output issues before DOM parsing
+            geographyXml = sanitizeXmlForDomParsing(geographyXml, new String[]{"r"});
 
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(false);
@@ -177,6 +189,195 @@ public class WorldviewXmlParser {
         }
 
         return region;
+    }
+
+    // ======================== Power System Parsing ========================
+
+    /**
+     * Parse power system XML from AI response.
+     * Extracts {@code <p>...</p>} fragment, wraps in {@code <root>}, DOM parses,
+     * and returns a ParsedPowerSystems record containing NovelPowerSystem entities
+     * with nested levels and steps.
+     * <p>
+     * Uses DOM parsing (like geography) because Jackson XmlParser cannot handle
+     * the root element mismatch: AI returns {@code <p>} but WorldSettingXmlDto
+     * expects {@code <w>}.
+     *
+     * @param aiResponse the full AI response containing {@code <p>...</p>} tags
+     * @param projectId  the project ID to set on each power system
+     * @return ParsedPowerSystems record (systems list may be empty)
+     */
+    public ParsedPowerSystems parsePowerSystemXml(String aiResponse, Long projectId) {
+        try {
+            // Extract <p>...</p> fragment
+            int start = aiResponse.indexOf("<p>");
+            int end = aiResponse.indexOf("</p>");
+            if (start < 0 || end < 0) {
+                log.info("未找到 <p> 力量体系标签，跳过入库");
+                return new ParsedPowerSystems(Collections.emptyList());
+            }
+            String powerSystemXml = "<root>" + aiResponse.substring(start, end + 4) + "</root>";
+
+            // Sanitize XML to fix common LLM output issues before DOM parsing
+            powerSystemXml = sanitizeXmlForDomParsing(powerSystemXml, new String[]{"ss", "ll"});
+
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(false);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(new org.xml.sax.InputSource(new StringReader(powerSystemXml)));
+
+            Element root = doc.getDocumentElement();
+
+            // Find the <p> element
+            Element pElement = null;
+            NodeList rootChildren = root.getChildNodes();
+            for (int i = 0; i < rootChildren.getLength(); i++) {
+                Node node = rootChildren.item(i);
+                if (node.getNodeType() == Node.ELEMENT_NODE && "p".equals(node.getNodeName())) {
+                    pElement = (Element) node;
+                    break;
+                }
+            }
+            if (pElement == null) {
+                log.info("<p> 标签内无内容，跳过入库");
+                return new ParsedPowerSystems(Collections.emptyList());
+            }
+
+            List<NovelPowerSystem> systems = new ArrayList<>();
+
+            // Parse each <ss> (cultivation system) under <p>
+            NodeList ssNodes = pElement.getChildNodes();
+            for (int i = 0; i < ssNodes.getLength(); i++) {
+                Node ssNode = ssNodes.item(i);
+                if (ssNode.getNodeType() == Node.ELEMENT_NODE && "ss".equals(ssNode.getNodeName())) {
+                    try {
+                        systems.add(parseSingleSystem((Element) ssNode, projectId));
+                    } catch (Exception e) {
+                        log.warn("解析力量体系节点失败，跳过: {}", e.getMessage());
+                    }
+                }
+            }
+
+            if (systems.isEmpty()) {
+                log.info("力量体系解析结果为空，跳过入库");
+            }
+
+            return new ParsedPowerSystems(systems);
+
+        } catch (Exception e) {
+            log.error("解析力量体系失败, projectId={}", projectId, e);
+            return new ParsedPowerSystems(Collections.emptyList());
+        }
+    }
+
+    /**
+     * Parse a single {@code <ss>} system node into a NovelPowerSystem entity
+     * with nested levels and steps.
+     */
+    private NovelPowerSystem parseSingleSystem(Element ssElement, Long projectId) {
+        NovelPowerSystem system = new NovelPowerSystem();
+        system.setProjectId(projectId);
+
+        List<NovelPowerSystemLevel> levels = new ArrayList<>();
+        NodeList children = ssElement.getChildNodes();
+
+        for (int i = 0; i < children.getLength(); i++) {
+            Node child = children.item(i);
+            if (child.getNodeType() != Node.ELEMENT_NODE) continue;
+            String tag = child.getNodeName();
+
+            switch (tag) {
+                case "name" -> system.setName(child.getTextContent().trim());
+                case "sf" -> system.setSourceFrom(child.getTextContent().trim());
+                case "cr" -> system.setCoreResource(child.getTextContent().trim());
+                case "cm" -> system.setCultivationMethod(child.getTextContent().trim());
+                case "d" -> system.setDescription(child.getTextContent().trim());
+                case "lls" -> {
+                    // Parse levels (legacy format: <lls> wrapping <ll> nodes)
+                    NodeList llNodes = child.getChildNodes();
+                    int levelIndex = 1;
+                    for (int j = 0; j < llNodes.getLength(); j++) {
+                        Node llNode = llNodes.item(j);
+                        if (llNode.getNodeType() == Node.ELEMENT_NODE && "ll".equals(llNode.getNodeName())) {
+                            try {
+                                levels.add(parseSingleLevel((Element) llNode, levelIndex++));
+                            } catch (Exception e) {
+                                log.warn("解析境界节点失败，跳过: {}", e.getMessage());
+                            }
+                        }
+                    }
+                }
+                case "ll" -> {
+                    // Parse single level (new format: <ll> directly under <ss>)
+                    try {
+                        levels.add(parseSingleLevel((Element) child, levels.size() + 1));
+                    } catch (Exception e) {
+                        log.warn("解析境界节点失败，跳过: {}", e.getMessage());
+                    }
+                }
+            }
+        }
+
+        if (!levels.isEmpty()) {
+            system.setLevels(levels);
+        }
+
+        return system;
+    }
+
+    /**
+     * Parse a single {@code <ll>} level node into a NovelPowerSystemLevel entity
+     * with nested steps.
+     */
+    private NovelPowerSystemLevel parseSingleLevel(Element llElement, int levelIndex) {
+        NovelPowerSystemLevel level = new NovelPowerSystemLevel();
+        level.setLevel(levelIndex);
+
+        List<NovelPowerSystemLevelStep> steps = new ArrayList<>();
+        NodeList children = llElement.getChildNodes();
+
+        for (int i = 0; i < children.getLength(); i++) {
+            Node child = children.item(i);
+            if (child.getNodeType() != Node.ELEMENT_NODE) continue;
+            String tag = child.getNodeName();
+
+            switch (tag) {
+                case "ln" -> level.setLevelName(child.getTextContent().trim());
+                case "dd" -> level.setDescription(child.getTextContent().trim());
+                case "bc" -> level.setBreakthroughCondition(child.getTextContent().trim());
+                case "lsp" -> level.setLifespan(child.getTextContent().trim());
+                case "pr" -> level.setPowerRange(child.getTextContent().trim());
+                case "la" -> level.setLandmarkAbility(child.getTextContent().trim());
+                case "steps" -> {
+                    // Parse step list (legacy format: <steps> wrapping <step> nodes)
+                    NodeList stepNodes = child.getChildNodes();
+                    int stepIndex = 1;
+                    for (int j = 0; j < stepNodes.getLength(); j++) {
+                        Node stepNode = stepNodes.item(j);
+                        if (stepNode.getNodeType() == Node.ELEMENT_NODE && "step".equals(stepNode.getNodeName())) {
+                            NovelPowerSystemLevelStep stepEntity = new NovelPowerSystemLevelStep();
+                            stepEntity.setLevel(stepIndex++);
+                            stepEntity.setLevelName(stepNode.getTextContent().trim());
+                            steps.add(stepEntity);
+                        }
+                    }
+                }
+                case "step" -> {
+                    // Parse single step (new format: <step> directly under <ll>)
+                    NovelPowerSystemLevelStep stepEntity = new NovelPowerSystemLevelStep();
+                    stepEntity.setLevel(steps.size() + 1);
+                    stepEntity.setLevelName(child.getTextContent().trim());
+                    steps.add(stepEntity);
+                }
+            }
+        }
+
+        if (!steps.isEmpty()) {
+            level.setSteps(steps);
+        }
+
+        return level;
     }
 
     // ======================== Faction Parsing ========================
@@ -456,6 +657,72 @@ public class WorldviewXmlParser {
 
         log.warn("三级匹配均失败，未找到力量体系: {}", name);
         return null;
+    }
+
+    // ======================== XML Sanitization ========================
+
+    /**
+     * Sanitize LLM-generated XML to fix common structural issues before DOM parsing.
+     * <p>
+     * Common LLM issues:
+     * 1. Extra closing tags (e.g., {@code </ll>} without matching {@code <ll>} opening)
+     * 2. Missing closing tags (e.g., {@code <ll>} without {@code </ll>})
+     * <p>
+     * Strategy: For each container tag, count opens vs closes and fix imbalances:
+     * - Extra closes: remove the last N excess closing tags
+     * - Missing closes: append closing tags at the end of the XML
+     *
+     * @param xml           the XML string to sanitize
+     * @param containerTags tag names that are commonly repeated and may have balance issues
+     * @return sanitized XML string
+     */
+    private String sanitizeXmlForDomParsing(String xml, String[] containerTags) {
+        for (String tag : containerTags) {
+            String openTag = "<" + tag + ">";
+            String closeTag = "</" + tag + ">";
+
+            int openCount = countTagOccurrences(xml, openTag);
+            int closeCount = countTagOccurrences(xml, closeTag);
+
+            if (closeCount == openCount) continue; // already balanced
+
+            if (closeCount > openCount) {
+                // Remove excess closing tags from the end
+                int excess = closeCount - openCount;
+                int searchFrom = xml.length();
+                while (excess > 0 && searchFrom > 0) {
+                    int idx = xml.lastIndexOf(closeTag, searchFrom - 1);
+                    if (idx < 0) break;
+                    xml = xml.substring(0, idx) + xml.substring(idx + closeTag.length());
+                    searchFrom = idx;
+                    excess--;
+                }
+                log.debug("XML sanitizer: removed {} excess </{}> tags", closeCount - openCount - excess, tag);
+            } else {
+                // Add missing closing tags at the end
+                int missing = openCount - closeCount;
+                StringBuilder suffix = new StringBuilder();
+                for (int i = 0; i < missing; i++) {
+                    suffix.append(closeTag);
+                }
+                xml = xml + suffix;
+                log.debug("XML sanitizer: added {} missing </{}> tags", missing, tag);
+            }
+        }
+        return xml;
+    }
+
+    /**
+     * Count non-overlapping occurrences of a substring.
+     */
+    private int countTagOccurrences(String str, String sub) {
+        int count = 0;
+        int idx = 0;
+        while ((idx = str.indexOf(sub, idx)) != -1) {
+            count++;
+            idx += sub.length();
+        }
+        return count;
     }
 
     // ======================== Utility ========================

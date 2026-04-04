@@ -266,6 +266,82 @@ class WorldviewXmlParserTest {
         assertNull(result);
     }
 
+    // ======================== parsePowerSystemXml (new format) ========================
+
+    @Test
+    void testParsePowerSystemXml_newFormat_noLlsNoStepsWrapper() {
+        // New template format: <ll> directly under <ss>, <step> directly under <ll>
+        String xml = "<p><ss><name>修仙</name><sf>天地灵气</sf><cr>灵石</cr><cm>打坐冥想</cm>" +
+            "<d><![CDATA[修仙体系描述]]></d>" +
+            "<ll><ln>练气期</ln><dd><![CDATA[吸收灵气]]></dd><bc><![CDATA[感悟天地]]></bc>" +
+            "<lsp>约150年</lsp><pr><![CDATA[战力描述]]></pr><la>灵气外放</la>" +
+            "<step>初期</step><step>中期</step><step>后期</step></ll>" +
+            "<ll><ln>筑基期</ln><dd><![CDATA[凝聚灵液]]></dd><bc><![CDATA[灵气液化]]></bc>" +
+            "<lsp>约300年</lsp><pr><![CDATA[战力描述2]]></pr><la>御剑飞行</la>" +
+            "<step>初期</step><step>中期</step><step>后期</step></ll>" +
+            "</ss></p>";
+
+        WorldviewXmlParser.ParsedPowerSystems result = worldviewXmlParser.parsePowerSystemXml(xml, 1L);
+
+        assertEquals(1, result.systems().size());
+        NovelPowerSystem system = result.systems().get(0);
+        assertEquals("修仙", system.getName());
+        assertEquals("天地灵气", system.getSourceFrom());
+        assertEquals("灵石", system.getCoreResource());
+        assertEquals("打坐冥想", system.getCultivationMethod());
+        assertEquals(1L, system.getProjectId());
+
+        assertNotNull(system.getLevels());
+        assertEquals(2, system.getLevels().size());
+
+        // Level 1: 练气期
+        assertEquals("练气期", system.getLevels().get(0).getLevelName());
+        assertEquals(1, system.getLevels().get(0).getLevel());
+        assertEquals("约150年", system.getLevels().get(0).getLifespan());
+        assertEquals("灵气外放", system.getLevels().get(0).getLandmarkAbility());
+        assertNotNull(system.getLevels().get(0).getSteps());
+        assertEquals(3, system.getLevels().get(0).getSteps().size());
+        assertEquals("初期", system.getLevels().get(0).getSteps().get(0).getLevelName());
+        assertEquals(1, system.getLevels().get(0).getSteps().get(0).getLevel());
+        assertEquals("后期", system.getLevels().get(0).getSteps().get(2).getLevelName());
+
+        // Level 2: 筑基期
+        assertEquals("筑基期", system.getLevels().get(1).getLevelName());
+        assertEquals(2, system.getLevels().get(1).getLevel());
+        assertEquals("御剑飞行", system.getLevels().get(1).getLandmarkAbility());
+    }
+
+    @Test
+    void testParsePowerSystemXml_legacyFormat_withLlsAndStepsWrapper() {
+        // Old format: <lls> wrapping <ll>, <steps> wrapping <step>
+        String xml = "<p><ss><name>仙道</name><sf>灵气</sf><cr>灵石</cr><cm>冥想</cm>" +
+            "<d>描述</d>" +
+            "<lls><ll><ln>练气</ln><dd>描述</dd><bc>条件</bc>" +
+            "<steps><step>初</step><step>中</step></steps>" +
+            "</ll></lls>" +
+            "</ss></p>";
+
+        WorldviewXmlParser.ParsedPowerSystems result = worldviewXmlParser.parsePowerSystemXml(xml, 1L);
+
+        assertEquals(1, result.systems().size());
+        NovelPowerSystem system = result.systems().get(0);
+        assertEquals("仙道", system.getName());
+        assertEquals(1, system.getLevels().size());
+        assertEquals("练气", system.getLevels().get(0).getLevelName());
+        assertEquals(2, system.getLevels().get(0).getSteps().size());
+        assertEquals("初", system.getLevels().get(0).getSteps().get(0).getLevelName());
+        assertEquals("中", system.getLevels().get(0).getSteps().get(1).getLevelName());
+    }
+
+    @Test
+    void testParsePowerSystemXml_noPTag() {
+        String xml = "No power system tags here";
+
+        WorldviewXmlParser.ParsedPowerSystems result = worldviewXmlParser.parsePowerSystemXml(xml, 1L);
+
+        assertTrue(result.systems().isEmpty());
+    }
+
     // ======================== buildNameToIdMap ========================
 
     @Test
