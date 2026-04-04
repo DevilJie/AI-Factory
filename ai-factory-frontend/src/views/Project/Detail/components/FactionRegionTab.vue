@@ -156,6 +156,44 @@ const hasChildren = (node: ContinentRegion): boolean => {
   return !!(node.children && node.children.length > 0)
 }
 
+// 获取节点及所有后代节点的 id
+const getAllDescendantIds = (node: ContinentRegion): number[] => {
+  const ids: number[] = []
+  const walk = (children: ContinentRegion[]) => {
+    for (const child of children) {
+      if (child.id) ids.push(child.id)
+      if (child.children?.length) walk(child.children)
+    }
+  }
+  if (node.children?.length) walk(node.children)
+  return ids
+}
+
+const isIdSelected = (id: number): boolean => {
+  return associatedRegionIds.value.has(id) || selectedRegionIds.value.includes(id)
+}
+
+// 判断节点选中状态
+const isNodeChecked = (node: ContinentRegion): boolean => {
+  const id = node.id
+  if (!id) return false
+  if (isIdSelected(id)) return true
+  // 所有子节点都选中
+  if (node.children?.length) {
+    const allIds = getAllDescendantIds(node)
+    if (allIds.length > 0 && allIds.every(cid => isIdSelected(cid))) return true
+  }
+  return false
+}
+
+// 判断节点半选状态
+const isNodeIndeterminate = (node: ContinentRegion): boolean => {
+  if (!node.children?.length) return false
+  const ids = getAllDescendantIds(node)
+  const checkedCount = ids.filter(id => isIdSelected(id)).length
+  return checkedCount > 0 && checkedCount < ids.length
+}
+
 onMounted(() => {
   loadData()
 })
@@ -188,15 +226,21 @@ onMounted(() => {
           <input
             type="checkbox"
             :value="node.id"
-            :checked="associatedRegionIds.has(node.id!) || selectedRegionIds.includes(node.id!)"
+            :checked="isNodeChecked(node)"
+            :indeterminate="isNodeIndeterminate(node)"
             :disabled="associatedRegionIds.has(node.id!)"
             @change="(e: Event) => {
               const checked = (e.target as HTMLInputElement).checked
-              if (checked && node.id && !selectedRegionIds.includes(node.id)) {
-                selectedRegionIds.push(node.id)
-              } else if (!checked && node.id) {
-                const idx = selectedRegionIds.indexOf(node.id)
-                if (idx > -1) selectedRegionIds.splice(idx, 1)
+              const ids = getAllDescendantIds(node)
+              if (node.id) ids.push(node.id)
+              for (const id of ids) {
+                if (associatedRegionIds.has(id)) continue
+                if (checked && !selectedRegionIds.includes(id)) {
+                  selectedRegionIds.push(id)
+                } else if (!checked) {
+                  const idx = selectedRegionIds.indexOf(id)
+                  if (idx > -1) selectedRegionIds.splice(idx, 1)
+                }
               }
             }"
             class="flex-shrink-0"
