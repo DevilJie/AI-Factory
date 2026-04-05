@@ -46,6 +46,49 @@
 
 ---
 
+## Milestone: v1.0.3 — 世界观生成任务拆分
+
+**Shipped:** 2026-04-05
+**Phases:** 4 | **Plans:** 6 | **Tasks:** 11
+
+### What Was Built
+- V4 Flyway migration with 3 independent AI prompt templates + unified template simplification
+- 3 independent generation strategies (GeographyTaskStrategy, PowerSystemTaskStrategy, FactionTaskStrategy) with dependency validation
+- WorldviewXmlParser shared DOM parsing utility (~400 lines extracted, 26 unit tests)
+- WorldviewTaskStrategy 9-step orchestrator (~250 LOC, down from ~920)
+- 3 independent AI generation buttons with mutual exclusion, localStorage recovery, polling
+- Post-milestone: cascade faction re-generation, indeterminate region tree state, ConfirmDialog
+
+### What Worked
+- "Copy first, extract later" strategy — Phase 7 copied DOM parsing to unblock API work, Phase 8 consolidated cleanly
+- 9-step orchestrator pattern — clean delegation via step stubs, each module fully persists before next starts
+- Single generatingModule union-type ref — 3 booleans → 1 ref for cleaner mutual exclusion
+- localStorage recovery for in-progress generation — 10min expiry matching poll timeout
+- Config is yolo mode — auto-proceed on verification gates kept momentum
+
+### What Was Inefficient
+- Phase 6-8 all executed in a single day with minimal context breaks — risk of fatigue
+- REQUIREMENTS.md UI items weren't checked off after Phase 9 execution — had to fix during milestone completion
+- ROADMAP Progress table got out of sync (showed 0/? for completed phases) — STATE.md was more reliable
+- UAT tests defined but never run (7 pending) — human verification skipped for milestone completion
+
+### Patterns Established
+- Step stub delegation: createStepStub(String) for cross-strategy calls from orchestrator
+- Module generation state machine: generatingModule ref + handler + localStorage + restoreModuleState
+- Controller-level dependency validation with context injection into async task config
+- Green gradient AI button: `bg-gradient-to-r from-green-500 to-teal-500` with Sparkles/Loader2 icons
+
+### Key Lessons
+1. Extract after copy is a safe refactoring pattern — duplicate first to unblock, consolidate when all consumers are known
+2. Orchestrator + Strategy pattern scales well — WorldviewTaskStrategy went from 920 → 250 LOC by delegating
+3. REQUIREMENTS.md should be updated immediately after execution, not deferred to milestone completion
+4. UAT testing should be run before claiming milestone complete — automate what can be automated
+
+### Cost Observations
+- Model mix: ~90% sonnet, ~10% opus (planning/review agents)
+- Sessions: 3 (Phase 6-7, Phase 8, Phase 9)
+- Notable: Phase 8-02 orchestrator rewrite completed in 5 minutes — clear plan + familiar codebase
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -53,14 +96,18 @@
 | Milestone | Sessions | Phases | Key Change |
 |-----------|----------|--------|------------|
 | v1.0.2 | 3+ | 5 | Third worldview structuring — pattern fully mature |
+| v1.0.3 | 3 | 4 | Generation decomposition — orchestrator pattern proven |
 
 ### Cumulative Quality
 
 | Milestone | Tests | Coverage | Zero-Dep Additions |
 |-----------|-------|----------|-------------------|
 | v1.0.2 | 0 | n/a | 37 requirements, all met |
+| v1.0.3 | 40+ | parser+orchestrator | 16 requirements, all met |
 
 ### Top Lessons (Verified Across Milestones)
 
 1. Clone existing patterns for similar domains — zero deviation means zero risk
 2. Tree table + transient field + DOM parsing is a proven stack for worldview structuring
+3. Orchestrator + Strategy pattern decomposes monoliths cleanly — 920 → 250 LOC
+4. Copy-first extract-later is safe for cross-cutting refactors

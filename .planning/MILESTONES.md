@@ -1,5 +1,19 @@
 # Milestones
 
+## v1.0.3 世界观生成任务拆分 (Shipped: 2026-04-04)
+
+**Phases completed:** 4 phases, 6 plans, 11 tasks
+
+**Key accomplishments:**
+
+- V4 Flyway migration creating 3 independent AI prompt templates (geography/power system/faction) by extracting from unified worldview template, plus simplifying the unified template to only output t/b/l/r fields
+- FactionTaskStrategy with 3-step async pipeline (clean/generate/save) plus 3 REST endpoints for independent geography, power system, and faction generation with dependency validation
+- Extracted ~400 lines of duplicated DOM parsing into WorldviewXmlParser utility, refactored GeographyTaskStrategy and FactionTaskStrategy to delegate all XML parsing and name matching
+- Rewrote WorldviewTaskStrategy from 920-line monolith to ~250-line 9-step orchestrator delegating to GeographyTaskStrategy, PowerSystemTaskStrategy, FactionTaskStrategy with dependency context injection and 14 unit tests
+- 3 independent AI generation buttons with mutual exclusion, localStorage recovery, and polling for Geography/PowerSystem/Faction modules
+
+---
+
 ## v1.0.2 势力阵营结构化重构 (Shipped: 2026-04-02)
 
 **Phases completed:** 5 phases, 12 plans, 18 tasks
