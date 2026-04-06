@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0.4
 milestone_name: 角色体系关联与提取增强
 status: executing
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-04-06T00:06:49Z"
+stopped_at: Completed 10-02-PLAN.md
+last_updated: "2026-04-06T00:19:19Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # 项目状态
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 ## Current Position
 
 Phase: 10-角色体系关联与提取增强
-Plan: 01 complete, 02 next
-Status: Executing — Plan 01 complete
+Plan: 02 complete, 03 next
+Status: Executing — Plan 02 complete
 Last activity: 2026-04-06
 
-Progress: [===-------] 33%
+Progress: [======----] 67%
 
 ## Performance Metrics
 
@@ -46,7 +46,7 @@ Progress: [===-------] 33%
 |-------|-------|--------|
 | 1-5 (v1.0.2) | 12 | Complete |
 | 6-9 (v1.0.3) | 6 | Complete |
-| 10 (v1.0.4) | 1/3 | In Progress |
+| 10 (v1.0.4) | 2/3 | In Progress |
 
 ## Accumulated Context
 
@@ -57,6 +57,8 @@ All decisions logged in PROJECT.md Key Decisions table (18 items, all Good).
 - 10-01: In-memory name matching pattern for power system and faction resolution (avoids N+1 in extraction loop)
 - 10-01: Batch query aggregation pattern for character list API (cultivationRealm + factionInfo summary)
 - 10-01: CharacterDetailVO with fromCharacter() factory method for clean VO construction
+- 10-02: Prompt template v2 with Chinese roleType definitions and FC tag format for improved classification accuracy
+- 10-02: existingRoleDistribution injected as separate template variable while roleType definitions are inline in chapterInfo
 
 ### Pending Todos
 
@@ -76,5 +78,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-04-06
-Stopped at: Completed 10-01-PLAN.md
+Stopped at: Completed 10-02-PLAN.md
 Resume file: None
