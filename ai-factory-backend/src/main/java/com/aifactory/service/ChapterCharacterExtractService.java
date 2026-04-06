@@ -6,10 +6,23 @@ import com.aifactory.dto.AIGenerateResponse;
 import com.aifactory.dto.ChapterCharacterExtractXmlDto;
 import com.aifactory.dto.ChapterCharacterExtractXmlDto.CharacterExtractDto;
 import com.aifactory.dto.ChapterCharacterExtractXmlDto.CultivationSystemDto;
+import com.aifactory.dto.ChapterCharacterExtractXmlDto.FactionConnectionDto;
 import com.aifactory.entity.Chapter;
+import com.aifactory.entity.CharacterPowerSystem;
 import com.aifactory.entity.NovelCharacter;
+import com.aifactory.entity.NovelFaction;
+import com.aifactory.entity.NovelFactionCharacter;
+import com.aifactory.entity.NovelPowerSystem;
+import com.aifactory.entity.NovelPowerSystemLevel;
+import com.aifactory.entity.NovelPowerSystemLevelStep;
 import com.aifactory.entity.NovelWorldview;
+import com.aifactory.mapper.CharacterPowerSystemMapper;
 import com.aifactory.mapper.NovelCharacterMapper;
+import com.aifactory.mapper.NovelFactionCharacterMapper;
+import com.aifactory.mapper.NovelFactionMapper;
+import com.aifactory.mapper.NovelPowerSystemLevelMapper;
+import com.aifactory.mapper.NovelPowerSystemLevelStepMapper;
+import com.aifactory.mapper.NovelPowerSystemMapper;
 import com.aifactory.mapper.NovelWorldviewMapper;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -55,6 +68,12 @@ public class ChapterCharacterExtractService {
     private final NovelCharacterChapterService characterChapterService;
     private final PromptTemplateService promptTemplateService;
     private final PowerSystemService powerSystemService;
+    private final CharacterPowerSystemMapper characterPowerSystemMapper;
+    private final NovelPowerSystemMapper novelPowerSystemMapper;
+    private final NovelPowerSystemLevelMapper powerSystemLevelMapper;
+    private final NovelPowerSystemLevelStepMapper powerSystemLevelStepMapper;
+    private final NovelFactionMapper novelFactionMapper;
+    private final NovelFactionCharacterMapper novelFactionCharacterMapper;
 
     /**
      * 提示词模板编码
@@ -172,7 +191,13 @@ public class ChapterCharacterExtractService {
                 // 7.2 匹配或创建角色
                 NovelCharacter character = matchOrCreateCharacter(projectId, charDto, existingCharacters);
 
-                // 7.3 创建章节关联
+                // 7.3 解析并保存角色-力量体系关联 (per D-01/D-02)
+                resolveAndSavePowerSystemAssociations(character.getId(), charDto.getCultivationSystems(), projectId);
+
+                // 7.4 解析并保存角色-势力关联 (per D-04/D-05/D-06)
+                resolveAndSaveFactionAssociations(character.getId(), charDto.getFactionConnections(), projectId);
+
+                // 7.5 创建章节关联
                 createCharacterChapterRelation(chapter, character, charDto);
 
                 log.info("角色处理完成: characterId={}, name={}", character.getId(), character.getName());
@@ -518,6 +543,212 @@ public class ChapterCharacterExtractService {
         } catch (JsonProcessingException e) {
             log.warn("解析修炼体系JSON失败: {}", e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * 解析并保存角色-力量体系关联
+     *
+     * 遍历提取到的修炼体系列表，通过名称匹配找到对应的力量体系和境界等级，
+     * 然后upsert到character_power_system关联表。
+     *
+     * 匹配策略（per D-01）：
+     * 1. systemName精确匹配 -> powerSystemId
+     * 2. currentLevel精确匹配 -> levelId（在对应力量体系内）
+     * 3. 匹配失败时ID字段为null（per D-03），文本信息保留在cultivation_level JSON中
+     *
+     * @param characterId 角色ID
+     * @param cultivationSystems 修炼体系DTO列表
+     * @param projectId 项目ID
+     */
+    private void resolveAndSavePowerSystemAssociations(Long characterId,
+                                                        List<CultivationSystemDto> cultivationSystems,
+                                                        Long projectId) {
+        if (cultivationSystems == null || cultivationSystems.isEmpty()) {
+            return;
+        }
+
+        // 获取项目下所有力量体系，用于内存匹配
+        List<NovelPowerSystem> allSystems = novelPowerSystemMapper.selectList(
+                new LambdaQueryWrapper<NovelPowerSystem>()
+                        .eq(NovelPowerSystem::getProjectId, projectId));
+
+        for (CultivationSystemDto csDto : cultivationSystems) {
+            if (csDto.getSystemName() == null || csDto.getSystemName().isBlank()) {
+                continue;
+            }
+
+            // Step 1: 匹配力量体系名称（精确 -> 模糊）
+            NovelPowerSystem matchedSystem = null;
+            for (NovelPowerSystem sys : allSystems) {
+                if (sys.getName() != null && sys.getName().equals(csDto.getSystemName().trim())) {
+                    matchedSystem = sys;
+                    break;
+                }
+            }
+            if (matchedSystem == null) {
+                // Fuzzy match: LIKE '%systemName%'
+                for (NovelPowerSystem sys : allSystems) {
+                    if (sys.getName() != null && sys.getName().contains(csDto.getSystemName().trim())) {
+                        matchedSystem = sys;
+                        break;
+                    }
+                }
+            }
+
+            if (matchedSystem == null) {
+                log.debug("力量体系名称匹配失败: systemName={}, projectId={}", csDto.getSystemName(), projectId);
+                // Per D-03: 文本信息保留在cultivation_level JSON中，不丢弃
+                continue;
+            }
+
+            // Step 2: 匹配境界等级（在对应力量体系内）
+            Long matchedLevelId = null;
+            Long matchedStepId = null;
+            if (csDto.getCurrentLevel() != null && !csDto.getCurrentLevel().isBlank()) {
+                List<NovelPowerSystemLevel> levels = powerSystemLevelMapper.selectList(
+                        new LambdaQueryWrapper<NovelPowerSystemLevel>()
+                                .eq(NovelPowerSystemLevel::getPowerSystemId, matchedSystem.getId()));
+
+                // 先精确匹配levelName
+                NovelPowerSystemLevel matchedLevel = null;
+                for (NovelPowerSystemLevel lvl : levels) {
+                    if (lvl.getLevelName() != null && lvl.getLevelName().equals(csDto.getCurrentLevel().trim())) {
+                        matchedLevel = lvl;
+                        break;
+                    }
+                }
+                // Fuzzy match
+                if (matchedLevel == null) {
+                    for (NovelPowerSystemLevel lvl : levels) {
+                        if (lvl.getLevelName() != null && lvl.getLevelName().contains(csDto.getCurrentLevel().trim())) {
+                            matchedLevel = lvl;
+                            break;
+                        }
+                    }
+                }
+                if (matchedLevel != null) {
+                    matchedLevelId = matchedLevel.getId();
+
+                    // Step 3: 尝试在境界内匹配子境界步骤
+                    List<NovelPowerSystemLevelStep> steps = powerSystemLevelStepMapper.selectList(
+                            new LambdaQueryWrapper<NovelPowerSystemLevelStep>()
+                                    .eq(NovelPowerSystemLevelStep::getPowerSystemLevelId, matchedLevel.getId()));
+                    for (NovelPowerSystemLevelStep step : steps) {
+                        if (step.getLevelName() != null && csDto.getCurrentLevel().contains(step.getLevelName())) {
+                            matchedStepId = step.getId();
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Step 4: Upsert character_power_system
+            CharacterPowerSystem existing = characterPowerSystemMapper.selectOne(
+                    new LambdaQueryWrapper<CharacterPowerSystem>()
+                            .eq(CharacterPowerSystem::getCharacterId, characterId)
+                            .eq(CharacterPowerSystem::getPowerSystemId, matchedSystem.getId()));
+
+            if (existing != null) {
+                // Update existing record
+                existing.setCurrentRealmId(matchedLevelId);
+                existing.setCurrentSubRealmId(matchedStepId);
+                characterPowerSystemMapper.updateById(existing);
+                log.debug("更新力量体系关联: characterId={}, powerSystemId={}, realmId={}, stepId={}",
+                        characterId, matchedSystem.getId(), matchedLevelId, matchedStepId);
+            } else {
+                // Insert new record
+                CharacterPowerSystem newAssoc = new CharacterPowerSystem();
+                newAssoc.setCharacterId(characterId);
+                newAssoc.setPowerSystemId(matchedSystem.getId());
+                newAssoc.setCurrentRealmId(matchedLevelId);
+                newAssoc.setCurrentSubRealmId(matchedStepId);
+                characterPowerSystemMapper.insert(newAssoc);
+                log.debug("新增力量体系关联: characterId={}, powerSystemId={}, realmId={}, stepId={}",
+                        characterId, matchedSystem.getId(), matchedLevelId, matchedStepId);
+            }
+        }
+    }
+
+    /**
+     * 解析并保存角色-势力关联
+     *
+     * 遍历提取到的势力关联列表，通过名称匹配找到对应的势力，
+     * 然后upsert到novel_faction_character关联表。
+     *
+     * 匹配策略（per D-04/D-05/D-06）：
+     * 1. factionName精确匹配 -> factionId
+     * 2. 角色可属于多个势力，每个势力一条关联记录
+     * 3. 匹配失败时跳过（文本信息已在其他地方保留）
+     *
+     * @param characterId 角色ID
+     * @param factionConnections 势力关联DTO列表
+     * @param projectId 项目ID
+     */
+    private void resolveAndSaveFactionAssociations(Long characterId,
+                                                    List<FactionConnectionDto> factionConnections,
+                                                    Long projectId) {
+        if (factionConnections == null || factionConnections.isEmpty()) {
+            return;
+        }
+
+        // 获取项目下所有势力，用于内存匹配
+        List<NovelFaction> allFactions = novelFactionMapper.selectList(
+                new LambdaQueryWrapper<NovelFaction>()
+                        .eq(NovelFaction::getProjectId, projectId));
+
+        for (FactionConnectionDto fcDto : factionConnections) {
+            if (fcDto.getFactionName() == null || fcDto.getFactionName().isBlank()) {
+                continue;
+            }
+
+            // Step 1: 匹配势力名称（精确 -> 模糊）
+            NovelFaction matchedFaction = null;
+            for (NovelFaction faction : allFactions) {
+                if (faction.getName() != null && faction.getName().equals(fcDto.getFactionName().trim())) {
+                    matchedFaction = faction;
+                    break;
+                }
+            }
+            if (matchedFaction == null) {
+                // Fuzzy match
+                for (NovelFaction faction : allFactions) {
+                    if (faction.getName() != null && faction.getName().contains(fcDto.getFactionName().trim())) {
+                        matchedFaction = faction;
+                        break;
+                    }
+                }
+            }
+
+            if (matchedFaction == null) {
+                log.debug("势力名称匹配失败: factionName={}, projectId={}", fcDto.getFactionName(), projectId);
+                continue;
+            }
+
+            // Step 2: Upsert novel_faction_character
+            NovelFactionCharacter existing = novelFactionCharacterMapper.selectOne(
+                    new LambdaQueryWrapper<NovelFactionCharacter>()
+                            .eq(NovelFactionCharacter::getFactionId, matchedFaction.getId())
+                            .eq(NovelFactionCharacter::getCharacterId, characterId));
+
+            if (existing != null) {
+                // Update role if changed
+                if (fcDto.getRole() != null && !fcDto.getRole().equals(existing.getRole())) {
+                    existing.setRole(fcDto.getRole());
+                    novelFactionCharacterMapper.updateById(existing);
+                    log.debug("更新势力关联角色: characterId={}, factionId={}, role={}",
+                            characterId, matchedFaction.getId(), fcDto.getRole());
+                }
+            } else {
+                // Insert new record
+                NovelFactionCharacter newAssoc = new NovelFactionCharacter();
+                newAssoc.setFactionId(matchedFaction.getId());
+                newAssoc.setCharacterId(characterId);
+                newAssoc.setRole(fcDto.getRole());
+                novelFactionCharacterMapper.insert(newAssoc);
+                log.debug("新增势力关联: characterId={}, factionId={}, role={}",
+                        characterId, matchedFaction.getId(), fcDto.getRole());
+            }
         }
     }
 }

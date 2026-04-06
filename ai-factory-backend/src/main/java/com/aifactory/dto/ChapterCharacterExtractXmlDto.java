@@ -171,6 +171,14 @@ public class ChapterCharacterExtractXmlDto {
         private List<CultivationSystemDto> cultivationSystems;
 
         /**
+         * 势力关联列表（支持多个势力）
+         */
+        @JacksonXmlElementWrapper(useWrapping = false)
+        @JacksonXmlProperty(localName = "FC")
+        @Schema(description = "势力关联列表，对应XML中的多个<FC>标签，包含角色所属势力信息")
+        private List<FactionConnectionDto> factionConnections;
+
+        /**
          * 外貌/装扮变化
          */
         @JacksonXmlProperty(localName = "AP")
@@ -248,5 +256,35 @@ public class ChapterCharacterExtractXmlDto {
         @Schema(description = "本章境界变化，描述角色在本章中境界的变化情况，对应XML中的<CH>标签",
                 example = "从练气圆满突破到筑基初期")
         private String levelChange;
+    }
+
+    /**
+     * 势力关联内部类
+     *
+     * XML格式示例：
+     * <FC>
+     *   <N>势力名称</N>
+     *   <R>职位/角色</R>
+     * </FC>
+     */
+    @Data
+    @Schema(description = "势力关联信息，对应XML中的<FC>标签，包含角色所属势力的名称和角色职位")
+    public static class FactionConnectionDto {
+
+        /**
+         * 势力名称
+         */
+        @JacksonXmlProperty(localName = "N")
+        @Schema(description = "势力名称，对应XML中的<N>标签",
+                example = "青云门")
+        private String factionName;
+
+        /**
+         * 在势力中的职位/角色
+         */
+        @JacksonXmlProperty(localName = "R")
+        @Schema(description = "在势力中的职位/角色，对应XML中的<R>标签",
+                example = "长老")
+        private String role;
     }
 }
