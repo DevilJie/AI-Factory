@@ -28,6 +28,15 @@
 
 </details>
 
+<details>
+<summary>v1.0.4 角色体系关联与提取增强 (Phase 10) — IN PROGRESS</summary>
+
+- [x] Phase 10: Plan 01 - Backend data layer and extraction logic — completed 2026-04-06
+- [ ] Phase 10: Plan 02 - Prompt template update (FC tags + roleType definitions)
+- [ ] Phase 10: Plan 03 - Frontend character detail Drawer tabs and association management
+
+</details>
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -41,3 +50,4 @@
 | 7. 独立生成 API + 依赖校验 | v1.0.3 | 2/2 | Complete | 2026-04-03 |
 | 8. 原有逻辑重构 | v1.0.3 | 2/2 | Complete | 2026-04-03 |
 | 9. 前端独立生成按钮 | v1.0.3 | 1/1 | Complete | 2026-04-03 |
+| 10. 角色体系关联与提取增强 | v1.0.4 | 1/3 | In Progress | - |
