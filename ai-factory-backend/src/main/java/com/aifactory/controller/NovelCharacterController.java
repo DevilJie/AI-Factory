@@ -2,11 +2,14 @@ package com.aifactory.controller;
 
 import com.aifactory.common.UserContext;
 import com.aifactory.dto.CharacterDto;
+import com.aifactory.dto.CharacterFactionRequest;
+import com.aifactory.dto.CharacterPowerSystemRequest;
 import com.aifactory.entity.NovelCharacter;
 import com.aifactory.response.Result;
 import com.aifactory.service.NovelCharacterService;
 import com.aifactory.vo.CharacterArcVO;
 import com.aifactory.vo.CharacterChapterVO;
+import com.aifactory.vo.CharacterDetailVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -63,26 +66,26 @@ public class NovelCharacterController {
     }
 
     /**
-     * 获取人物详情
+     * 获取人物详情（包含关联的力量体系和势力信息）
      */
     @Operation(
             summary = "获取人物详情",
-            description = "根据人物ID获取人物的完整详细信息，包括基本信息、性格、外貌、背景故事、能力等"
+            description = "根据人物ID获取人物的完整详细信息，包括基本信息、性格、外貌、背景故事、能力以及关联的力量体系和势力信息"
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "成功获取人物详情",
-                    content = @Content(schema = @Schema(implementation = NovelCharacter.class))),
+                    content = @Content(schema = @Schema(implementation = CharacterDetailVO.class))),
             @ApiResponse(responseCode = "404", description = "人物不存在")
     })
     @GetMapping("/{characterId}")
-    public Result<NovelCharacter> getCharacterDetail(
+    public Result<CharacterDetailVO> getCharacterDetail(
             @Parameter(description = "人物ID", required = true, example = "1")
             @PathVariable Long characterId) {
         Long userId = UserContext.getUserId();
         log.info("用户 {} 获取人物 {} 详情", userId, characterId);
 
-        NovelCharacter character = characterService.getCharacterDetail(characterId);
-        return Result.ok(character);
+        CharacterDetailVO detail = characterService.getCharacterDetail(characterId);
+        return Result.ok(detail);
     }
 
     /**
@@ -216,5 +219,94 @@ public class NovelCharacterController {
 
         List<CharacterChapterVO> chapters = characterService.getCharacterChapters(characterId);
         return Result.ok(chapters);
+    }
+
+    // ==================== 角色关联管理接口 ====================
+
+    /**
+     * 添加/更新角色-力量体系关联
+     */
+    @Operation(
+            summary = "添加/更新角色-力量体系关联",
+            description = "为指定角色添加或更新与力量体系的关联，包含当前境界等级信息"
+    )
+    @PostMapping("/{characterId}/power-systems")
+    public Result<String> upsertPowerSystemAssociation(
+            @Parameter(description = "角色ID", required = true, example = "1")
+            @PathVariable Long characterId,
+            @RequestBody CharacterPowerSystemRequest request) {
+        Long userId = UserContext.getUserId();
+        log.info("用户 {} 更新角色 {} 的力量体系关联", userId, characterId);
+
+        characterService.upsertPowerSystemAssociation(
+                characterId,
+                request.getPowerSystemId(),
+                request.getCurrentRealmId(),
+                request.getCurrentSubRealmId()
+        );
+        return Result.ok("操作成功");
+    }
+
+    /**
+     * 删除角色-力量体系关联
+     */
+    @Operation(
+            summary = "删除角色-力量体系关联",
+            description = "删除指定的角色-力量体系关联记录"
+    )
+    @DeleteMapping("/{characterId}/power-systems/{associationId}")
+    public Result<String> deletePowerSystemAssociation(
+            @Parameter(description = "角色ID", required = true, example = "1")
+            @PathVariable Long characterId,
+            @Parameter(description = "关联记录ID", required = true, example = "1")
+            @PathVariable Long associationId) {
+        Long userId = UserContext.getUserId();
+        log.info("用户 {} 删除角色 {} 的力量体系关联 {}", userId, characterId, associationId);
+
+        characterService.deletePowerSystemAssociation(associationId);
+        return Result.ok("删除成功");
+    }
+
+    /**
+     * 添加/更新角色-势力关联
+     */
+    @Operation(
+            summary = "添加/更新角色-势力关联",
+            description = "为指定角色添加或更新与势力的关联，包含职位/角色信息"
+    )
+    @PostMapping("/{characterId}/factions")
+    public Result<String> upsertFactionAssociation(
+            @Parameter(description = "角色ID", required = true, example = "1")
+            @PathVariable Long characterId,
+            @RequestBody CharacterFactionRequest request) {
+        Long userId = UserContext.getUserId();
+        log.info("用户 {} 更新角色 {} 的势力关联", userId, characterId);
+
+        characterService.upsertFactionAssociation(
+                characterId,
+                request.getFactionId(),
+                request.getRole()
+        );
+        return Result.ok("操作成功");
+    }
+
+    /**
+     * 删除角色-势力关联
+     */
+    @Operation(
+            summary = "删除角色-势力关联",
+            description = "删除指定的角色-势力关联记录"
+    )
+    @DeleteMapping("/{characterId}/factions/{associationId}")
+    public Result<String> deleteFactionAssociation(
+            @Parameter(description = "角色ID", required = true, example = "1")
+            @PathVariable Long characterId,
+            @Parameter(description = "关联记录ID", required = true, example = "1")
+            @PathVariable Long associationId) {
+        Long userId = UserContext.getUserId();
+        log.info("用户 {} 删除角色 {} 的势力关联 {}", userId, characterId, associationId);
+
+        characterService.deleteFactionAssociation(associationId);
+        return Result.ok("删除成功");
     }
 }

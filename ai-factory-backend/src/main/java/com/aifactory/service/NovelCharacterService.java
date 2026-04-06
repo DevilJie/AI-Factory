@@ -3,15 +3,28 @@ package com.aifactory.service;
 import com.aifactory.common.XmlParser;
 import com.aifactory.common.xml.CharacterArcXmlDto;
 import com.aifactory.dto.CharacterDto;
+import com.aifactory.entity.CharacterPowerSystem;
 import com.aifactory.entity.NovelCharacter;
 import com.aifactory.entity.NovelCharacterChapter;
+import com.aifactory.entity.NovelFaction;
+import com.aifactory.entity.NovelFactionCharacter;
+import com.aifactory.entity.NovelPowerSystem;
+import com.aifactory.entity.NovelPowerSystemLevel;
+import com.aifactory.entity.NovelPowerSystemLevelStep;
 import com.aifactory.entity.Project;
 import com.aifactory.entity.ProjectBasicSettings;
 import com.aifactory.mapper.ChapterMapper;
+import com.aifactory.mapper.CharacterPowerSystemMapper;
 import com.aifactory.mapper.NovelCharacterMapper;
+import com.aifactory.mapper.NovelFactionCharacterMapper;
+import com.aifactory.mapper.NovelFactionMapper;
+import com.aifactory.mapper.NovelPowerSystemLevelMapper;
+import com.aifactory.mapper.NovelPowerSystemLevelStepMapper;
+import com.aifactory.mapper.NovelPowerSystemMapper;
 import com.aifactory.vo.ArcStageVO;
 import com.aifactory.vo.CharacterArcVO;
 import com.aifactory.vo.CharacterChapterVO;
+import com.aifactory.vo.CharacterDetailVO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +33,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -56,8 +71,26 @@ public class NovelCharacterService {
     @Autowired
     private ChapterMapper chapterMapper;
 
+    @Autowired
+    private CharacterPowerSystemMapper characterPowerSystemMapper;
+
+    @Autowired
+    private NovelPowerSystemMapper novelPowerSystemMapper;
+
+    @Autowired
+    private NovelPowerSystemLevelMapper novelPowerSystemLevelMapper;
+
+    @Autowired
+    private NovelPowerSystemLevelStepMapper novelPowerSystemLevelStepMapper;
+
+    @Autowired
+    private NovelFactionCharacterMapper novelFactionCharacterMapper;
+
+    @Autowired
+    private NovelFactionMapper novelFactionMapper;
+
     /**
-     * 获取人物列表
+     * 获取人物列表（包含聚合的修炼境界和势力信息）
      */
     public List<CharacterDto> getCharacterList(Long projectId) {
         LambdaQueryWrapper<NovelCharacter> queryWrapper = new LambdaQueryWrapper<>();
@@ -65,8 +98,114 @@ public class NovelCharacterService {
                 .orderByDesc(NovelCharacter::getCreateTime);
 
         List<NovelCharacter> characters = characterMapper.selectList(queryWrapper);
+
+        if (characters.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // Batch query: collect all character IDs
+        List<Long> characterIds = characters.stream()
+                .map(NovelCharacter::getId)
+                .collect(Collectors.toList());
+
+        // Batch query power system associations
+        List<CharacterPowerSystem> allPowerAssocs = characterPowerSystemMapper.selectList(
+                new LambdaQueryWrapper<CharacterPowerSystem>()
+                        .in(CharacterPowerSystem::getCharacterId, characterIds));
+        Map<Long, List<CharacterPowerSystem>> powerAssocsByCharId = allPowerAssocs.stream()
+                .collect(Collectors.groupingBy(CharacterPowerSystem::getCharacterId));
+
+        // Batch resolve power system names
+        Map<Long, String> powerSystemNames = new HashMap<>();
+        Map<Long, String> levelNames = new HashMap<>();
+        if (!allPowerAssocs.isEmpty()) {
+            List<Long> psIds = allPowerAssocs.stream()
+                    .map(CharacterPowerSystem::getPowerSystemId)
+                    .distinct()
+                    .collect(Collectors.toList());
+            List<NovelPowerSystem> powerSystems = novelPowerSystemMapper.selectBatchIds(psIds);
+            for (NovelPowerSystem ps : powerSystems) {
+                powerSystemNames.put(ps.getId(), ps.getName());
+            }
+
+            List<Long> levelIds = allPowerAssocs.stream()
+                    .map(CharacterPowerSystem::getCurrentRealmId)
+                    .filter(id -> id != null)
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (!levelIds.isEmpty()) {
+                List<NovelPowerSystemLevel> levels = novelPowerSystemLevelMapper.selectBatchIds(levelIds);
+                for (NovelPowerSystemLevel lvl : levels) {
+                    levelNames.put(lvl.getId(), lvl.getLevelName());
+                }
+            }
+        }
+
+        // Batch query faction associations
+        List<NovelFactionCharacter> allFactionAssocs = novelFactionCharacterMapper.selectList(
+                new LambdaQueryWrapper<NovelFactionCharacter>()
+                        .in(NovelFactionCharacter::getCharacterId, characterIds));
+        Map<Long, List<NovelFactionCharacter>> factionAssocsByCharId = allFactionAssocs.stream()
+                .collect(Collectors.groupingBy(NovelFactionCharacter::getCharacterId));
+
+        // Batch resolve faction names
+        Map<Long, String> factionNames = new HashMap<>();
+        if (!allFactionAssocs.isEmpty()) {
+            List<Long> factionIds = allFactionAssocs.stream()
+                    .map(NovelFactionCharacter::getFactionId)
+                    .distinct()
+                    .collect(Collectors.toList());
+            List<NovelFaction> factions = novelFactionMapper.selectBatchIds(factionIds);
+            for (NovelFaction f : factions) {
+                factionNames.put(f.getId(), f.getName());
+            }
+        }
+
+        // Build DTOs with aggregated data
         return characters.stream()
-                .map(this::convertToDto)
+                .map(character -> {
+                    CharacterDto dto = convertToDto(character);
+
+                    // Build cultivationRealm string
+                    List<CharacterPowerSystem> charPowerAssocs = powerAssocsByCharId.getOrDefault(
+                            character.getId(), new ArrayList<>());
+                    if (!charPowerAssocs.isEmpty()) {
+                        List<String> realmNames = new ArrayList<>();
+                        for (CharacterPowerSystem psa : charPowerAssocs) {
+                            if (psa.getCurrentRealmId() != null) {
+                                String lvlName = levelNames.get(psa.getCurrentRealmId());
+                                if (lvlName != null) {
+                                    realmNames.add(lvlName);
+                                }
+                            }
+                        }
+                        if (!realmNames.isEmpty()) {
+                            dto.setCultivationRealm(String.join("、", realmNames));
+                        }
+                    }
+
+                    // Build factionInfo string
+                    List<NovelFactionCharacter> charFactionAssocs = factionAssocsByCharId.getOrDefault(
+                            character.getId(), new ArrayList<>());
+                    if (!charFactionAssocs.isEmpty()) {
+                        List<String> factionInfoParts = new ArrayList<>();
+                        for (NovelFactionCharacter fca : charFactionAssocs) {
+                            String fName = factionNames.get(fca.getFactionId());
+                            if (fName != null) {
+                                String info = fName;
+                                if (fca.getRole() != null && !fca.getRole().isBlank()) {
+                                    info = fName + fca.getRole();
+                                }
+                                factionInfoParts.add(info);
+                            }
+                        }
+                        if (!factionInfoParts.isEmpty()) {
+                            dto.setFactionInfo(String.join("、", factionInfoParts));
+                        }
+                    }
+
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -86,10 +225,74 @@ public class NovelCharacterService {
     }
 
     /**
-     * 获取人物详情
+     * 获取人物详情（包含关联的力量体系和势力信息）
      */
-    public NovelCharacter getCharacterDetail(Long characterId) {
-        return characterMapper.selectById(characterId);
+    public CharacterDetailVO getCharacterDetail(Long characterId) {
+        NovelCharacter character = characterMapper.selectById(characterId);
+        if (character == null) {
+            return null;
+        }
+
+        CharacterDetailVO vo = CharacterDetailVO.fromCharacter(character);
+
+        // Query power system associations
+        List<CharacterPowerSystem> powerSystemAssocs = characterPowerSystemMapper.selectList(
+                new LambdaQueryWrapper<CharacterPowerSystem>()
+                        .eq(CharacterPowerSystem::getCharacterId, characterId));
+
+        List<CharacterDetailVO.PowerSystemAssociation> powerSystemVOs = new ArrayList<>();
+        for (CharacterPowerSystem assoc : powerSystemAssocs) {
+            CharacterDetailVO.PowerSystemAssociation psVO = new CharacterDetailVO.PowerSystemAssociation();
+            psVO.setId(assoc.getId());
+            psVO.setPowerSystemId(assoc.getPowerSystemId());
+            psVO.setCurrentRealmId(assoc.getCurrentRealmId());
+            psVO.setCurrentSubRealmId(assoc.getCurrentSubRealmId());
+
+            // Resolve names
+            NovelPowerSystem system = novelPowerSystemMapper.selectById(assoc.getPowerSystemId());
+            if (system != null) {
+                psVO.setPowerSystemName(system.getName());
+            }
+            if (assoc.getCurrentRealmId() != null) {
+                NovelPowerSystemLevel level = novelPowerSystemLevelMapper.selectById(assoc.getCurrentRealmId());
+                if (level != null) {
+                    psVO.setCurrentRealmName(level.getLevelName());
+                }
+            }
+            if (assoc.getCurrentSubRealmId() != null) {
+                NovelPowerSystemLevelStep step = novelPowerSystemLevelStepMapper.selectById(assoc.getCurrentSubRealmId());
+                if (step != null) {
+                    psVO.setCurrentSubRealmName(step.getLevelName());
+                }
+            }
+
+            powerSystemVOs.add(psVO);
+        }
+        vo.setPowerSystemAssociations(powerSystemVOs);
+
+        // Query faction associations
+        List<NovelFactionCharacter> factionAssocs = novelFactionCharacterMapper.selectList(
+                new LambdaQueryWrapper<NovelFactionCharacter>()
+                        .eq(NovelFactionCharacter::getCharacterId, characterId));
+
+        List<CharacterDetailVO.FactionAssociation> factionVOs = new ArrayList<>();
+        for (NovelFactionCharacter assoc : factionAssocs) {
+            CharacterDetailVO.FactionAssociation fVO = new CharacterDetailVO.FactionAssociation();
+            fVO.setId(assoc.getId());
+            fVO.setFactionId(assoc.getFactionId());
+            fVO.setRole(assoc.getRole());
+
+            // Resolve faction name
+            NovelFaction faction = novelFactionMapper.selectById(assoc.getFactionId());
+            if (faction != null) {
+                fVO.setFactionName(faction.getName());
+            }
+
+            factionVOs.add(fVO);
+        }
+        vo.setFactionAssociations(factionVOs);
+
+        return vo;
     }
 
     /**
@@ -155,6 +358,7 @@ public class NovelCharacterService {
         dto.setName(character.getName());
         dto.setAvatar(character.getAvatar());
         dto.setRole(character.getRole());
+        dto.setRoleType(character.getRoleType());
 
         return dto;
     }
@@ -321,5 +525,87 @@ public class NovelCharacterService {
             log.warn("获取章节标题失败，chapterId={}", chapterId, e);
             return "未知章节";
         }
+    }
+
+    // ==================== 角色关联管理 ====================
+
+    /**
+     * 添加/更新角色-力量体系关联
+     *
+     * @param characterId 角色ID
+     * @param powerSystemId 力量体系ID
+     * @param currentRealmId 当前境界ID（可选）
+     * @param currentSubRealmId 当前子境界ID（可选）
+     */
+    @Transactional
+    public void upsertPowerSystemAssociation(Long characterId, Long powerSystemId,
+                                              Long currentRealmId, Long currentSubRealmId) {
+        CharacterPowerSystem existing = characterPowerSystemMapper.selectOne(
+                new LambdaQueryWrapper<CharacterPowerSystem>()
+                        .eq(CharacterPowerSystem::getCharacterId, characterId)
+                        .eq(CharacterPowerSystem::getPowerSystemId, powerSystemId));
+
+        if (existing != null) {
+            existing.setCurrentRealmId(currentRealmId);
+            existing.setCurrentSubRealmId(currentSubRealmId);
+            characterPowerSystemMapper.updateById(existing);
+        } else {
+            CharacterPowerSystem newAssoc = new CharacterPowerSystem();
+            newAssoc.setCharacterId(characterId);
+            newAssoc.setPowerSystemId(powerSystemId);
+            newAssoc.setCurrentRealmId(currentRealmId);
+            newAssoc.setCurrentSubRealmId(currentSubRealmId);
+            characterPowerSystemMapper.insert(newAssoc);
+        }
+        log.info("保存角色-力量体系关联: characterId={}, powerSystemId={}", characterId, powerSystemId);
+    }
+
+    /**
+     * 删除角色-力量体系关联
+     *
+     * @param associationId 关联记录ID
+     */
+    @Transactional
+    public void deletePowerSystemAssociation(Long associationId) {
+        characterPowerSystemMapper.deleteById(associationId);
+        log.info("删除角色-力量体系关联: associationId={}", associationId);
+    }
+
+    /**
+     * 添加/更新角色-势力关联
+     *
+     * @param characterId 角色ID
+     * @param factionId 势力ID
+     * @param role 在势力中的职位/角色（可选）
+     */
+    @Transactional
+    public void upsertFactionAssociation(Long characterId, Long factionId, String role) {
+        NovelFactionCharacter existing = novelFactionCharacterMapper.selectOne(
+                new LambdaQueryWrapper<NovelFactionCharacter>()
+                        .eq(NovelFactionCharacter::getCharacterId, characterId)
+                        .eq(NovelFactionCharacter::getFactionId, factionId));
+
+        if (existing != null) {
+            existing.setRole(role);
+            novelFactionCharacterMapper.updateById(existing);
+        } else {
+            NovelFactionCharacter newAssoc = new NovelFactionCharacter();
+            newAssoc.setCharacterId(characterId);
+            newAssoc.setFactionId(factionId);
+            newAssoc.setRole(role);
+            novelFactionCharacterMapper.insert(newAssoc);
+        }
+        log.info("保存角色-势力关联: characterId={}, factionId={}", characterId, factionId);
+    }
+
+    /**
+     * 删除角色-势力关联
+     *
+     * @param associationId 关联记录ID
+     */
+    @Transactional
+    public void deleteFactionAssociation(Long associationId) {
+        novelFactionCharacterMapper.deleteById(associationId);
+        log.info("删除角色-势力关联: associationId={}", associationId);
     }
 }
