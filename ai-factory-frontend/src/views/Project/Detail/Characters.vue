@@ -21,6 +21,7 @@ import {
   type CharacterRoleType
 } from '@/api/character'
 import { success, error, warning } from '@/utils/toast'
+import CharacterDrawer from './components/CharacterDrawer.vue'
 
 const route = useRoute()
 
@@ -31,6 +32,10 @@ const searchKeyword = ref('')
 const showCreateModal = ref(false)
 const selectedRoleType = ref<CharacterRoleType | 'all'>('all')
 const creating = ref(false)
+
+// Drawer state
+const showDrawer = ref(false)
+const selectedCharacter = ref<Character | null>(null)
 
 // 表单数据
 const formData = ref<CharacterForm>({
@@ -155,6 +160,17 @@ const handleDelete = async (character: Character) => {
   }
 }
 
+// 打开角色详情抽屉
+const openDrawer = (character: Character) => {
+  selectedCharacter.value = character
+  showDrawer.value = true
+}
+
+// 关闭抽屉后刷新列表
+const handleDrawerSaved = () => {
+  loadData()
+}
+
 // 获取角色类型样式
 const getRoleTypeStyle = (roleType: CharacterRoleType) => {
   return roleTypes.find(r => r.value === roleType)?.color || roleTypes[3]?.color || 'bg-gray-100 text-gray-700'
@@ -264,7 +280,8 @@ watch(() => route.params.id, () => {
         <div
           v-for="character in filteredCharacters"
           :key="character.id"
-          class="group bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all border border-gray-100 dark:border-gray-700"
+          class="group bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all border border-gray-100 dark:border-gray-700 cursor-pointer"
+          @click="openDrawer(character)"
         >
           <!-- Avatar & Actions -->
           <div class="relative mb-3">
@@ -289,13 +306,14 @@ watch(() => route.params.id, () => {
             <!-- Actions -->
             <div class="absolute top-0 right-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
+                @click.stop="openDrawer(character)"
                 class="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                 title="编辑"
               >
                 <Edit3 class="w-4 h-4" />
               </button>
               <button
-                @click="handleDelete(character)"
+                @click.stop="handleDelete(character)"
                 class="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                 title="删除"
               >
@@ -308,10 +326,24 @@ watch(() => route.params.id, () => {
           <div class="text-center">
             <h3 class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ character.name }}</h3>
             <p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">{{ character.role || '未设置角色' }}</p>
+            <p
+              v-if="character.cultivationRealm || character.factionInfo"
+              class="text-xs text-gray-400 truncate mt-0.5"
+            >
+              {{ [character.cultivationRealm, character.factionInfo].filter(Boolean).join(' . ') }}
+            </p>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Character Detail Drawer -->
+    <CharacterDrawer
+      v-model="showDrawer"
+      :character="selectedCharacter"
+      :project-id="projectId()"
+      @saved="handleDrawerSaved"
+    />
 
     <!-- Create Modal -->
     <div
