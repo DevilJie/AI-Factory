@@ -41,4 +41,23 @@ public class CharacterDto {
             example = "主角",
             allowableValues = {"主角", "女主角", "反派", "配角", "导师", "助手", "对手", "路人"})
     private String role;
+
+    /**
+     * 角色类型
+     */
+    @Schema(description = "角色类型", example = "protagonist",
+            allowableValues = {"protagonist", "supporting", "antagonist", "npc"})
+    private String roleType;
+
+    /**
+     * 修炼境界名称汇总（如："玄武境"）
+     */
+    @Schema(description = "修炼境界名称汇总，多个体系用顿号分隔", example = "玄武境")
+    private String cultivationRealm;
+
+    /**
+     * 势力信息汇总（如："青云门长老"）
+     */
+    @Schema(description = "势力信息汇总，格式为势力名称+职位，多个用顿号分隔", example = "青云门长老")
+    private String factionInfo;
 }
