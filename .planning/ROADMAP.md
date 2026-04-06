@@ -39,7 +39,7 @@
 2. 识别角色与阵营势力的关联关系，更新 llm_chapter_character_extract 提示词模板明确生成势力阵营信息
 3. 修复角色类型识别问题 (protagonist/supporting/antagonist/npc 无法准确识别)
 
-**Plans:** 3/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 10-01-PLAN.md — Wave 1: 后端数据层与提取逻辑 — completed 2026-04-06
@@ -59,4 +59,4 @@ Plans:
 | 7. 独立生成 API + 依赖校验 | v1.0.3 | 2/2 | Complete | 2026-04-03 |
 | 8. 原有逻辑重构 | v1.0.3 | 2/2 | Complete | 2026-04-03 |
 | 9. 前端独立生成按钮 | v1.0.3 | 1/1 | Complete | 2026-04-03 |
-| 10. 角色体系关联与提取增强 | v1.0.4 | 3/3 | Executed — Verification pending | 2026-04-06 |
+| 10. 角色体系关联与提取增强 | v1.0.4 | 3/3 | Complete    | 2026-04-06 |
