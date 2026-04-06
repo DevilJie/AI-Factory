@@ -31,6 +31,10 @@ export interface Character {
   tags?: string[]
   createdAt: string
   updatedAt: string
+  /** 修炼境界（列表API聚合字段） */
+  cultivationRealm?: string
+  /** 势力信息（列表API聚合字段） */
+  factionInfo?: string
 }
 
 /**
@@ -43,6 +47,8 @@ export interface CharacterDto {
   role: string
   roleType?: string
   gender?: string
+  cultivationRealm?: string
+  factionInfo?: string
 }
 
 /**
@@ -65,6 +71,37 @@ export interface CharacterForm {
 }
 
 /**
+ * 力量体系关联（人物详情中）
+ */
+export interface PowerSystemAssociation {
+  id: number
+  powerSystemId: number
+  powerSystemName: string
+  currentRealmId: number | null
+  currentRealmName: string | null
+  currentSubRealmId: number | null
+  currentSubRealmName: string | null
+}
+
+/**
+ * 势力关联（人物详情中）
+ */
+export interface FactionAssociation {
+  id: number
+  factionId: number
+  factionName: string
+  role: string
+}
+
+/**
+ * 扩展人物详情（含关联数据）
+ */
+export interface CharacterDetail extends Character {
+  powerSystemAssociations: PowerSystemAssociation[]
+  factionAssociations: FactionAssociation[]
+}
+
+/**
  * 获取人物列表
  */
 export const getCharacterList = async (projectId: string): Promise<Character[]> => {
@@ -81,28 +118,36 @@ export const getCharacterList = async (projectId: string): Promise<Character[]> 
     gender: (dto.gender as CharacterGender) || 'other',
     personality: [],
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    cultivationRealm: dto.cultivationRealm,
+    factionInfo: dto.factionInfo
   }))
 }
 
 /**
- * 获取角色详情
+ * 获取角色详情（含关联数据）
  */
-export const getCharacterDetail = async (projectId: string, characterId: string): Promise<Character> => {
-  const response = await request.get<CharacterDto>(
+export const getCharacterDetail = async (projectId: string, characterId: string): Promise<CharacterDetail> => {
+  const response = await request.get<any>(
     `/api/novel/${projectId}/characters/${characterId}`
   )
   return {
     id: String(response.id),
     projectId,
-    name: response.name,
+    name: response.name || '',
     avatar: response.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${response.name}`,
     role: response.role || '',
     roleType: (response.roleType as CharacterRoleType) || 'supporting',
     gender: (response.gender as CharacterGender) || 'other',
-    personality: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    personality: response.personality ? (typeof response.personality === 'string' ? JSON.parse(response.personality) : response.personality) : [],
+    appearance: response.appearance,
+    background: response.background,
+    abilities: response.abilities ? (typeof response.abilities === 'string' ? JSON.parse(response.abilities) : response.abilities) : [],
+    tags: response.tags ? (typeof response.tags === 'string' ? JSON.parse(response.tags) : response.tags) : [],
+    createdAt: response.createdAt || new Date().toISOString(),
+    updatedAt: response.updatedAt || new Date().toISOString(),
+    powerSystemAssociations: response.powerSystemAssociations || [],
+    factionAssociations: response.factionAssociations || []
   }
 }
 
@@ -156,4 +201,42 @@ export const updateCharacter = async (projectId: string, characterId: string, da
  */
 export const deleteCharacter = async (projectId: string, characterId: string): Promise<void> => {
   await request.delete(`/api/novel/${projectId}/characters/${characterId}`)
+}
+
+/**
+ * 添加力量体系关联
+ */
+export const addPowerSystemAssociation = async (
+  projectId: string, characterId: string,
+  data: { powerSystemId: number; currentRealmId?: number; currentSubRealmId?: number }
+): Promise<void> => {
+  await request.post(`/api/novel/${projectId}/characters/${characterId}/power-systems`, data)
+}
+
+/**
+ * 删除力量体系关联
+ */
+export const deletePowerSystemAssociation = async (
+  projectId: string, characterId: string, associationId: number
+): Promise<void> => {
+  await request.delete(`/api/novel/${projectId}/characters/${characterId}/power-systems/${associationId}`)
+}
+
+/**
+ * 添加势力关联
+ */
+export const addFactionAssociation = async (
+  projectId: string, characterId: string,
+  data: { factionId: number; role: string }
+): Promise<void> => {
+  await request.post(`/api/novel/${projectId}/characters/${characterId}/factions`, data)
+}
+
+/**
+ * 删除势力关联
+ */
+export const deleteFactionAssociation = async (
+  projectId: string, characterId: string, associationId: number
+): Promise<void> => {
+  await request.delete(`/api/novel/${projectId}/characters/${characterId}/factions/${associationId}`)
 }
