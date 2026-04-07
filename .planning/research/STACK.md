@@ -1,235 +1,445 @@
-# Stack Research
+# Stack Research - Chapter Character Planning (v1.0.5)
 
-**Domain:** Tree-structured faction data with many-to-many relationships in Spring Boot + Vue.js
-**Researched:** 2026-04-01
-**Confidence:** HIGH
+**Domain:** Chapter character planning system for AI novel generation
+**Researched:** 2026-04-07
+**Confidence:** HIGH (entirely based on codebase analysis, zero new external dependencies)
 
-## Recommended Stack
+## Executive Summary
 
-This is a follow-on research for the faction/force structured refactoring milestone. The core stack is already locked by the existing codebase. The recommendations below focus on patterns and features within the existing stack that are relevant to this specific milestone.
+This milestone requires **zero new dependencies**. All changes are extensions of existing patterns: adding a JSON column to `novel_chapter_plan`, mapping an existing unmapped JSON column, updating two AI prompt templates, extending regex-based XML parsing, and adding a display section to an existing drawer component. The entire implementation fits within the validated Spring Boot 3.2 + MyBatis-Plus + Vue 3 stack.
 
-### Core Technologies (Existing, No Changes)
+The key insight is that the database already has a `character_arcs` JSON column on `novel_chapter_plan` that the Java entity does not map. We need one new column (`planned_characters`) for pre-generation character planning, and we map the existing `character_arcs` for post-generation arc tracking. The AI template system (`PromptTemplateService`) and XML parsing (`OutlineTaskStrategy.parseChaptersXml`) are already proven patterns that simply need field additions.
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Spring Boot | 3.2.0 | Backend framework | Already in use. Provides DI, transaction management, REST APIs. No version change needed. |
-| MyBatis-Plus | 3.5.5 | ORM framework | Already in use. Provides `LambdaQueryWrapper`, `BaseMapper`, auto-increment IDs. This version supports all tree patterns needed. |
-| Vue 3 | 3.5.24 | Frontend framework | Already in use. Composition API with `<script setup>` is the established pattern in this codebase. |
-| Vite | 7.2.4 | Build tool | Already in use. No changes needed. |
-| Tailwind CSS | 4.1.18 | Styling | Already in use. GeographyTree.vue demonstrates the visual pattern to follow. |
-| MySQL | 8.0+ | Database | Already in use. Supports all needed features: AUTO_INCREMENT, foreign keys, indexes. |
-| Jackson XML | (managed by Spring Boot) | XML parsing for simple structures | Already in use via XmlParser component for top-level world-setting parsing. |
+## Recommended Stack (No Changes to Core Stack)
 
-### Tree Structure Pattern (Validated, Reuse Geography Pattern)
+### Core Framework - Unchanged
 
-| Pattern | Implementation | Why |
-|---------|---------------|-----|
-| `parent_id + deep` adjacency list | `NovelContinentRegion` entity pattern | Already validated in this codebase. The `ContinentRegionServiceImpl` demonstrates the complete lifecycle: auto-calculate `deep` on add, cascade update `deep` on parent change, recursive delete, tree build from flat list. **Copy this pattern directly for `novel_faction`.** |
-| Java-side tree building | `buildTree()` in `ContinentRegionServiceImpl` | Loads all nodes in one query, groups by `parentId` using `Collectors.groupingBy`, sets children, filters roots. Database-agnostic and handles unlimited depth. **Reuse verbatim.** |
-| `@TableField(exist = false)` for children | `NovelContinentRegion.children` | MyBatis-Plus annotation to exclude `List<NovelFaction> children` from DB mapping. **Same pattern.** |
-| Recursive save | `saveNodeRecursive()` in service | Inserts parent first, then iterates children setting their `parentId` to the parent's generated ID. Auto-increment ID is available immediately after `insert()`. **Same pattern.** |
+| Technology | Version | Purpose | Status |
+|------------|---------|---------|--------|
+| Spring Boot | 3.2.0 | Backend framework | Unchanged |
+| MyBatis-Plus | 3.5.5 | ORM | Unchanged |
+| Vue 3 | 3.5.x | Frontend framework | Unchanged |
+| Vite | 7.2.x | Build tool | Unchanged |
+| Tailwind CSS | 4.1.x | Styling | Unchanged |
+| LangChain4j | 1.11.0 | AI orchestration | Unchanged |
+| Jackson ObjectMapper | (Spring Boot managed) | JSON serialization | Unchanged |
 
-**Confidence:** HIGH -- This is not theoretical. The pattern is already running in production for geography.
+### No New Dependencies Required
 
-### Many-to-Many Relationship Tables
+| Need | Existing Solution | Location |
+|------|-------------------|----------|
+| JSON field storage | MySQL `JSON` column type + `String` field in entity | `novel_chapter_plan.character_arcs` (DB has it, entity does not map it) |
+| JSON serialization | `com.fasterxml.jackson.databind.ObjectMapper` (already injected) | `PromptTemplateBuilder` line 50, `OutlineTaskStrategy` line 30 |
+| XML parsing (AI output) | Regex-based `extractXmlFieldCData()` pattern | `OutlineTaskStrategy` lines 1273-1289 |
+| AI template system | `PromptTemplateService.executeTemplate()` | Used everywhere for all 3 existing templates |
+| Frontend drawer/panel | `ChapterPlanDrawer.vue` pattern | Existing component at line 1 |
+| Frontend types | `ChapterPlan` interface in `types/project.ts` | Existing type at line 140 |
 
-| Table | Pattern | Why |
-|-------|---------|-----|
-| `novel_faction_region` | Simple join table with `faction_id`, `region_id` | Standard many-to-many. No extra fields needed -- a faction controls regions, that is the entire relationship. Follow `novel_worldview_power_system` pattern (auto-increment ID + two foreign keys). |
-| `novel_faction_character` | Join table with `faction_id`, `character_id`, `role` | Extended many-to-many. The `role` field (e.g., "掌门", "长老", "弟子") makes this more than a simple junction. Use VARCHAR for role since the values are free-form Chinese text, not an enum. |
-| `novel_faction_relation` | Self-referencing pair table with `faction_id`, `related_faction_id`, `relation_type`, `description` | Faction-to-faction relationship. `relation_type` should be VARCHAR with values like "盟友", "敌对", "中立". Include `description` for context. Both faction IDs reference `novel_faction.id`. |
+---
 
-**Entity pattern for each:** Follow `NovelWorldviewPowerSystem` style -- `@Data`, `@TableName`, `@TableId(type = IdType.AUTO)`, Long IDs.
+## Database Changes
 
-**Confidence:** HIGH -- Standard relational patterns, already proven in this codebase.
+### Change 1: Add `planned_characters` Column (NEW)
 
-### DOM XML Parsing for Faction Data
+The table already has `character_arcs JSON DEFAULT NULL` (line 381 of `sql/init.sql`) and `foreshadowing_actions JSON DEFAULT NULL` (line 382), but no `planned_characters` column. Add it.
 
-| Technology | Purpose | Why |
-|------------|---------|-----|
-| `javax.xml.parsers.DocumentBuilder` | Parse AI response XML containing nested `<f>` faction tags | Already proven in `WorldviewTaskStrategy.saveGeographyRegionsFromXml()`. Jackson XML cannot handle nested same-name tags (e.g., `<f>` inside `<f>`), so DOM is the correct choice. **This is a settled decision in this codebase.** |
-| `org.w3c.dom.Element.getChildNodes()` | Iterate direct children only | Critical: use `getChildNodes()` on each Element, NOT `getElementsByTagName()`. The latter searches the entire subtree, which would incorrectly pick up deeply nested `<f>` tags. The existing code already does this correctly in `parseSingleRegion()`. |
-| `Node.ELEMENT_NODE` type check | Filter text/whitespace nodes | Already used in existing code: `if (node.getNodeType() == Node.ELEMENT_NODE && "r".equals(node.getNodeName()))`. Same pattern for `"f"` tags. |
+```sql
+-- V5__chapter_plan_planned_characters.sql
 
-**Recommended faction XML structure (for AI prompt):**
+ALTER TABLE novel_chapter_plan
+  ADD COLUMN planned_characters JSON DEFAULT NULL
+  COMMENT '规划登场角色（JSON数组，由AI章节规划阶段生成）'
+  AFTER foreshadowing_payoff;
+```
+
+**Why a new column instead of reusing `character_arcs`:** `character_arcs` stores post-generation arc data (what actually happened to characters after the chapter is written). `planned_characters` stores pre-generation planning (which characters should appear and what they should do). Separating them enables comparing plan vs. actual and avoids semantic confusion. This follows the existing pattern where `foreshadowing_setup` (planned) and `foreshadowing_payoff` (actual) are separate fields.
+
+### Change 2: Map Existing `character_arcs` Column (No Migration)
+
+The `character_arcs` column already exists in the database (`character_arcs json DEFAULT NULL COMMENT '人物弧光变化'`). It is simply not mapped in `NovelChapterPlan.java`. No SQL change needed -- only a Java entity field addition.
+
+---
+
+## JSON Field Structures
+
+### `planned_characters` - New Column
+
+```json
+[
+  {
+    "characterName": "林动",
+    "roleType": "protagonist",
+    "plannedRole": "本章核心视角人物",
+    "plannedScene": "在天剑宗外门考核中展示新突破的武技",
+    "plannedEmotion": "紧张、兴奋、决心",
+    "plannedDevelopment": "从怯懦到自信的转变",
+    "importance": "primary"
+  },
+  {
+    "characterName": "萧炎",
+    "roleType": "supporting",
+    "plannedRole": "协助与冲突对象",
+    "plannedScene": "作为对手在考核中出现",
+    "plannedEmotion": "不屑、惊讶",
+    "plannedDevelopment": "对主角实力重新评估",
+    "importance": "secondary"
+  }
+]
+```
+
+**Field rationale:**
+
+| Field | Type | Why |
+|-------|------|-----|
+| `characterName` | string | AI generates by name; IDs resolved at save time via `NovelCharacterService` name lookup (same proven pattern as faction parsing in `WorldviewXmlParser`) |
+| `roleType` | enum string | Matches existing `protagonist/supporting/antagonist/npc` enum used in `NovelCharacter.roleType` |
+| `plannedRole` | free text | The character's narrative function in this specific chapter (not their global role) |
+| `plannedScene` | free text | What the character does -- feed this into chapter generation prompt |
+| `plannedEmotion` | free text (optional) | Emotional arc guidance for the writer AI |
+| `plannedDevelopment` | free text (optional) | Growth direction for this chapter |
+| `importance` | enum: `primary`/`secondary`/`minor` | Controls prompt emphasis; `primary` characters get detailed instructions, `minor` characters may be omitted from generation |
+
+### `character_arcs` - Existing Column (Now Mapped)
+
+```json
+[
+  {
+    "characterName": "林动",
+    "arcType": "growth",
+    "startState": "紧张不安",
+    "endState": "自信坚定",
+    "keyMoment": "考核中突破自我极限"
+  }
+]
+```
+
+This field is for post-generation tracking (what actually happened), populated by the chapter generation or character extraction process. Mapping it now enables future features but is not the primary deliverable of this milestone.
+
+---
+
+## Entity Changes
+
+### NovelChapterPlan.java - Add Two Fields
+
+Add two fields to the existing entity class:
+
+```java
+/**
+ * 规划登场角色（JSON格式）
+ * 由AI章节规划阶段生成，包含角色名、戏份、情绪等规划信息
+ * 格式: [{"characterName":"...", "roleType":"...", "plannedRole":"...", ...}]
+ */
+private String plannedCharacters;
+
+/**
+ * 人物弧光变化（JSON格式）
+ * 已有数据库列（character_arcs），本次补充Java实体映射
+ * 格式: [{"characterName":"...", "arcType":"...", "startState":"...", ...}]
+ */
+private String characterArcs;
+```
+
+**Why `String` not a typed JSON field:** Consistent with every other JSON column in the codebase. Evidence:
+- `keyEvents` is `String` (line 62)
+- `foreshadowingSetup` is `String` (line 98)
+- `foreshadowingPayoff` is `String` (line 103)
+- `NovelCharacterChapter.cultivationLevel` is `String` (line 107)
+
+MyBatis-Plus handles JSON columns as `String` by default. Jackson `ObjectMapper` is used at the service layer for typed access.
+
+---
+
+## AI Template Changes
+
+### Template 1: `llm_outline_chapter_generate` - Add Character Planning Output
+
+**Current output tags:** `<n>` (chapterNumber), `<v>` (volumeNumber), `<t>` (title), `<p>` (plotOutline), `<e>` (keyEvents), `<g>` (goal), `<w>` (wordCount), `<s>` (startingScene), `<f>` (endingScene).
+
+**New output tag:** `<r>` (roles/characters) -- follows single-letter convention, does not collide with existing tags.
+
+Extended XML output format per chapter:
 
 ```xml
-<f>
-  <n>势力名称</n>
-  <t>正派</t>                    <!-- type: 仅顶级 -->
-  <ps>力量体系名称</ps>           <!-- core_power_system: 仅顶级，按名称引用 -->
-  <d><![CDATA[描述]]></d>
-  <f>                            <!-- 子势力，递归嵌套 -->
-    <n>分堂名称</n>
-    <d><![CDATA[描述]]></d>
-    <f>...</f>
-  </f>
-  <regions>                      <!-- 关联区域，按名称引用 -->
-    <r>东玄大陆</r>
-    <r>北荒</r>
-  </regions>
-  <relations>                    <!-- 势力关系，按名称引用 -->
-    <rel><n>敌对势力名</n><t>敌对</t><d>百年世仇</d></rel>
-  </relations>
-</f>
+<o>
+  <n>1</n>
+  <v>1</v>
+  <t><![CDATA[章节标题]]></t>
+  <p><![CDATA[情节大纲]]></p>
+  <e><![CDATA[关键事件]]></e>
+  <g><![CDATA[本章目标]]></g>
+  <w>3000</w>
+  <s><![CDATA[起点场景]]></s>
+  <f><![CDATA[终点场景]]></f>
+  <r><![CDATA[
+    [
+      {"characterName":"角色名","roleType":"protagonist","plannedRole":"本章角色定位","plannedScene":"计划戏份","plannedEmotion":"情绪走向","importance":"primary"},
+      {"characterName":"角色名2","roleType":"supporting","plannedRole":"协助角色","plannedScene":"计划戏份","importance":"secondary"}
+    ]
+  ]]></r>
+</o>
 ```
 
-**Why this XML structure:**
-- `<f>` for faction, `<n>` for name, `<d>` for description -- consistent with existing `<r>` pattern for regions
-- `<t>` and `<ps>` only on top-level factions (inherited by children in application logic)
-- `<regions>` and `<relations>` grouped in their own sub-elements to avoid ambiguity with recursive `<f>` children
-- Names instead of IDs -- AI does not know database IDs; backend resolves names to IDs after parsing
+**Template variable injection:** The template already receives `characterInfo` variable with the project's existing characters (line 940 of `OutlineTaskStrategy`). No new template variables needed -- the LLM uses the existing character list to plan their chapter appearances.
 
-**Confidence:** HIGH -- Extends the proven geography XML parsing pattern.
+**Template change scope:** Only the output instruction section of the template needs updating. The input variables and structure remain identical.
 
-### Vue 3 Frontend Tree Component
+### Template 2: `llm_chapter_generate_standard` - Inject Planned Characters
 
-| Pattern | Implementation | Why |
-|---------|---------------|-----|
-| Hand-rolled recursive template | Follow `GeographyTree.vue` pattern | The existing GeographyTree uses explicit nesting (Level 0, 1, 2, 3+) rather than a true recursive component. This is simpler to understand and debug for the limited depth of faction trees (typically 2-3 levels). **Follow the same approach for FactionTree.vue.** |
-| No external tree library | -- | The existing codebase has zero external tree dependencies. Adding one (e.g., vue3-treeview) would introduce a new dependency for marginal benefit. The hand-rolled approach works well for the typical 3-4 level depth of novel world factions. |
-| `expandedNodes` as `Set<number>` | `GeographyTree.vue` line 23 | Tracks which nodes are expanded. Simple and performant. **Reuse.** |
-| Inline editing with `editingNode` ref | `GeographyTree.vue` pattern | Click edit -> populate local refs -> save -> reload. No complex form state management needed. **Reuse.** |
-| Tailwind utility classes for styling | Existing patterns | Dark mode support, hover effects, icon colors by depth level. **Follow GeographyTree styling.** |
-| Lucide icons by depth | `getLevelIcon()` / `getLevelColor()` | Replace geography icons (Globe2, Mountain, Trees, MapPin) with faction-appropriate icons. Suggested: `Sword` (top-level), `Shield` (second-level), `Users` (third-level), `User` (leaf). Use same `getLevelColor()` approach. |
+**Current variables:** `role`, `targetWordCount`, `maxWordCount`, `minWordCount`, `volumeNumber`, `chapterNumber`, `chapterTitle`, `chapterOutline`, `startingScene`, `endingScene`, `lastChapterEndingScene`, `volumeTitle`, `volumeTheme`, `volumeInfo`, `plotStage`, `plotStageDescription`, `worldview`, `recentChapters`, `knowledgeContext`, narrative settings, `characterInfo`.
 
-**FactionTree additional UI elements (beyond GeographyTree):**
+**New template variable:**
 
-| Element | Implementation | Why |
-|---------|---------------|-----|
-| Faction type badge | Small colored pill next to name (`正派` green, `反派` red, `中立` gray) | Users need to see faction alignment at a glance. Not present in GeographyTree. |
-| Power system tag | Small text tag showing associated power system name (top-level only) | Critical for understanding which cultivation system a faction uses. Loaded from the faction's `corePowerSystem` name. |
-| Region associations | Collapsible list of region names under each top-level faction | Shows territory control. Clicking could navigate to geography section. |
-| Relation indicators | Icon or badge showing number of allied/hostile factions | Quick overview of faction diplomacy. Detailed view on a separate relations panel. |
-| Character roster (separate tab/panel) | Table listing characters and their roles in each faction | Separate from the tree because it involves many-to-many character data. Not inline. |
+| Variable Name | Source | Format | Purpose |
+|---------------|--------|--------|---------|
+| `plannedCharacters` | `NovelChapterPlan.plannedCharacters` parsed and formatted | Structured instruction text block | Direct the AI to include specific characters with specific roles |
 
-**Confidence:** HIGH -- Extends proven GeographyTree pattern with incremental additions.
-
-### MyBatis-Plus Features to Use
-
-| Feature | Where | Why |
-|---------|-------|-----|
-| `LambdaQueryWrapper` | All service queries | Already the standard in this codebase. Type-safe column references. Use `.eq()`, `.isNull()`, `.orderByAsc()` as in ContinentRegionServiceImpl. |
-| `BaseMapper.insert()` | Single node inserts | Returns auto-generated ID immediately via `@TableId(type = IdType.AUTO)`. Essential for the recursive save pattern (insert parent, get ID, set as children's parentId). |
-| `BaseMapper.deleteBatchIds()` | Cascade delete | Takes a `List<Long>` of IDs. Used in `ContinentRegionServiceImpl.deleteRegion()`. Same approach for factions -- collect all descendant IDs, add the target, delete all at once. |
-| `BaseMapper.selectList()` | Flat list queries | Load all faction nodes for a project, then build tree in Java. Same as geography. |
-| `BaseMapper.selectById()` | Parent lookups | Used when calculating `deep` for new/updated nodes. |
-| `@Transactional` | Service methods | Already used on all mutating methods in ContinentRegionServiceImpl. **Must use** on `saveTree()`, `deleteRegion()`, and all cascade operations. |
-| `@TableField(exist = false)` | Entity children field | Marks `List<NovelFaction> children` as non-database. Already proven pattern. |
-
-### Name-to-ID Resolution (Post-Parse)
-
-| Concern | Approach | Why |
-|---------|----------|-----|
-| Power system name -> ID | After parsing faction XML, query `novel_power_system` by `name` and `projectId` | Power systems are saved before factions in the worldview generation flow. Names are unique per project (enforced by AI prompt). |
-| Region name -> ID | Query `novel_continent_region` by `name` and `projectId` | Geography is saved before factions. A region may appear under multiple factions, so use `LIKE` or exact match. |
-| Faction name -> ID (for relations) | Parse all factions first, build a `Map<String, Long>` of name-to-ID | Faction relations reference other factions by name. Build the map after all factions are inserted, then iterate relations and resolve names. This requires a two-pass approach. |
-
-**Two-pass insert strategy for factions with relations:**
+**Example injection text that `buildPlannedCharactersText()` would produce:**
 
 ```
-Pass 1: Parse and insert all factions (tree structure). Build name-to-ID map.
-Pass 2: Parse and insert faction-region associations and faction-faction relations,
-         using the name-to-ID map for resolution.
+【本章角色规划 - 必须严格遵循】
+以下角色必须在本章登场，按规划执行戏份：
+
+1. **林动**（主角）- importance: primary
+   - 角色定位：本章核心视角人物
+   - 计划戏份：在天剑宗外门考核中展示新突破的武技
+   - 情绪走向：紧张、兴奋、决心
+   - 成长方向：从怯懦到自信的转变
+
+2. **萧炎**（配角）- importance: secondary
+   - 角色定位：协助与冲突对象
+   - 计划戏份：作为对手在考核中出现
+   - 情绪走向：不屑、惊讶
+
+3. 其他已有角色：如剧情自然需要可以登场，但不作为重点
 ```
 
-This is necessary because faction relations reference other factions that may not exist yet during Pass 1.
+**Why a separate variable instead of merging into `characterInfo`:** The planned characters are directives (what the AI MUST do), while `characterInfo` is reference data (who exists and their last state). Mixing them would dilute the directive strength. The template can position `plannedCharacters` as a hard constraint section separate from the reference `characterInfo`.
 
-**Confidence:** HIGH -- Logical extension of existing patterns.
+---
+
+## Backend Service Changes
+
+### OutlineTaskStrategy.java - Extend XML Parsing
+
+**Method: `parseChaptersXml()`** (line ~1182)
+
+Add extraction of the `<r>` tag alongside existing fields:
+
+```java
+// After existing field extractions (line ~1210):
+extractXmlFieldCData(chapterContent, "r", chapterData);
+
+// In field mapping section (line ~1233):
+if (chapterData.containsKey("r")) {
+    chapterData.put("plannedCharacters", chapterData.get("r"));
+}
+```
+
+**Method: `saveVolumeChaptersToDatabase()`** (line ~585) and **`saveChaptersToDatabase()`** (line ~2085)
+
+Add `plannedCharacters` field when creating/updating `NovelChapterPlan`:
+
+```java
+// When creating new chapter plan:
+chapterPlan.setPlannedCharacters(chapterData.getOrDefault("plannedCharacters", null));
+
+// When updating existing chapter plan:
+existingChapter.setPlannedCharacters(chapterData.getOrDefault("plannedCharacters", null));
+```
+
+### PromptTemplateBuilder.java - Inject Planned Characters into Chapter Generation
+
+**Method: `buildTemplateVariables()`** (line ~149)
+
+After building `characterInfo` (line ~204-207), add planned characters:
+
+```java
+// Inject planned characters from chapter plan (if available)
+String plannedCharacters = chapterPlan.getPlannedCharacters();
+if (plannedCharacters != null && !plannedCharacters.isEmpty()) {
+    variables.put("plannedCharacters", buildPlannedCharactersText(plannedCharacters));
+} else {
+    variables.put("plannedCharacters", "");
+}
+```
+
+**New private method `buildPlannedCharactersText(String json)`:**
+
+Parse the JSON array using the already-injected `ObjectMapper`, iterate over items, format as structured instruction text. This follows the exact same pattern as `buildCharacterInfoText()` (lines 651-718).
+
+### ChapterPromptBuilder.java - Also Inject (Legacy Path)
+
+The non-template `ChapterPromptBuilder` is used as a fallback. In `buildChapterPlanInfo()` (line ~175), add a planned characters section after the existing chapter plan fields, similar to how `buildChapterPlanInfo` currently appends plotOutline, startingScene, endingScene.
+
+---
+
+## Frontend Changes
+
+### Types - Extend ChapterPlan Interface
+
+**File:** `ai-factory-frontend/src/types/project.ts` (line ~140)
+
+```typescript
+export interface ChapterPlan {
+  id: string
+  volumeId?: string
+  projectId: string
+  chapterNumber: number
+  title: string
+  summary?: string
+  keyEvents?: string
+  characters?: string[]
+  foreshadowing?: string
+  plannedCharacters?: PlannedCharacter[]  // NEW
+  characterArcs?: CharacterArc[]          // NEW (optional, for future use)
+}
+
+// NEW interfaces
+export interface PlannedCharacter {
+  characterName: string
+  roleType: string
+  plannedRole: string
+  plannedScene: string
+  plannedEmotion?: string
+  plannedDevelopment?: string
+  importance: 'primary' | 'secondary' | 'minor'
+}
+
+export interface CharacterArc {
+  characterName: string
+  arcType: string
+  startState: string
+  endState: string
+  keyMoment: string
+}
+```
+
+### ChapterPlanDrawer.vue - Display Character Planning
+
+**Approach:** Add a read-only section in the drawer showing planned characters when available.
+
+The component currently shows: chapterNumber, title, summary, keyEvents, characters (comma-separated input), foreshadowing.
+
+Add a section (between keyEvents and characters) that renders when `currentChapterPlan.plannedCharacters?.length > 0`:
+
+```
+--- 角色规划 (AI规划) ---
++-------------------------------------------+
+| 林动 (主角) - 主要                         |
+| 角色定位: 本章核心视角人物                  |
+| 计划戏份: 在考核中展示新武技                |
+| 情绪走向: 紧张、兴奋、决心                  |
++-------------------------------------------+
+| 萧炎 (配角) - 次要                         |
+| 角色定位: 协助与冲突对象                    |
+| 计划戏份: 作为对手出现                      |
++-------------------------------------------+
+```
+
+**Design details:**
+- Read-only display (not editable -- the AI generates this, user can regenerate the chapter plan to change it)
+- Use Tailwind CSS card style consistent with existing dark/light mode patterns
+- `importance` shown as colored badge: primary=blue, secondary=gray, minor=transparent
+- Use `v-if` + `v-for` -- no new component needed (data is small, 3-8 characters per chapter)
+- The existing `characters` text input remains for manual override
+
+### API Layer - Extend ChapterPlanDto
+
+**File:** `ai-factory-frontend/src/api/outline.ts` (line ~41)
+
+```typescript
+export interface ChapterPlanDto {
+  id: string
+  chapterNumber: number
+  title: string
+  summary?: string
+  targetWordCount?: number
+  plotPoints?: string
+  generated?: boolean
+  plannedCharacters?: PlannedCharacter[]  // NEW
+  characterArcs?: CharacterArc[]          // NEW
+}
+```
+
+---
 
 ## Alternatives Considered
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Tree storage | Adjacency list (`parent_id + deep`) | Nested sets / materialized path / closure table | Adjacency list is already the established pattern in this codebase. Nested sets add complexity for marginal query benefit. The tree is small (typically < 50 nodes per project), so the Java-side `buildTree()` is fast enough. |
-| Tree query | Load all + Java-side build | `WITH RECURSIVE` CTE in MySQL | CTE is more complex, harder to debug, and the project uses Java-side tree building successfully already. No reason to change for a similarly-sized dataset. |
-| XML parsing | `org.w3c.dom` DOM | Jackson XML (`XmlParser`) | Jackson XML cannot handle nested same-name tags. This is already a settled decision in the codebase -- see `WorldviewTaskStrategy` line 346 comment: "Jackson XML 无法处理嵌套同名 <r> 标签". Same applies to nested `<f>` tags. |
-| XML parsing | `org.w3c.dom` DOM | SAX / StAX | DOM loads the entire XML into memory. The AI responses are small (< 10KB), so memory is not a concern. DOM provides easier random access and tree traversal, which matches the recursive parsing pattern. |
-| Frontend tree | Hand-rolled template | `vue3-treeview` / `sl-vue-tree` / `vue-tree` | Adds a dependency for minimal benefit. The GeographyTree pattern works. Faction trees are shallow (2-3 levels). The explicit nesting approach is readable and maintainable. |
-| Faction relation type | VARCHAR string | ENUM column type | VARCHAR is more flexible. Relation types may evolve (e.g., "宗门", "附属", "暗盟"). VARCHAR avoids ALTER TABLE for new types. The existing codebase uses strings for similar classifications (e.g., `NovelCharacter.roleType`). |
-| Batch insert | Sequential `insert()` in loop | `IService.saveBatch()` | The faction tree for a single project is small (typically 5-30 nodes). Sequential insert within a `@Transactional` method is simple and fast enough. `saveBatch` requires extending `IService` which adds complexity for negligible gain at this data volume. |
+| Decision Point | Chosen | Alternative | Why Not |
+|----------------|--------|-------------|---------|
+| Storage for planned characters | JSON column on `novel_chapter_plan` | Separate `novel_chapter_plan_character` table | JSON is simpler; data is always read/written together; matches existing pattern (`keyEvents`, `foreshadowingSetup` all stored as JSON/TEXT on the same row). A join table would require JOIN queries and cascade delete for a small list (3-8 items). |
+| Character reference in JSON | By name | By ID | AI does not know database IDs. Name-matching is the proven pattern used for faction parsing (`WorldviewXmlParser.saveTree -> buildNameToIdMap`) and character extraction (`ChapterCharacterExtractService.isSameCharacter`). |
+| Template output format | JSON inside CDATA `<r>` tag | Nested XML `<character><name>...</name></character>` tags | JSON inside CDATA is simpler to parse. The regex-based `extractXmlFieldCData` already handles CDATA extraction. Nested XML would require recursive DOM parsing for minimal benefit. Consistent with how `keyEvents` (E tag) is already sometimes JSON. |
+| Frontend display | Inline read-only block in ChapterPlanDrawer | New dedicated component / modal | Data is small (3-8 characters per chapter). Inline keeps UX simple. Extract to component only if complexity grows. |
+| `character_arcs` column | Map existing unmapped DB column | Create new column | Column exists in database schema (`sql/init.sql` line 381). Not mapping it is wasted schema. Mapping it is zero-cost (one String field). |
+| Tag letter for characters | `<r>` (roles) | `<ch>`, `<a>` (actors) | `<r>` follows the single-letter convention. Does not collide with any existing tag. `<a>` is already used for "age" in character parsing. |
 
-## What NOT to Use
+---
 
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| `Element.getElementsByTagName()` for recursive child parsing | Returns ALL descendants with that tag name across the entire subtree, not just direct children. This would incorrectly match deeply nested `<f>` tags when you only want immediate children. | `Element.getChildNodes()` + filter by `Node.ELEMENT_NODE` + check `getNodeName()`. This is what the existing `parseSingleRegion()` already does. |
-| Jackson `XmlMapper` for nested faction parsing | Cannot handle nested same-name tags like `<f><f></f></f>`. Already confirmed broken in this codebase for the geography case. | `DocumentBuilder` + `org.w3c.dom` DOM parsing. |
-| `IService<T>` / `ServiceImpl` for FactionService | Adds framework coupling and the batch methods are overkill for this data volume. The existing `ContinentRegionService` / `ContinentRegionServiceImpl` use plain `@Service` + `@Autowired Mapper`, which is simpler and the established pattern. | Plain `@Service` + `@Autowired NovelFactionMapper` + `@Transactional`. Match the `ContinentRegionServiceImpl` pattern. |
-| `DELETE` without collecting descendants first | A simple `deleteById()` on a parent node leaves orphaned children in the database. The geography code handles this correctly by collecting all descendant IDs first. | `collectDescendantIds()` + `deleteBatchIds()`. Copy the pattern from `ContinentRegionServiceImpl`. |
-| Frontend state management (Pinia store) for tree data | The GeographyTree loads data on mount and refreshes after each mutation. No cross-component sharing needed. Adding a Pinia store would be over-engineering. | Component-local `ref<NovelFaction[]>([])` loaded on mount. Same as GeographyTree. |
-| Separate REST endpoint per relationship type | Could create `/factions/{id}/regions`, `/factions/{id}/characters`, `/factions/{id}/relations`. This fragments the API and increases frontend call count. | Include relationships in the faction tree response (regions as names, relations as nested objects). Use dedicated endpoints only for character associations (which are managed separately). |
+## What NOT to Do
 
-## Stack Patterns by Variant
+| Avoid | Why | Do Instead |
+|-------|-----|------------|
+| Add a new dependency (JSON library, XML library, UI component library) | Everything needed already exists in the stack | Use existing `ObjectMapper`, `extractXmlFieldCData()`, Tailwind CSS |
+| Use `@TableField(typeHandler = JacksonTypeHandler.class)` for JSON columns | Not used anywhere in the existing codebase for JSON fields; all JSON fields are `String` with manual `ObjectMapper` usage | Keep `String` fields, parse with `ObjectMapper` at service layer |
+| Create a new REST endpoint for planned characters | The data is part of `NovelChapterPlan` and should travel with the existing chapter plan response | Return `plannedCharacters` field in existing chapter plan API response |
+| Make planned characters editable in the frontend drawer | The data is AI-generated guidance; editing individual character plans manually would be fragile and confusing | Display as read-only. User regenerates the chapter plan to get new character planning. |
+| Store planned characters in `novel_character_chapter` table | That table tracks post-generation actual data (what happened), not pre-generation planning (what should happen). Mixing them breaks the plan-vs-actual distinction. | Use `plannedCharacters` JSON on `novel_chapter_plan` for planning; `novel_character_chapter` remains for actuals |
 
-**If faction tree exceeds 100 nodes per project:**
-- Consider adding a `project_id + parent_id` composite index on `novel_faction` for faster tree queries
-- The Java-side `buildTree()` still works fine at this scale, no need for CTE
+---
 
-**If faction-faction relations become bidirectional (A is ally of B means B is ally of A):**
-- Store relations once with a convention (lower ID first), add a UNIQUE constraint on `(faction_id, related_faction_id)`
-- Alternatively, query both directions: `WHERE faction_id = ? OR related_faction_id = ?`
-- For now, store relations as directed (one row per direction) since "A is ally of B" and "B is enemy of A" can coexist in fiction
+## Files to Modify (Complete List)
 
-**If the GeographyTree explicit nesting approach becomes unwieldy (more than 4 levels):**
-- Refactor to a true recursive Vue component using `defineComponent` with `name` property for self-reference
-- The current GeographyTree hardcodes 4 levels (lines 180-348), which is sufficient for factions
-- Faction trees in Chinese web novels typically have: Sect -> Hall -> Branch (3 levels max)
+### Backend Java (4 files modified)
 
-## Version Compatibility
+| File | Change | LOC Estimate |
+|------|--------|-------------|
+| `entity/NovelChapterPlan.java` | Add `plannedCharacters` and `characterArcs` String fields | +15 |
+| `service/task/impl/OutlineTaskStrategy.java` | Parse `<r>` tag in `parseChaptersXml()`, save `plannedCharacters` in both save methods | +25 |
+| `service/chapter/prompt/PromptTemplateBuilder.java` | Add `plannedCharacters` variable in `buildTemplateVariables()`, new `buildPlannedCharactersText()` method | +50 |
+| `service/chapter/prompt/ChapterPromptBuilder.java` | Add planned characters section in `buildChapterPlanInfo()` | +20 |
 
-| Package | Compatible With | Notes |
-|---------|-----------------|-------|
-| MyBatis-Plus 3.5.5 | Spring Boot 3.2.0 | Confirmed via `mybatis-plus-spring-boot3-starter` artifact in pom.xml |
-| MyBatis-Plus 3.5.5 | Java 21 | Supported since MyBatis-Plus 3.5.3+ |
-| Vue 3.5.24 + Vite 7.2.4 | TypeScript 5.9.3 | All latest stable, confirmed compatible in existing package.json |
-| Tailwind CSS 4.1.18 | PostCSS 8.5.6 | v4 uses new engine, already configured in the project |
-| Jackson XML | Spring Boot 3.2.0 | Version managed by Spring Boot parent POM |
-| `org.w3c.dom` | Java 21 (JDK built-in) | Part of JDK, no dependency needed |
+### Database (1 new file)
 
-## New Files to Create
+| File | Change |
+|------|--------|
+| `sql/V5__chapter_plan_planned_characters.sql` (NEW) | `ALTER TABLE` to add `planned_characters` JSON column |
 
-### Backend
-| File | Pattern Source |
-|------|---------------|
-| `NovelFaction.java` (entity) | Copy `NovelContinentRegion.java`, add `type`, `corePowerSystemId` fields |
-| `NovelFactionMapper.java` | Copy `NovelContinentRegionMapper.java` |
-| `NovelFactionRegion.java` (entity) | Copy `NovelWorldviewPowerSystem.java`, add second FK |
-| `NovelFactionCharacter.java` (entity) | Copy `NovelWorldviewPowerSystem.java`, add `role` field |
-| `NovelFactionRelation.java` (entity) | New, self-referencing pair with `relationType` + `description` |
-| `FactionService.java` (interface) | Copy `ContinentRegionService.java` |
-| `FactionServiceImpl.java` | Copy `ContinentRegionServiceImpl.java`, add name-to-ID resolution |
-| `FactionController.java` | Copy `ContinentRegionController.java`, add relation endpoints |
+### AI Templates (2 templates updated)
 
-### Frontend
-| File | Pattern Source |
-|------|---------------|
-| `faction.ts` (API) | Copy `continentRegion.ts`, add relation/character endpoints |
-| `FactionTree.vue` | Copy `GeographyTree.vue`, add type badge and power system tag |
+| Template Code | Change |
+|---------------|--------|
+| `llm_outline_chapter_generate` | Add `<r>` output tag instruction and character planning guidance to the prompt text |
+| `llm_chapter_generate_standard` | Add `${plannedCharacters}` variable injection point in the template body |
 
-### Database
-| File | Purpose |
-|------|---------|
-| SQL migration script | Create 4 new tables, add indexes, eventually drop `novel_worldview.forces` column |
+### Frontend (3 files modified)
+
+| File | Change | LOC Estimate |
+|------|--------|-------------|
+| `types/project.ts` | Add `PlannedCharacter`, `CharacterArc` interfaces, extend `ChapterPlan` | +25 |
+| `api/outline.ts` | Extend `ChapterPlanDto` with new fields | +5 |
+| `views/.../ChapterPlanDrawer.vue` | Add planned characters display section | +40 |
+
+**Total estimated LOC change:** ~180 lines across 8 files (excluding template text changes)
+
+---
 
 ## Sources
 
-- **Existing codebase analysis** (HIGH confidence) -- All patterns verified by reading actual source files:
-  - `ContinentRegionServiceImpl.java` -- Tree CRUD lifecycle
-  - `NovelContinentRegion.java` -- Entity pattern with `@TableField(exist = false)`
-  - `GeographyTree.vue` -- Frontend tree component pattern
-  - `WorldviewTaskStrategy.java` -- DOM XML parsing and worldview save flow
-  - `XmlParser.java` -- Jackson XML wrapper (confirmed unsuitable for nested same-name tags)
-  - `NovelWorldviewPowerSystem.java` -- Many-to-many join table pattern
-  - `pom.xml` -- Dependency versions confirmed
-  - `package.json` -- Frontend versions confirmed
-
-- **MyBatis-Plus batch operations** -- Multiple sources confirm `saveBatch` is not true batch insert without `rewriteBatchedStatements=true`. Not relevant at faction data volumes. ([Comate](https://comate.baidu.com/zh/page/ut2wio36mvo), [CSDN](https://ask.csdn.net/questions/8968284), [juejin](https://juejin.cn/post/7221739494277791800))
-
-- **DOM XML nested same-name tag parsing** -- Stack Overflow and community consensus: use `getChildNodes()` not `getElementsByTagName()` for recursive parsing. ([SO](https://stackoverflow.com/questions/18391388/parsing-xml-with-tags-with-same-name-on-different-levels-in-dom), [CodeRanch](https://coderanch.com/t/127860/languages/nested-elements-DOM))
-
-- **Vue 3 recursive components** -- Community pattern: explicit nesting for shallow trees, self-referencing component for deep trees. ([Hashnode](https://nhasbeen.hashnode.dev/vue-3-recursion-with-treeview-component), [DEV Community](https://dev.to/jacobandrewsky/building-recursive-components-in-vue-46cc))
+- **Codebase analysis (HIGH confidence):**
+  - `entity/NovelChapterPlan.java` -- Current entity fields, missing `plannedCharacters` and `characterArcs` mappings
+  - `sql/init.sql` line 361-386 -- `novel_chapter_plan` table definition with existing `character_arcs` and `foreshadowing_actions` JSON columns
+  - `service/task/impl/OutlineTaskStrategy.java` -- XML parsing pattern (`parseChaptersXml`, `extractXmlFieldCData`), DB save methods
+  - `service/chapter/prompt/PromptTemplateBuilder.java` -- Template variable building, character info formatting
+  - `service/chapter/prompt/ChapterPromptBuilder.java` -- Legacy prompt builder (fallback path)
+  - `service/task/impl/ChapterContentGenerateTaskStrategy.java` -- Chapter generation flow
+  - `service/ChapterCharacterExtractService.java` -- Post-generation character extraction (confirms plan-vs-actual separation)
+  - `dto/CharacterPromptInfo.java` -- Existing character prompt DTO
+  - `entity/NovelCharacterChapter.java` -- Post-generation character tracking fields
+  - `views/.../ChapterPlanDrawer.vue` -- Current frontend drawer
+  - `types/project.ts` -- Frontend type definitions
+  - `api/outline.ts` -- Frontend API layer
 
 ---
-*Stack research for: faction structured refactoring in AI Factory*
-*Researched: 2026-04-01*
+*Stack research for: Chapter Character Planning (v1.0.5)*
+*Researched: 2026-04-07*

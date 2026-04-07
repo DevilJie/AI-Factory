@@ -1,178 +1,244 @@
-# Feature Research
+# Feature Research: Chapter Character Planning System
 
-**Domain:** Structured faction/force system for AI novel generation application
-**Researched:** 2026-04-01
-**Confidence:** HIGH (based on codebase analysis + competitor research)
+**Domain:** Chapter-level character planning and enforcement for AI novel generation
+**Researched:** 2026-04-07
+**Confidence:** HIGH (based on thorough codebase analysis of existing planning, generation, and extraction pipelines)
 
-## Feature Landscape
+## Executive Summary
 
-### Table Stakes (Users Expect These)
+The current AI novel generation pipeline operates in an open-loop for character management: the AI generates chapter plans (with no explicit character assignments), then generates chapter content (injecting all non-NPC characters as context), and finally extracts characters post-generation into `novel_character_chapter` records. This creates three problems: (1) the AI decides character appearances ad-hoc with no pre-planning, leading to inconsistent screen time; (2) the generation prompt includes ALL non-NPC characters regardless of relevance, wasting token budget and confusing the model; (3) there is no way for users to control or predict which characters appear in which chapters.
 
-Features users assume exist in a structured faction system. Missing these makes the refactoring pointless because the AI cannot produce better content than the current flat text approach.
+The chapter character planning system closes this loop by adding a "plan characters -> generate by plan -> extract and verify" cycle. The key insight is that the `novel_chapter_plan` table already has an unused `character_arcs` JSON column, the `ChapterGenerationTaskStrategy` already calls `buildCharacterPromptInfoList()` during planning, and the `PromptTemplateBuilder` already has `buildCharacterInfoText()`. The changes are primarily about threading planned character data through existing pipelines rather than building new infrastructure.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Faction CRUD with tree hierarchy | Users need to create, edit, delete factions with parent-child nesting (e.g., Sect > Inner Sect > Peak). The geography refactoring already proved this pattern. | MEDIUM | Directly mirrors NovelContinentRegion. Service pattern: FactionService with addRegion/updateRegion/deleteRegion equivalents. |
-| Faction type classification (ally/enemy/neutral) | Without type, the AI cannot reason about conflict dynamics. Every faction in xianxia/wuxia has alignment. | LOW | Single enum field on top-level faction. Child factions inherit. |
-| Power system association | A faction without a power system is narratively hollow -- the AI needs to know what cultivation path the sect practices. | LOW | FK to novel_power_system on top-level faction. Child factions inherit. Requires power systems to exist first (already guaranteed by generation order). |
-| Region association (faction-location mapping) | Factions occupy territory. Without this link the AI cannot place events geographically. | LOW | Simple many-to-many table novel_faction_region. No extra UI beyond a multi-select dropdown. |
-| AI-generated faction creation | The worldview prompt already generates faction content (<f> tag). Must continue working but now parse into structured tables instead of flat text. | MEDIUM | Refactor <f> section in prompt template to output structured XML. Add DOM parsing in WorldviewTaskStrategy analogous to saveGeographyRegionsFromXml. |
-| Transient forces field for prompt building | Chapter generation (PromptTemplateBuilder), outline generation, chapter fix, volume optimize -- all call fillGeography(). Need equivalent fillForces() that reconstructs text from faction tables for AI context. | LOW | Add fillForces(NovelWorldview) to FactionService. Build text from tree + relations. Mark forces as @TableField(exist = false). |
-| Tree view UI component | Users already have GeographyTree.vue. A faction tree without a tree component is unusable. | MEDIUM | FactionTree.vue mirrors GeographyTree.vue. Additional fields (type badge, power system label) add moderate UI complexity. |
-| Cascading delete | Deleting a parent faction must delete children, relations, and association rows. Users expect this from the geography tree behavior. | LOW | Same recursive collectDescendantIds pattern as ContinentRegionServiceImpl. Also clean novel_faction_relation, novel_faction_region, novel_faction_character rows. |
+## Current State Analysis
 
-### Differentiators (Competitive Advantage)
+### What Exists
 
-Features that elevate the product beyond flat-text competitors and approach the capabilities of dedicated worldbuilding tools like World Anvil and Kanka.
+| Component | Current Behavior | Gap |
+|-----------|------------------|-----|
+| `ChapterGenerationTaskStrategy` | Generates chapter plans with XML output containing n/t/p/e/g/w/s/f fields. No character planning fields. | No `<characters>` section in XML output or prompt. |
+| `ChapterPlanXmlDto` (two copies: `common.xml` and `dto`) | Parses XML into `ChapterPlanItem` with 8 fields. | No character-related fields in DTO. |
+| `NovelChapterPlan` entity | Has `plotOutline`, `keyEvents`, `chapterGoal`, etc. DB already has `character_arcs` JSON column. | `character_arcs` column unused in entity and service. No `planned_characters` field. |
+| `ChapterContentGenerateTaskStrategy` | Builds prompt via `PromptTemplateBuilder`, generates chapter, then calls `ChapterCharacterExtractService.extractCharacters()`. | Injects ALL non-NPC characters via `buildCharacterPromptInfoList()`. No filtering by plan. |
+| `PromptTemplateBuilder` | `buildCharacterPromptInfoList()` gets all non-NPC characters + last appearance state. `buildCharacterInfoText()` formats them for the prompt. | No awareness of planned characters. Cannot constrain to "only these characters should appear." |
+| `ChapterCharacterExtractService` | Post-generation: calls LLM to extract character info from chapter content, matches/creates characters, saves to `novel_character_chapter`. | No cross-reference against planned characters. No validation that planned characters actually appeared. |
+| `ChapterPlanDrawer.vue` | Shows chapter plan details in a drawer: chapter number, title, summary, key events, characters (comma-separated text input), foreshadowing. | "Characters" field is a free-text comma-separated string (`newCharacters`), not linked to `novel_character` table. |
+| `CreationCenter.vue` | Sets `chapter.newCharacters` as comma-separated string into the editor store. | No structured character display or planning UI. |
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Faction-to-faction relationships with typed relations (ally/enemy/neutral + description) | World Anvil charges for Diplomacy Webs. Kanka has basic relations. Having structured faction relationships that feed into AI prompts is a genuine differentiator -- the AI can then write conflict-aware dialogue and plot. No other AI novel tool does this. | MEDIUM | novel_faction_relation table. CRUD API. UI: relationship list per faction with type selector + description. The fillForces() text builder includes relationship info for AI context. |
-| Faction-to-character association with role/title | Kanka has this as "Members" with roles. For an AI novel tool, this is critical -- the AI needs to know that "Elder Chen" belongs to "Qingyun Sect" when writing chapters. Without it, the AI hallucinates affiliations. | MEDIUM | novel_faction_character table with role field. Manual-only per PROJECT.md. UI: character picker + role input on faction detail page. The fillForces() method can include member info. |
-| Type/power-system inheritance from root faction | Novelcrafter uses flat codex entries. Having automatic inheritance (child factions inherit type and core_power_system from their root ancestor) is a structural differentiator -- prevents data inconsistency and reduces user effort. | LOW | Inheritance logic in FactionService: when reading, walk up to root to resolve type and power system. No extra UI -- just display the inherited value with a "(inherited)" badge. |
-| Name-based ID resolution during AI generation | AI outputs faction names, backend resolves to IDs by matching against existing power systems and regions. This is clever -- it means the AI does not need to know database IDs, and the system can cross-reference naturally. | LOW | Post-parse resolution step: for each faction, look up core_power_system by name in novel_power_system table, look up region names in novel_continent_region table. Store resolved IDs. |
+### Key Data Points
 
-### Anti-Features (Commonly Requested, Often Problematic)
+- `novel_chapter_plan` table has `character_arcs` JSON column (already in DB schema, not used in Java entity).
+- `novel_chapter_plan` table does NOT have `planned_characters` -- this needs adding.
+- `ChapterPlanXmlDto` exists in two packages: `com.aifactory.common.xml` (used by `ChapterGenerationTaskStrategy`) and `com.aifactory.dto` (appears older/alternative). Only the `common.xml` version is actively used.
+- The prompt template code `llm_outline_chapter_generate` controls what the AI outputs for chapter planning.
+- The prompt template code `llm_chapter_generate_standard` controls how characters are injected during chapter generation.
+- Character extraction template `llm_chapter_character_extract` already handles post-generation extraction.
 
-Features that seem appealing but would harm the project scope, architecture, or user experience.
+## Table Stakes (Must Have)
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| AI auto-association of characters to factions | "Why not have AI automatically link characters to factions during generation?" | Worldview generation happens before character creation in the workflow. Characters do not exist yet. Even if they did, AI hallucination rates for entity linking are high and create dirty data that is hard to audit. | Keep manual-only character linking. Users explicitly assign characters after both entities exist. This is the same approach Kanka and Novelcrafter use. |
-| Visual faction relationship graph / map | "Show a diplomacy web like World Anvil" | World Anvil built their Diplomacy Webs as a premium feature with substantial D3.js/canvas rendering. The current frontend uses no graph rendering library. Building this would double the frontend scope and the ROI for an AI novel tool (not a TTRPG campaign manager) is low -- users need the data in prompts, not on a canvas. | Simple tabular relationship list with colored badges for relation type. If demand arises later, a future phase can add visualization. |
-| Faction timeline/history events | "Track when factions formed, went to war, merged" | This is timeline structuring, which PROJECT.md explicitly scopes out. Mixing timeline events into faction data would create a coupling that complicates both the timeline refactor (future work) and this faction refactor. | Keep timeline as flat text in worldview. When timeline is later structured, add faction-event links then. |
-| Dynamic power shifts / resource tracking | "Track faction influence scores, territory changes over time" | This is a simulation game feature, not a novel writing tool feature. Adding numeric tracking (influence, resources, military strength) creates a game system that needs constant updates and validation, with zero benefit for AI text generation. | Static descriptive fields (description text). The AI reads descriptions and relationships to write -- it does not need numeric simulation data. |
-| Bidirectional relation sync | "When I set Faction A as enemy of Faction B, automatically create the reverse relation" | Sounds convenient but creates edge cases: what if the relationship is asymmetric? (A considers B an ally, but B considers A a puppet.) Enforcing symmetry reduces narrative expressiveness for no real UX gain in a manual-editing context. | Allow separate directional relations. The UI can show a hint if a reverse relation is missing, but not auto-create it. |
-| Nested faction depth limits | "Limit to 3 levels deep like geography" | Artificially limiting depth prevents valid world structures (e.g., Sect > Hall > Division > Team > Cell). The tree table pattern handles arbitrary depth with no performance cost at typical novel scale (tens to low hundreds of nodes). | No depth limit. Same as geography -- the tree handles it. The UI renders recursively. |
+Features that are essential to close the "plan -> generate -> verify" character loop. Missing any of these means the system still operates open-loop.
 
-## Feature Dependencies
+| # | Feature | Why Expected | Complexity | Trigger (AI vs User) | Notes |
+|---|---------|--------------|------------|----------------------|-------|
+| T-01 | Planned characters field in chapter plan | The entire feature premise. Each chapter plan must record which characters are expected to appear and what roles they play. Without this, there is nothing to enforce. | LOW | AI (during planning) + User (manual override) | DB: add `planned_characters` JSON column to `novel_chapter_plan`. Entity: add field. DTO: add field. The existing `character_arcs` JSON column can store arc-level info per character. |
+| T-02 | AI generates character assignments during chapter planning | The AI already generates plot outlines per chapter. It should also decide which characters appear and what they do, based on the volume's character roster and story needs. | MEDIUM | AI | Modify `llm_outline_chapter_generate` prompt template to request `<characters>` section in XML output. Modify `ChapterGenerationTaskStrategy` to inject existing character list into planning prompt. |
+| T-03 | Parse character planning from XML output | The AI's chapter plan XML must be parsed to extract character assignments and persisted to `planned_characters` JSON. | MEDIUM | AI (parsing) | Extend `ChapterPlanXmlDto.Chapter` to include character list. Add parsing in `ChapterGenerationTaskStrategy.saveChaptersToDatabase()`. Must handle AI outputting character names (not IDs) and resolve them. |
+| T-04 | Inject planned characters into chapter generation prompt | When generating chapter content, the system should inject ONLY the planned characters (with their planned roles/arcs), not ALL non-NPC characters. This is the enforcement mechanism. | MEDIUM | AI | Modify `ChapterContentGenerateTaskStrategy` to read `planned_characters` from the chapter plan. Modify `PromptTemplateBuilder` to accept planned character constraints. Add a "character plan" section to the prompt telling the AI exactly which characters must appear and what they should do. |
+| T-05 | Frontend display of planned characters in chapter plan | Users need to see which characters are planned for each chapter. This is basic visibility. | LOW | User (viewing) | Modify `ChapterPlanDrawer.vue` to show planned character list (read from plan data). Can use simple card/list layout. No editing needed for v1 -- AI plans, user views. |
+| T-06 | Cross-reference extracted characters against plan | After chapter generation + extraction, compare extracted characters with planned characters. If a planned character was not extracted, flag it. | LOW | AI (automated) | Post-extraction validation step in `ChapterContentGenerateTaskStrategy`. Compare `extractCharacters()` output with `planned_characters`. Log warnings, do not block. |
+
+## Differentiators (Competitive Advantage)
+
+Features that go beyond the basic loop and provide meaningful user control over character narrative.
+
+| # | Feature | Value Proposition | Complexity | Trigger (AI vs User) | Notes |
+|---|---------|-------------------|------------|----------------------|-------|
+| D-01 | Manual character planning override | Users can manually edit the planned character list before generation. This gives authors creative control -- they can add/remove characters and adjust arcs without re-running AI planning. | MEDIUM | User | Requires character picker UI (multi-select from project's character list) + arc text input per character. Save back to `planned_characters` JSON. |
+| D-02 | Character arc tracking per chapter plan | Each planned character can have a "role in this chapter" description (e.g., "Li Yun discovers the spy's identity" or "Chen Feng trains new technique"). This gives the AI more specific guidance than just a name. | LOW | AI (auto-generate) + User (edit) | Use the existing `character_arcs` JSON column. Schema: `[{"characterId": 1, "characterName": "...", "role": "...", "arc": "..."}]`. |
+| D-03 | Character appearance density analysis | Show users how many chapters each character is planned for vs. actually appeared in. Helps identify overused or underused characters. | MEDIUM | User (viewing) | Aggregate query across `planned_characters` (planned) and `novel_character_chapter` (actual). Display as a simple table or chart in a future reporting view. |
+| D-04 | Re-planning triggered by character changes | When a user edits a character's fundamental info (name, role type), offer to re-plan affected chapters where that character was planned. | HIGH | User (trigger) | Complex dependency chain. Requires knowing which plans reference which characters, then re-running AI planning for those chapters. Defer to future. |
+
+## Anti-Features (Explicitly Do NOT Build)
+
+Features that seem natural but would overcomplicate the system or contradict the project's AI-first philosophy.
+
+| Anti-Feature | Why It Seems Appealing | Why We Should NOT Build It | What To Do Instead |
+|-------------|----------------------|---------------------------|-------------------|
+| Hard enforcement (block generation if planned characters not in content) | "Ensure the AI follows the plan exactly" | AI-generated text is probabilistic. Hard enforcement would cause infinite regeneration loops. The plan is guidance, not a contract. | Soft enforcement: inject planned characters strongly in the prompt, log post-generation mismatches, let users decide whether to re-generate. |
+| Per-character screen time / word count quotas | "Ensure balanced character appearances" | This is a screenplay/analytics feature, not a novel planning feature. Tracking word count per character in generated text requires NLP parsing and is unreliable. | Let the AI naturally balance appearances based on the planned roles. Provide visibility (D-03) but not quotas. |
+| Character relationship graph per chapter | "Visualize character interactions per chapter" | Requires a graph rendering library and complex interaction data extraction. The ROI for writing (vs. TTRPG management) is low. | Simple list display. Relationship data already exists in `novel_faction_relation` and `novel_faction_character` for faction-based relationships. |
+| Automatic re-generation when planned vs. actual mismatch | "If a planned character doesn't appear, auto-re-generate" | Creates unpredictable generation loops and cost. A missing character might be intentionally omitted by the AI for narrative reasons. | Warn the user. Let them manually trigger re-generation if desired. |
+| Character scheduling across chapters (timeline view) | "Gantt chart of character appearances across chapters" | Over-engineered for current scope. Requires a full timeline/gantt component that doesn't exist in the frontend stack. | Simple table view of planned characters per chapter. Timeline visualization is a v2+ feature. |
+| Mandatory character planning before generation | "Users must plan characters before any chapter can be generated" | This would break the existing workflow for users who don't care about character planning. It also blocks users who want to let the AI decide. | Make character planning opt-in: if `planned_characters` is null/empty, fall back to current behavior (inject all non-NPC characters). |
+
+## Feature Dependency Graph
 
 ```
-[Faction Table (novel_faction)]
-    |--requires--> [Power System Table (novel_power_system)] -- for core_power_system FK
-    |--requires--> [Geography Table (novel_continent_region)] -- for region association
+[T-01: planned_characters field in DB/entity]
     |
-    +--[Faction-Region Association (novel_faction_region)]
-    |       +--requires--> [Faction Table]
-    |       +--requires--> [Geography Table]
+    +---> [T-02: AI generates character assignments during planning]
+    |         +--requires--> [Existing character list query] (already exists in ChapterCharacterExtractService)
+    |         +--requires--> [Prompt template update: llm_outline_chapter_generate]
     |
-    +--[Faction-Character Association (novel_faction_character)]
-    |       +--requires--> [Faction Table]
-    |       +--requires--> [Character Table (novel_character)]
-    |       +--requires--> [Manual linking UI]
+    +---> [T-03: Parse character planning from XML]
+    |         +--requires--> [T-02] (XML output must contain characters)
+    |         +--requires--> [ChapterPlanXmlDto extension]
+    |         +--requires--> [Character name-to-ID resolution] (same pattern as faction name matching)
     |
-    +--[Faction-Faction Relation (novel_faction_relation)]
-    |       +--requires--> [Faction Table]
+    +---> [T-04: Inject planned characters into generation prompt]
+    |         +--requires--> [T-01] (data must exist in chapter plan)
+    |         +--requires--> [PromptTemplateBuilder modification]
+    |         +--requires--> [Prompt template update: llm_chapter_generate_standard]
+    |         +--degrades-gracefully--> [Current behavior: inject all non-NPC characters]
     |
-    +--[AI Generation (WorldviewTaskStrategy)]
-    |       +--requires--> [Faction Table]
-    |       +--requires--> [Prompt Template Update]
-    |       +--requires--> [Power System Table] (generation order: power systems saved first)
-    |       +--requires--> [Geography Table] (generation order: geography saved first)
+    +---> [T-05: Frontend display]
+    |         +--requires--> [T-01] (data in API response)
+    |         +--requires--> [ChapterPlanDrawer.vue modification]
     |
-    +--[fillForces() for AI Prompts]
-            +--requires--> [Faction Table]
-            +--enhances--> [Faction-Faction Relation] (includes relation info in prompt text)
-            +--enhances--> [Faction-Character Association] (includes member info in prompt text)
-            +--requires--> [Transient forces field on NovelWorldview]
+    +---> [T-06: Cross-reference extraction vs plan]
+    |         +--requires--> [T-01] (plan data)
+    |         +--requires--> [Existing extraction pipeline] (ChapterCharacterExtractService)
+              +--runs-after--> [Chapter content generation + character extraction]
 
-[Frontend FactionTree.vue]
-    +--requires--> [Faction CRUD API]
-    +--requires--> [Faction Tree endpoint]
+[D-01: Manual override]
+    +--requires--> [T-01]
+    +--requires--> [Character picker UI component]
 
-[Frontend Faction Relations UI]
-    +--requires--> [Faction-Faction Relation API]
+[D-02: Character arc per chapter]
+    +--requires--> [T-01]
+    +--uses--> [Existing character_arcs JSON column]
 
-[Frontend Faction-Character UI]
-    +--requires--> [Faction-Character Association API]
-    +--requires--> [Character List API] (for character picker dropdown)
+[D-03: Appearance density analysis]
+    +--requires--> [T-01] (planned data)
+    +--requires--> [novel_character_chapter table] (actual data, already exists)
 ```
 
-### Dependency Notes
+### Critical Dependency Notes
 
-- **Faction Table requires Power System and Geography Tables:** The generation order in WorldviewTaskStrategy is: power systems -> geography -> factions. This is already guaranteed because the AI output contains all sections, and parsing is sequential. The faction's core_power_system field references a power system by name, and regions are referenced by name. Both must exist before faction parsing resolves names to IDs.
-- **Faction-Character Association is post-generation only:** Characters are created after worldview generation. The association is manual-only and happens in a separate UI context (character management or faction detail page). This is explicitly scoped in PROJECT.md.
-- **fillForces() enhances all downstream AI features:** Every strategy that reads worldview (ChapterGenerationTaskStrategy, OutlineTaskStrategy, ChapterFixTaskStrategy, VolumeOptimizeTaskStrategy, PromptTemplateBuilder, PromptContextBuilder) will benefit. The forces field becomes transient and is populated from structured tables, giving the AI richer context.
-- **Frontend Faction Relations UI conflicts with Geography Tree timing:** Both components render in the same worldview management page. If both are expanded simultaneously, the page could get crowded. Consider collapsible sections or tab-based layout.
+1. **T-01 is the foundation.** Everything depends on having `planned_characters` in the database and entity. This is a single ALTER TABLE + entity field addition. The existing `character_arcs` JSON column can store the arc/role details per character.
 
-## MVP Definition
+2. **T-04 degrades gracefully.** If `planned_characters` is null or empty (existing plans, or plans where AI did not output characters), the system falls back to the current behavior of injecting all non-NPC characters. This means the feature is backward-compatible and can be rolled out incrementally.
 
-### Launch With (v1)
+3. **Name resolution follows the established pattern.** The AI outputs character names (not IDs). The backend must resolve names to IDs using the same approach as faction/region/power system name matching -- exact match first, then fuzzy match. The `NovelCharacterService` already has `getNonNpcCharacters()` which returns all characters for matching.
 
-The minimum set that makes the faction system structurally equivalent to the geography system and provides AI-usable data.
+4. **Two ChapterPlanXmlDto classes exist.** `com.aifactory.common.xml.ChapterPlanXmlDto` (used by `ChapterGenerationTaskStrategy`) and `com.aifactory.dto.ChapterPlanXmlDto` (used elsewhere). Both need updating, or consolidate to one.
 
-- [ ] **Faction table with tree CRUD** -- The foundational data structure. Without this, nothing else works. Mirrors NovelContinentRegion exactly.
-- [ ] **Type and power system fields on root factions with inheritance** -- Required for AI to reason about faction alignment and capabilities. Low implementation cost since it follows the same pattern.
-- [ ] **AI prompt template update for structured faction XML** -- Without this, the AI still outputs flat text for factions, making the structured tables useless. Must change the <f> section in the prompt template (id=3) to output structured XML with faction hierarchy, type, power system name, and region names.
-- [ ] **DOM parsing of faction XML in WorldviewTaskStrategy** -- Analogous to saveGeographyRegionsFromXml. Parse the new <f> XML structure, resolve names to IDs, insert into faction tables.
-- [ ] **fillForces() method and transient field** -- Every prompt builder needs this. The existing `worldview.getForces()` calls must be replaced with dynamically-built text from the faction tree.
-- [ ] **FactionTree.vue component** -- Users must be able to see and edit the faction hierarchy. Mirrors GeographyTree.vue with added type badge and power system label.
-- [ ] **SQL migration script** -- Create tables, remove forces column from novel_worldview.
+5. **The planning prompt needs character context.** Currently `ChapterGenerationTaskStrategy.buildChapterPromptUsingTemplate()` sets `variables.put("characterInfo", "No characters")`. This must change to inject the project's character roster so the AI can assign characters to chapters.
 
-### Add After Validation (v1.x)
+## MVP Recommendation
 
-Features that complete the system but are not blocking for initial structural value.
+### Phase 1: Data Foundation (T-01 + T-03 partial)
+The bare minimum to make the data flow work end-to-end.
 
-- [ ] **Faction-Faction relationship management** -- Add after the basic tree works. The relation table is independent and can be layered on without schema changes to the faction table itself. Trigger: once users have 5+ factions, they need relationship tracking.
-- [ ] **Faction-Character manual association** -- Add after the faction tree is stable. Requires character picker UI. Trigger: users start asking "how do I link characters to factions?"
-- [ ] **Faction-Region association** -- Can be deferred initially since region info is already in the AI prompt via the geography section. Trigger: users want to filter factions by region or see which regions are contested.
+1. Add `planned_characters` JSON column to `novel_chapter_plan` table.
+2. Add `plannedCharacters` field to `NovelChapterPlan` entity.
+3. Extend `ChapterPlanXmlDto.Chapter` with character list fields.
+4. Update `ChapterPlanDto` to include planned characters.
 
-### Future Consideration (v2+)
+**Rationale:** Cannot do anything without the data layer. This is a 2-3 hour task with minimal risk.
 
-Features that would be valuable but are explicitly out of scope for this refactoring milestone.
+### Phase 2: AI Planning Output (T-02 + T-03)
+Make the AI produce character assignments during chapter planning.
 
-- [ ] **Visual relationship graph** -- Only if user demand is strong. Consider integrating a lightweight graph library (e.g., vis-network or d3-force) rather than building from scratch.
-- [ ] **Faction templates per genre** -- Pre-built faction archetypes for different novel types (xianxia sects, fantasy guilds, sci-fi corporations). Defer because genre-specific features need their own research cycle.
-- [ ] **Faction event log** -- Requires timeline structuring first. Defer to the timeline refactor milestone.
+1. Update `llm_outline_chapter_generate` prompt template to request character planning.
+2. Inject character roster into `ChapterGenerationTaskStrategy`'s planning prompt.
+3. Parse character XML and persist to `planned_characters` JSON.
+4. Handle name-to-ID resolution with the existing character list.
 
-## Feature Prioritization Matrix
+**Rationale:** This is the core AI integration. The planning prompt must be carefully designed to output character data in a parseable XML format without breaking existing chapter plan output.
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Faction table + tree CRUD | HIGH | MEDIUM | P1 |
-| Type classification (ally/enemy/neutral) | HIGH | LOW | P1 |
-| Power system association | HIGH | LOW | P1 |
-| AI prompt template update | HIGH | MEDIUM | P1 |
-| DOM parsing + name-to-ID resolution | HIGH | MEDIUM | P1 |
-| fillForces() transient field | HIGH | LOW | P1 |
-| FactionTree.vue | HIGH | MEDIUM | P1 |
-| SQL migration | HIGH | LOW | P1 |
-| Type/power-system inheritance | MEDIUM | LOW | P1 |
-| Faction-Faction relationships | MEDIUM | MEDIUM | P2 |
-| Faction-Character association | MEDIUM | MEDIUM | P2 |
-| Faction-Region association | MEDIUM | LOW | P2 |
-| Visual relationship graph | LOW | HIGH | P3 |
-| Faction templates per genre | LOW | MEDIUM | P3 |
-| Faction event log | LOW | HIGH | P3 |
+### Phase 3: Generation Enforcement (T-04)
+Make chapter generation respect planned characters.
 
-**Priority key:**
-- P1: Must have for launch -- the faction system is useless without these
-- P2: Should have, add when possible -- completes the system for serious users
-- P3: Nice to have, future consideration -- speculative features
+1. Modify `ChapterContentGenerateTaskStrategy` to read `planned_characters` from the plan.
+2. Modify `PromptTemplateBuilder.buildCharacterInfoText()` to accept planned character constraints.
+3. Update `llm_chapter_generate_standard` template to include character plan section.
+4. Add fallback logic: if no planned characters, use current behavior.
 
-## Competitor Feature Analysis
+**Rationale:** This is the enforcement mechanism. The prompt must strongly instruct the AI to include ONLY the planned characters (with their specified roles/arcs) and not introduce unplanned characters.
 
-| Feature | World Anvil | Kanka | Novelcrafter | AI Factory (Our Approach) |
-|---------|-------------|-------|--------------|---------------------------|
-| Faction hierarchy (tree) | Yes (nested orgs) | Yes (parent/child orgs) | Flat codex entries | Tree table with parent_id + deep, same as geography |
-| Faction-member linking | Yes (Members tab with roles) | Yes (Members with roles + status) | Manual codex cross-references | novel_faction_character with role field, manual-only |
-| Faction-faction relations | Yes (Diplomacy Webs, premium) | Yes (Relations system) | Affinity scores (-10 to 10) | novel_faction_relation with type + description |
-| Faction-region mapping | Yes (Location links) | Yes (Location entity linking) | Manual codex entries | novel_faction_region many-to-many |
-| AI auto-generation | No (manual entry only) | No (manual entry only) | Partial (AI can reference codex) | Full AI generation with DOM parsing into structured tables |
-| AI prompt integration | N/A (TTRPG tool) | N/A (TTRPG tool) | Codex auto-injected into AI context | fillForces() builds text from structured data for all AI strategies |
-| Visual relationship graph | Yes (Diplomacy Webs) | No | No | Deferred (P3) |
-| Power system per faction | No (TTRPG focus) | No (custom attributes) | No | Direct FK to novel_power_system -- unique to our domain |
+### Phase 4: Frontend + Verification (T-05 + T-06)
+Close the loop with visibility and verification.
 
-**Key differentiator:** AI Factory is the only tool that auto-generates structured faction data from AI and feeds it back into AI chapter generation. World Anvil and Kanka are manual TTRPG tools. Novelcrafter has AI integration but uses flat codex entries. Our structured approach with tree hierarchy + typed relations + power system links gives the AI richer, more consistent context.
+1. Update `ChapterPlanDrawer.vue` to display planned characters.
+2. Update API responses to include planned character data.
+3. Add post-extraction comparison in `ChapterContentGenerateTaskStrategy`.
+4. Log warnings when planned characters are missing from extraction results.
+
+**Rationale:** Frontend is straightforward once the data flows. Verification is a logging concern, not a blocking check.
+
+### Phase 5: Manual Override (D-01 + D-02)
+Give users control after the automated system works.
+
+1. Add character picker UI to chapter plan drawer.
+2. Allow editing planned character roles/arcs.
+3. Save manual changes back to `planned_characters` JSON.
+
+**Rationale:** Manual override only makes sense after users can see what the AI planned. Building it first would mean editing empty data.
+
+## Feature Complexity Estimates
+
+| Feature | Backend LOC | Frontend LOC | DB Changes | AI Prompt Changes | Total Effort |
+|---------|------------|-------------|------------|-------------------|-------------|
+| T-01: DB field + entity | ~20 | 0 | 1 ALTER TABLE | 0 | 0.5 day |
+| T-02: AI planning output | ~50 | 0 | 0 | 1 template (moderate) | 1 day |
+| T-03: XML parsing + persistence | ~80 | 0 | 0 | 0 | 1 day |
+| T-04: Generation enforcement | ~60 | 0 | 0 | 1 template (moderate) | 1 day |
+| T-05: Frontend display | ~10 | ~80 | 0 | 0 | 0.5 day |
+| T-06: Cross-reference check | ~30 | 0 | 0 | 0 | 0.5 day |
+| D-01: Manual override | ~30 | ~120 | 0 | 0 | 1 day |
+| D-02: Character arc editing | ~20 | ~60 | 0 | 0 | 0.5 day |
+| **Total MVP (T-01 through T-06)** | **~250** | **~80** | **1 migration** | **2 templates** | **~4.5 days** |
+| **Total with D-01 + D-02** | **~300** | **~260** | **0** | **0** | **~6 days** |
+
+## Planned Characters Data Schema
+
+The `planned_characters` JSON column should store structured data that serves both AI planning and frontend display:
+
+```json
+[
+  {
+    "characterId": 42,
+    "characterName": "Li Yun",
+    "roleInChapter": "protagonist",
+    "plannedArc": "Discovers the spy within the sect and confronts them",
+    "plannedBehavior": "Investigates suspicious activities, confronts Elder Chen",
+    "plannedEmotion": "Suspicion -> Anger -> Determination"
+  },
+  {
+    "characterId": 15,
+    "characterName": "Chen Feng",
+    "roleInChapter": "supporting",
+    "plannedArc": "Trains new technique and demonstrates growth",
+    "plannedBehavior": "Spars with senior disciple, reveals improved swordsmanship",
+    "plannedEmotion": "Frustration -> Breakthrough -> Pride"
+  }
+]
+```
+
+The `characterId` may be null for characters the AI names but that do not yet exist in the database (new characters introduced in this chapter). The `characterName` always serves as the display/lookup key.
+
+## AI Operation vs User Operation Classification
+
+| Operation | Actor | Automated? | Notes |
+|-----------|-------|-----------|-------|
+| Generate character assignments during chapter planning | AI | Yes | Part of existing `ChapterGenerationTaskStrategy`. Runs automatically when user clicks "generate chapter plans." |
+| Parse and persist character planning data | System | Yes | Post-AI-response parsing. Transparent to user. |
+| Inject planned characters into generation prompt | System | Yes | Transparent to user. System reads plan, builds prompt section. |
+| Post-generation extraction (existing) | AI | Yes | `ChapterCharacterExtractService.extractCharacters()`. Already runs after chapter generation. |
+| Cross-reference plan vs extraction | System | Yes | Automated comparison. Logs warnings. User sees nothing unless they check logs. |
+| View planned characters in chapter plan | User | No | User opens ChapterPlanDrawer to see what was planned. |
+| Override planned characters (D-01) | User | No | User manually adds/removes characters from the plan before generation. |
+| Edit character arc in plan (D-02) | User | No | User adjusts the planned arc description for a character. |
+| Trigger re-generation | User | No | User decides whether to re-generate a chapter based on mismatch warnings. |
 
 ## Sources
 
-- **Codebase analysis:** NovelContinentRegion entity, ContinentRegionServiceImpl, GeographyTree.vue, WorldviewTaskStrategy, PromptTemplateBuilder, WorldSettingXmlDto, NovelWorldview entity, NovelCharacter entity
-- **World Anvil:** [Diplomacy Webs Feature Guide](https://www.worldanvil.com/learn/diplomacy-webs/diplomacy-webs), [Organization Template Guide](https://www.worldanvil.com/learn/article-templates/organization)
-- **Kanka:** [Worldbuilding Software for Worldbuilders](https://kanka.io/use-cases/worldbuilders) -- organization/faction features based on platform documentation and community analysis
-- **Novelcrafter:** [Codex Features](https://www.novelcrafter.com/features/codex), [Codex Relations](https://www.novelcrafter.com/courses/codex-cookbook/codex-relationships), [Papercut Post Novelcrafter Review](https://www.papercutpost.com/writing-a-novel-in-novelcrafter-part-5/) -- faction affinity scoring and codex integration patterns
-- **PROJECT.md:** Explicit scope boundaries (no timeline, no rules, no AI character linking, no map visualization)
+- **Codebase analysis:** `NovelChapterPlan.java`, `ChapterPlanXmlDto.java` (both copies), `ChapterGenerationTaskStrategy.java`, `ChapterContentGenerateTaskStrategy.java`, `PromptTemplateBuilder.java`, `ChapterCharacterExtractService.java`, `NovelCharacterChapterService.java`, `ChapterPlanDrawer.vue`, `CreationCenter.vue`, `sql/init.sql`
+- **DB schema:** `novel_chapter_plan` table definition (already has `character_arcs` JSON column)
+- **PROJECT.md:** Milestone v1.0.5 scope and out-of-scope items
+- **Existing patterns:** Faction name-to-ID resolution, geography tree parsing, DOM XML parsing, prompt template system
 
 ---
-*Feature research for: structured faction/force system in AI novel generation*
-*Researched: 2026-04-01*
+*Feature research for: chapter character planning system in AI novel generation*
+*Researched: 2026-04-07*
