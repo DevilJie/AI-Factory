@@ -206,9 +206,10 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
                 log.info("未找到世界观设定");
             }
 
-            // 5b. 加载非NPC角色用于名称匹配
+            // 5b. 加载非NPC角色用于名称匹配和提示词注入
             List<NovelCharacter> allCharacters = novelCharacterService.getNonNpcCharacters(projectId);
             log.info("已加载 {} 个非NPC角色用于名称匹配", allCharacters.size());
+            context.putSharedData("allCharacters", allCharacters);
 
             // 6. 格式化keyEvents（如果是JSON格式，转换为可读文本）
             String formattedKeyEvents = formatKeyEvents(keyEvents);
@@ -448,8 +449,22 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
             }
             variables.put("worldviewInfo", worldviewBuilder.length() > 0 ? worldviewBuilder.toString() : "暂无世界观设定");
 
-            // 角色信息（当前策略不直接使用角色数据，设为默认值）
-            variables.put("characterInfo", "暂无登场角色");
+            // 角色信息注入（per D-03: 全量角色注入）
+            if (context.getSharedData().containsKey("allCharacters")) {
+                @SuppressWarnings("unchecked")
+                List<NovelCharacter> characters = (List<NovelCharacter>) context.getSharedData().get("allCharacters");
+                StringBuilder charInfo = new StringBuilder();
+                charInfo.append("以下为本项目已有角色列表：\n");
+                for (NovelCharacter c : characters) {
+                    charInfo.append("- ").append(c.getName());
+                    charInfo.append(" (").append(c.getRoleType() != null ? c.getRoleType() : "supporting");
+                    charInfo.append(")\n");
+                }
+                charInfo.append("\n你可以使用以上已有角色，也可以根据情节需要安排新角色登场。");
+                variables.put("characterInfo", charInfo.toString());
+            } else {
+                variables.put("characterInfo", "暂无登场角色");
+            }
 
             // 叙事设置（当前策略不直接使用叙事设置，设为默认值）
             variables.put("narrativeSettings", "");
