@@ -103,6 +103,21 @@ public class NovelChapterPlan {
     private String foreshadowingPayoff;
 
     /**
+     * 规划角色（JSON格式）
+     * 存储 AI 章节规划中计划登场的角色列表
+     * Schema: [{"characterName":"李云","roleType":"protagonist","roleDescription":"...","importance":"high","characterId":42}]
+     * characterId 为 null 表示名称匹配失败，角色名保留在 characterName 中
+     */
+    private String plannedCharacters;
+
+    /**
+     * 人物弧光变化（JSON格式）
+     * 已有数据库列（character_arcs），本次补充 Java 实体映射
+     * 存储 AI 生成章节后角色的状态/心态转变
+     */
+    private String characterArcs;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

@@ -60,6 +60,12 @@ public class ChapterPlanDto {
     @Schema(description = "待回收的伏笔，用分号分隔", example = "第一章提到的失踪父亲线索")
     private String foreshadowingPayoff;
 
+    @Schema(description = "规划角色列表，JSON格式，包含 AI 规划中计划登场的角色信息")
+    private String plannedCharacters;
+
+    @Schema(description = "人物弧光变化，JSON格式，记录角色在本章的状态/心态转变")
+    private String characterArcs;
+
     @Schema(description = "创建时间，格式：yyyy-MM-ddTHH:mm:ss", example = "2025-02-15T14:30:00")
     private LocalDateTime createTime;
 

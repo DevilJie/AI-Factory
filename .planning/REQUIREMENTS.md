@@ -11,7 +11,7 @@ Requirements for milestone v1.0.5 章节角色规划体系. Each maps to roadmap
 
 - [ ] **CP-01**: 用户生成章节规划时，AI 输出包含登场角色列表（角色名、戏份梗概、重要程度）
 - [ ] **CP-02**: 用户查看章节规划时，能看到解析并持久化的规划角色信息（planned_characters JSON 字段）
-- [ ] **CP-03**: novel_chapter_plan 实体映射 planned_characters JSON 字段和已有 character_arcs JSON 字段
+- [x] **CP-03**: novel_chapter_plan 实体映射 planned_characters JSON 字段和已有 character_arcs JSON 字段
 - [x] **CP-04**: 系统通过三级名称匹配（精确→简写→模糊）将 AI 输出的角色名关联到数据库已有角色
 
 ### 章节生成 (CG)
@@ -65,7 +65,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | CP-01 | Phase 12 | Pending |
 | CP-02 | Phase 12 | Pending |
-| CP-03 | Phase 11 | Pending |
+| CP-03 | Phase 11 | Complete |
 | CP-04 | Phase 11 | Complete |
 | CG-01 | Phase 13 | Pending |
 | CG-02 | Phase 13 | Pending |
@@ -80,4 +80,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-04-07 after roadmap creation*
+*Last updated: 2026-04-07 after phase 11 completion*

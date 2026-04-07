@@ -2,10 +2,10 @@
 
 ## Milestones
 
-- **v1.0.2 势力阵营结构化重构** — Phases 1-5 (shipped 2026-04-03)
-- **v1.0.3 世界观生成任务拆分** — Phases 6-9 (shipped 2026-04-05)
-- **v1.0.4 角色体系关联与提取增强** — Phase 10 (shipped 2026-04-06)
-- **v1.0.5 章节角色规划体系** — Phases 11-14 (in progress)
+- ✅ **v1.0.2 势力阵营结构化重构** — Phases 1-5 (shipped 2026-04-03)
+- ✅ **v1.0.3 世界观生成任务拆分** — Phases 6-9 (shipped 2026-04-05)
+- ✅ **v1.0.4 角色体系关联与提取增强** — Phase 10 (shipped 2026-04-06)
+- 🔄 **v1.0.5 章节角色规划体系** — Phases 11-14 (in progress)
 
 ## Phases
 
@@ -31,30 +31,14 @@
 </details>
 
 <details>
-<summary>v1.0.4 角色体系关联与提取增强 (Phase 10) — SHIPPED 2026-04-06</summary>
+<summary>✅ v1.0.4 角色体系关联与提取增强 (Phase 10) — SHIPPED 2026-04-06</summary>
 
-### Phase 10: 角色体系关联与提取增强
-
-**Goal:** 完善角色提取功能，建立角色与力量体系/势力阵营的结构化关联，修复角色类型识别问题
-**Depends on:** Phases 1-9 (completed)
-
-**Scope:**
-1. 新建角色-修炼体系关联表 (character_id, power_system_id, current_realm_id, current_sub_realm_id, 唯一索引 character_id+system_id)
-2. 识别角色与阵营势力的关联关系，更新 llm_chapter_character_extract 提示词模板明确生成势力阵营信息
-3. 修复角色类型识别问题 (protagonist/supporting/antagonist/npc 无法准确识别)
-
-**Plans:** 3/3 plans complete
-
-Plans:
-- [x] 10-01-PLAN.md — Wave 1: 后端数据层与提取逻辑 — completed 2026-04-06
-- [x] 10-02-PLAN.md — Wave 2: 提示词模板v2与角色类型修复 — completed 2026-04-06
-- [x] 10-03-PLAN.md — Wave 3: 前端Drawer Tab与列表增强 — completed 2026-04-06
+- [x] Phase 10: 角色体系关联与提取增强 (3/3 plans) — completed 2026-04-06
 
 </details>
 
-### v1.0.5 章节角色规划体系 (Phases 11-14)
-
-**Milestone Goal:** 在章节规划阶段预置登场角色和戏份安排，生成章节时严格按规划执行，形成"规划角色 -> 按规划生成 -> 提取验证"的闭环
+<details>
+<summary>🔄 v1.0.5 章节角色规划体系 (Phases 11-14) — IN PROGRESS</summary>
 
 - [x] **Phase 11: 数据基础 + 实体映射** — 数据库迁移、实体字段映射、DTO 合并、三级名称匹配 (completed 2026-04-07)
 - [ ] **Phase 12: AI 规划输出 + XML 解析** — 章节规划模板升级、角色规划 XML 解析、名称匹配关联
@@ -112,6 +96,8 @@ Plans:
 **Plans**: TBD
 **UI hint**: yes
 
+</details>
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -126,7 +112,7 @@ Plans:
 | 8. 原有逻辑重构 | v1.0.3 | 2/2 | Complete | 2026-04-03 |
 | 9. 前端独立生成按钮 | v1.0.3 | 1/1 | Complete | 2026-04-03 |
 | 10. 角色体系关联与提取增强 | v1.0.4 | 3/3 | Complete | 2026-04-06 |
-| 11. 数据基础 + 实体映射 | v1.0.5 | 2/2 | Complete   | 2026-04-07 |
+| 11. 数据基础 + 实体映射 | v1.0.5 | 2/2 | Complete | 2026-04-07 |
 | 12. AI 规划输出 + XML 解析 | v1.0.5 | 0/? | Not started | - |
 | 13. 章节生成约束注入 | v1.0.5 | 0/? | Not started | - |
 | 14. 前端展示 + 闭环验证 | v1.0.5 | 0/? | Not started | - |

@@ -380,6 +380,7 @@ CREATE TABLE "novel_chapter_plan" (
   "update_time" datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   "character_arcs" json DEFAULT NULL COMMENT '人物弧光变化',
   "foreshadowing_actions" json DEFAULT NULL COMMENT '伏笔操作',
+  "planned_characters" json DEFAULT NULL COMMENT '规划角色（JSON格式，存储 AI 规划中计划登场的角色列表）',
   PRIMARY KEY ("id"),
   KEY "idx_project_id" ("project_id"),
   KEY "idx_volume_plan_id" ("volume_plan_id")
