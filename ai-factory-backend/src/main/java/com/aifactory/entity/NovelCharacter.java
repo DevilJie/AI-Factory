@@ -1,5 +1,6 @@
 package com.aifactory.entity;
 
+import com.aifactory.common.NameMatchUtil;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -17,7 +18,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @TableName("novel_character")
-public class NovelCharacter {
+public class NovelCharacter implements NameMatchUtil.NamedEntity {
 
     /**
      * 人物ID（自增主键）

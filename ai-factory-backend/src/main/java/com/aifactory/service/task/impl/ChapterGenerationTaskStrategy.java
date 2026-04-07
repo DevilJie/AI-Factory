@@ -1,9 +1,11 @@
 package com.aifactory.service.task.impl;
 
+import com.aifactory.common.NameMatchUtil;
 import com.aifactory.common.XmlParser;
 import com.aifactory.dto.ChapterPlanXmlDto;
 import com.aifactory.entity.AiTask;
 import com.aifactory.entity.AiTaskStep;
+import com.aifactory.entity.NovelCharacter;
 import com.aifactory.entity.NovelChapterPlan;
 import com.aifactory.entity.NovelVolumePlan;
 import com.aifactory.entity.NovelWorldview;
@@ -13,6 +15,7 @@ import com.aifactory.mapper.NovelVolumePlanMapper;
 import com.aifactory.mapper.NovelWorldviewMapper;
 import com.aifactory.service.ContinentRegionService;
 import com.aifactory.service.FactionService;
+import com.aifactory.service.NovelCharacterService;
 import com.aifactory.service.PowerSystemService;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptTemplateService;
@@ -25,7 +28,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.xml.sax.InputSource;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.StringReader;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -71,6 +81,9 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
 
     @Autowired
     private FactionService factionService;
+
+    @Autowired
+    private NovelCharacterService novelCharacterService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -193,6 +206,10 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
                 log.info("未找到世界观设定");
             }
 
+            // 5b. 加载非NPC角色用于名称匹配
+            List<NovelCharacter> allCharacters = novelCharacterService.getNonNpcCharacters(projectId);
+            log.info("已加载 {} 个非NPC角色用于名称匹配", allCharacters.size());
+
             // 6. 格式化keyEvents（如果是JSON格式，转换为可读文本）
             String formattedKeyEvents = formatKeyEvents(keyEvents);
 
@@ -289,7 +306,7 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
                 log.info("成功解析 {} 个章节", chaptersList.size());
 
                 // 保存到数据库
-                saveChaptersToDatabase(projectId, volumeId, plotStage, currentChapterNumber, chaptersList);
+                saveChaptersToDatabase(projectId, volumeId, plotStage, currentChapterNumber, chaptersList, allCharacters);
 
                 // 更新上下文（用于下一批的连贯性）
                 recentContext = buildRecentContextFromChapters(chaptersList);
@@ -630,81 +647,196 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
     }
 
     /**
-     * 解析章节XML（使用Jackson XML，符合系统规范）
+     * 解析章节XML（DOM解析，支持嵌套同名<ch>标签）
+     * 替代原有Jackson XmlParser，因为Jackson无法正确处理<o>内嵌套的多个<ch>同名标签。
+     * 遵循WorldviewXmlParser的DOM解析模式。
      */
     private List<Map<String, String>> parseChaptersXml(String xmlStr) {
         try {
-            // 使用通用的XmlParser解析XML
-            ChapterPlanXmlDto dto = xmlParser.parse(xmlStr, ChapterPlanXmlDto.class);
+            // 提取 <c>...</c> 片段
+            int start = xmlStr.indexOf("<c>");
+            int end = xmlStr.indexOf("</c>");
+            if (start < 0 || end < 0) {
+                log.error("XML缺少根元素<c>");
+                return null;
+            }
+            String chapterXml = "<root>" + xmlStr.substring(start, end + 4) + "</root>";
 
-            if (dto == null || dto.getChapters() == null || dto.getChapters().isEmpty()) {
-                log.error("解析后的章节列表为空");
+            // 清理XML，修复常见的LLM输出问题
+            chapterXml = sanitizeXmlForDomParsing(chapterXml, new String[]{"o", "ch"});
+
+            // DOM解析
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(false);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(new InputSource(new StringReader(chapterXml)));
+
+            Element root = doc.getDocumentElement();
+
+            // 使用getChildNodes()查找<c>元素（不使用getElementsByTagName）
+            Element cElement = null;
+            org.w3c.dom.NodeList rootChildren = root.getChildNodes();
+            for (int i = 0; i < rootChildren.getLength(); i++) {
+                org.w3c.dom.Node node = rootChildren.item(i);
+                if (node.getNodeType() == org.w3c.dom.Node.ELEMENT_NODE && "c".equals(node.getNodeName())) {
+                    cElement = (Element) node;
+                    break;
+                }
+            }
+            if (cElement == null) {
+                log.error("<c> 标签内无内容");
                 return null;
             }
 
-            // 转换为Map格式（兼容现有的saveChaptersToDatabase方法）
+            // 遍历 <o> 子节点
             List<Map<String, String>> chapters = new ArrayList<>();
-            for (ChapterPlanXmlDto.ChapterPlanItem item : dto.getChapters()) {
-                Map<String, String> chapter = new HashMap<>();
-
-                // 验证必填字段
-                if (item.getChapterNumber() == null) {
-                    log.warn("章节编号为空，跳过该章节");
-                    continue;
+            org.w3c.dom.NodeList oNodes = cElement.getChildNodes();
+            for (int i = 0; i < oNodes.getLength(); i++) {
+                org.w3c.dom.Node oNode = oNodes.item(i);
+                if (oNode.getNodeType() == org.w3c.dom.Node.ELEMENT_NODE && "o".equals(oNode.getNodeName())) {
+                    Map<String, String> chapterMap = parseSingleChapter((Element) oNode);
+                    if (chapterMap != null) {
+                        chapters.add(chapterMap);
+                    }
                 }
+            }
 
-                chapter.put("chapterNumber", String.valueOf(item.getChapterNumber()));
-                chapter.put("chapterTitle", item.getChapterTitle() != null ? item.getChapterTitle() : "");
-                chapter.put("plotOutline", item.getPlotOutline() != null ? item.getPlotOutline() : "");
-                chapter.put("keyEvents", item.getKeyEvents() != null ? item.getKeyEvents() : "");
-                chapter.put("chapterGoal", item.getChapterGoal() != null ? item.getChapterGoal() : "");
-                chapter.put("wordCountTarget",
-                    item.getWordCountTarget() != null ? String.valueOf(item.getWordCountTarget()) : "3000");
-                chapter.put("chapterStartingScene",
-                    item.getChapterStartingScene() != null ? item.getChapterStartingScene() : "");
-                chapter.put("chapterEndingScene",
-                    item.getChapterEndingScene() != null ? item.getChapterEndingScene() : "");
-
-                chapters.add(chapter);
+            if (chapters.isEmpty()) {
+                log.error("解析后的章节列表为空");
+                return null;
             }
 
             log.info("成功解析 {} 个章节", chapters.size());
             return chapters;
 
-        } catch (XmlParser.XmlParseException e) {
-            log.error("XML解析失败: {}", e.getMessage(), e);
-
-            // 详细的错误日志
-            if (xmlStr != null && xmlStr.length() > 0) {
-                log.error("XML内容预览（前500字符）: {}", xmlStr.substring(0, Math.min(500, xmlStr.length())));
-
-                // 检查常见问题
-                if (!xmlStr.contains("<c>")) {
-                    log.error("XML缺少根元素<c>");
-                }
-                if (!xmlStr.contains("<o>")) {
-                    log.error("XML缺少章节元素<o>");
-                }
-                int oCount = xmlStr.split("<o>").length - 1;
-                int closingOCount = xmlStr.split("</o>").length - 1;
-                if (oCount != closingOCount) {
-                    log.error("<o>标签不匹配：开始标签{}个，结束标签{}个", oCount, closingOCount);
-                }
-            }
-
-            return null;
         } catch (Exception e) {
-            log.error("解析章节XML时发生未知错误", e);
+            log.error("DOM解析章节XML失败: {}", e.getMessage(), e);
             return null;
         }
     }
 
     /**
-     * 保存章节到数据库（重构版：保存plotStage字段）
+     * 解析单个<o>章节元素：提取章节字段和<ch>角色标签
+     */
+    private Map<String, String> parseSingleChapter(Element oElement) {
+        List<Map<String, Object>> plannedChars = new ArrayList<>();
+        Map<String, String> chapter = new HashMap<>();
+
+        org.w3c.dom.NodeList children = oElement.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            org.w3c.dom.Node child = children.item(i);
+            if (child.getNodeType() != org.w3c.dom.Node.ELEMENT_NODE) continue;
+            String tag = child.getNodeName();
+            String text = child.getTextContent().trim();
+
+            switch (tag) {
+                case "n" -> chapter.put("chapterNumber", text);
+                case "t" -> chapter.put("chapterTitle", text);
+                case "p" -> chapter.put("plotOutline", text);
+                case "e" -> chapter.put("keyEvents", text);
+                case "g" -> chapter.put("chapterGoal", text);
+                case "w" -> chapter.put("wordCountTarget", text.isEmpty() ? "3000" : text);
+                case "s" -> chapter.put("chapterStartingScene", text);
+                case "ed", "f" -> chapter.put("chapterEndingScene", text);
+                case "ch" -> {
+                    // 解析角色标签: <ch><cn>名称</cn><cd>描述</cd><ci>重要度</ci></ch>
+                    Map<String, Object> charData = parseCharacterTag((Element) child);
+                    if (charData != null) {
+                        plannedChars.add(charData);
+                    }
+                }
+            }
+        }
+
+        // 章节编号为空则跳过
+        if (chapter.get("chapterNumber") == null || chapter.get("chapterNumber").isEmpty()) {
+            log.warn("章节编号为空，跳过该章节");
+            return null;
+        }
+
+        // 如果有角色数据，序列化为JSON
+        if (!plannedChars.isEmpty()) {
+            try {
+                chapter.put("plannedCharacters", objectMapper.writeValueAsString(plannedChars));
+            } catch (Exception e) {
+                log.warn("序列化角色数据失败: {}", e.getMessage());
+            }
+        }
+
+        return chapter;
+    }
+
+    /**
+     * 解析<ch>角色标签: 提取 <cn>(characterName), <cd>(roleDescription), <ci>(importance)
+     */
+    private Map<String, Object> parseCharacterTag(Element chElement) {
+        Map<String, Object> charData = new HashMap<>();
+        charData.put("characterId", null); // 默认null，后续由resolveCharacterIds填充
+
+        org.w3c.dom.NodeList children = chElement.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            org.w3c.dom.Node child = children.item(i);
+            if (child.getNodeType() != org.w3c.dom.Node.ELEMENT_NODE) continue;
+            String tag = child.getNodeName();
+            String text = child.getTextContent().trim();
+
+            switch (tag) {
+                case "cn" -> charData.put("characterName", text);
+                case "cd" -> charData.put("roleDescription", text);
+                case "ci" -> charData.put("importance", text);
+            }
+        }
+
+        // 至少要有角色名称
+        if (charData.get("characterName") == null || ((String) charData.get("characterName")).isEmpty()) {
+            return null;
+        }
+
+        return charData;
+    }
+
+    /**
+     * 角色名称匹配：将解析出的角色名与项目中已有角色进行三级名称匹配
+     * 匹配成功设置characterId和roleType，未匹配设置characterId=null且roleType="supporting"
+     */
+    private String resolveCharacterIds(String plannedCharactersJson, List<NovelCharacter> allCharacters) {
+        try {
+            List<Map<String, Object>> plannedChars = objectMapper.readValue(plannedCharactersJson,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+
+            for (Map<String, Object> charData : plannedChars) {
+                String characterName = (String) charData.get("characterName");
+                Long matchedId = NameMatchUtil.matchByName(allCharacters, characterName, NameMatchUtil.CHARACTER_SUFFIXES);
+                if (matchedId != null) {
+                    charData.put("characterId", matchedId);
+                    // 从匹配到的角色获取roleType
+                    for (NovelCharacter c : allCharacters) {
+                        if (c.getId().equals(matchedId)) {
+                            charData.put("roleType", c.getRoleType());
+                            break;
+                        }
+                    }
+                } else {
+                    charData.put("characterId", null);
+                    charData.put("roleType", "supporting");
+                }
+            }
+
+            return objectMapper.writeValueAsString(plannedChars);
+        } catch (Exception e) {
+            log.error("解析角色JSON失败: {}", e.getMessage());
+            return plannedCharactersJson;
+        }
+    }
+
+    /**
+     * 保存章节到数据库（重构版：保存plotStage字段 + 角色规划数据）
      * 注意：继续生成模式，不删除已有章节
      */
     private void saveChaptersToDatabase(Long projectId, Long volumeId, String plotStage,
-                                       int startChapterNumber, List<Map<String, String>> chaptersList) {
+                                       int startChapterNumber, List<Map<String, String>> chaptersList,
+                                       List<NovelCharacter> allCharacters) {
         LocalDateTime now = LocalDateTime.now();
 
         // 继续生成模式：不删除已有章节，直接追加新章节
@@ -729,10 +861,116 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
             chapterPlan.setCreateTime(now);
             chapterPlan.setUpdateTime(now);
 
+            // 角色规划：名称匹配并持久化
+            String plannedCharactersJson = chapterData.get("plannedCharacters");
+            if (plannedCharactersJson != null) {
+                chapterPlan.setPlannedCharacters(resolveCharacterIds(plannedCharactersJson, allCharacters));
+            }
+
             chapterPlanMapper.insert(chapterPlan);
             chapterNumber++;
         }
 
         log.info("保存第{}卷{}阶段的新章节 {} 个", volumeId, plotStage, chaptersList.size());
+    }
+
+    // ======================== XML Sanitization (duplicated from WorldviewXmlParser) ========================
+
+    /**
+     * Sanitize LLM-generated XML to fix common structural issues before DOM parsing.
+     * Duplicated from WorldviewXmlParser to avoid creating a shared dependency
+     * for this well-isolated ~80-line utility.
+     */
+    private String sanitizeXmlForDomParsing(String xml, String[] containerTags) {
+        // Step 1: Escape illegal XML characters in text nodes
+        xml = escapeIllegalXmlChars(xml);
+
+        // Step 2: Fix tag balance
+        for (String tag : containerTags) {
+            String openTag = "<" + tag + ">";
+            String closeTag = "</" + tag + ">";
+
+            int openCount = countTagOccurrences(xml, openTag);
+            int closeCount = countTagOccurrences(xml, closeTag);
+
+            if (closeCount == openCount) continue;
+
+            if (closeCount > openCount) {
+                // Remove excess closing tags from the end
+                int excess = closeCount - openCount;
+                int searchFrom = xml.length();
+                while (excess > 0 && searchFrom > 0) {
+                    int idx = xml.lastIndexOf(closeTag, searchFrom - 1);
+                    if (idx < 0) break;
+                    xml = xml.substring(0, idx) + xml.substring(idx + closeTag.length());
+                    searchFrom = idx;
+                    excess--;
+                }
+                log.debug("XML sanitizer: removed {} excess </{}> tags", closeCount - openCount - excess, tag);
+            } else {
+                // Add missing closing tags at the end
+                int missing = openCount - closeCount;
+                StringBuilder suffix = new StringBuilder();
+                for (int i = 0; i < missing; i++) {
+                    suffix.append(closeTag);
+                }
+                xml = xml + suffix;
+                log.debug("XML sanitizer: added {} missing </{}> tags", missing, tag);
+            }
+        }
+        return xml;
+    }
+
+    /**
+     * Escape illegal XML characters in text nodes (outside tags and CDATA sections).
+     */
+    private String escapeIllegalXmlChars(String xml) {
+        // Phase 1: Extract and replace CDATA sections with placeholders
+        List<String> cdataSections = new ArrayList<>();
+        StringBuilder buffer = new StringBuilder(xml);
+        String cdataOpen = "<![CDATA[";
+        String cdataClose = "]]>";
+
+        int searchStart = 0;
+        while (searchStart < buffer.length()) {
+            int cStart = buffer.indexOf(cdataOpen, searchStart);
+            if (cStart < 0) break;
+
+            int cEnd = buffer.indexOf(cdataClose, cStart + cdataOpen.length());
+            if (cEnd < 0) break;
+
+            String cdata = buffer.substring(cStart, cEnd + cdataClose.length());
+            cdataSections.add(cdata);
+
+            String placeholder = "\u0000CDATA" + (cdataSections.size() - 1) + "\u0000";
+            buffer.replace(cStart, cEnd + cdataClose.length(), placeholder);
+            searchStart = cStart + placeholder.length();
+        }
+
+        // Phase 2: Escape illegal chars in remaining text
+        String result = buffer.toString();
+        result = result.replaceAll("&(?!(?:amp|lt|gt|quot|apos|#\\d+|#x[0-9a-fA-F]+);)", "&amp;");
+        result = result.replaceAll("<(?![/!a-zA-Z])", "&lt;");
+
+        // Phase 3: Restore CDATA sections
+        for (int i = 0; i < cdataSections.size(); i++) {
+            String placeholder = "\u0000CDATA" + i + "\u0000";
+            result = result.replace(placeholder, cdataSections.get(i));
+        }
+
+        return result;
+    }
+
+    /**
+     * Count non-overlapping occurrences of a substring.
+     */
+    private int countTagOccurrences(String str, String sub) {
+        int count = 0;
+        int idx = 0;
+        while ((idx = str.indexOf(sub, idx)) != -1) {
+            count++;
+            idx += sub.length();
+        }
+        return count;
     }
 }

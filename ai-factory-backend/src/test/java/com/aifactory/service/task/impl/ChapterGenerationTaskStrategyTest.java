@@ -182,7 +182,7 @@ class ChapterGenerationTaskStrategyTest {
         assertEquals("Li Yun", chars1.get(0).get("characterName").asText());
         assertEquals("Protagonist enters the city", chars1.get(0).get("roleDescription").asText());
         assertEquals("high", chars1.get(0).get("importance").asText());
-        assertNull(chars1.get(0).get("characterId"), "characterId should be null before resolution");
+        assertTrue(chars1.get(0).get("characterId").isNull(), "characterId should be null before resolution");
         assertEquals("Zhang San", chars1.get(1).get("characterName").asText());
 
         // Chapter 2 should have plannedCharacters with 1 entry
