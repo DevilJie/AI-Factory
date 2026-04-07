@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0.2
 milestone_name: milestone
-status: executing
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-04-07T17:35:40.069Z"
+status: verifying
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-04-07T17:48:21.935Z"
 last_activity: 2026-04-07
 progress:
-  total_phases: 4
-  completed_phases: 2
-  total_plans: 7
+  total_phases: 3
+  completed_phases: 1
+  total_plans: 3
   completed_plans: 6
   percent: 25
 ---
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 12 (AI规划输出-XML解析) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-07
 
 Progress: [=====     ] 25%
@@ -50,6 +50,7 @@ Progress: [=====     ] 25%
 | 10 (v1.0.4) | 3 | Complete |
 | 11 (v1.0.5) | 2 | Complete |
 | Phase 12 P01 | 6min | 1 tasks | 3 files |
+| Phase 12 P02 | 9min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,8 @@ All decisions logged in PROJECT.md Key Decisions table (18 items, all Good).
 - [Phase 11]: stripSuffix sorts suffixes by length descending for greedy matching on each call
 - [Phase 12-01]: Duplicated sanitizeXmlForDomParsing from WorldviewXmlParser (~80 lines) rather than extracting shared utility
 - [Phase 12-01]: parseSingleChapter accepts both <ed> and <f> for ending scene to handle prompt format variants
+- [Phase 12]: Template version id=20 used instead of plan-specified id=19 (id=19 already occupied by character extract template v2)
+- [Phase 12]: Injected full character list (name + roleType) into prompt rather than complex format to keep prompt concise
 
 ### Pending Todos
 
@@ -92,6 +95,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-07T17:35:40.060Z
-Stopped at: Completed 12-01-PLAN.md
+Last session: 2026-04-07T17:48:21.928Z
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None
