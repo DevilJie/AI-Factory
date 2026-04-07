@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.2
 milestone_name: milestone
-status: completed
-stopped_at: Phase 12 context gathered
-last_updated: "2026-04-07T16:33:25.519Z"
+status: executing
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-04-07T17:35:40.069Z"
 last_activity: 2026-04-07
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
   percent: 25
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** 世界观的模块化独立生成让用户能按需单独重新生成地理环境、力量体系或阵营势力
-**Current focus:** Phase 11 complete — ready for Phase 12
+**Current focus:** Phase 12 — AI规划输出-XML解析
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
-Status: Phase complete, ready for Phase 12
+Phase: 12 (AI规划输出-XML解析) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-07
 
 Progress: [=====     ] 25%
@@ -49,6 +49,7 @@ Progress: [=====     ] 25%
 | 6-9 (v1.0.3) | 6 | Complete |
 | 10 (v1.0.4) | 3 | Complete |
 | 11 (v1.0.5) | 2 | Complete |
+| Phase 12 P01 | 6min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,8 @@ All decisions logged in PROJECT.md Key Decisions table (18 items, all Good).
 - [Phase 11]: Allowed empty strippedTarget == empty strippedCandidate in Tier 2 matching (handles honorific-only names)
 - [Phase 11]: Tier 3 contains match uses length >= 2 guard to prevent single-char false positives
 - [Phase 11]: stripSuffix sorts suffixes by length descending for greedy matching on each call
+- [Phase 12-01]: Duplicated sanitizeXmlForDomParsing from WorldviewXmlParser (~80 lines) rather than extracting shared utility
+- [Phase 12-01]: parseSingleChapter accepts both <ed> and <f> for ending scene to handle prompt format variants
 
 ### Pending Todos
 
@@ -89,6 +92,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-07T16:33:25.509Z
-Stopped at: Phase 12 context gathered
-Resume file: .planning/phases/12-AI规划输出-XML解析/12-CONTEXT.md
+Last session: 2026-04-07T17:35:40.060Z
+Stopped at: Completed 12-01-PLAN.md
+Resume file: None
