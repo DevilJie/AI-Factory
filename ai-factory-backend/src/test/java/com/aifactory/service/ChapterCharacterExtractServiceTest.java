@@ -1,6 +1,6 @@
 package com.aifactory.service;
 
-import com.aifactory.mapper.CharacterPowerSystemMapper;
+import com.aifactory.mapper.NovelCharacterPowerSystemMapper;
 import com.aifactory.mapper.NovelCharacterMapper;
 import com.aifactory.mapper.NovelFactionMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -30,7 +30,7 @@ class ChapterCharacterExtractServiceTest {
     private NovelFactionMapper novelFactionMapper;
 
     @Mock
-    private CharacterPowerSystemMapper characterPowerSystemMapper;
+    private NovelCharacterPowerSystemMapper novelCharacterPowerSystemMapper;
 
     @Test
     @DisplayName("Stub: resolve faction name via exact match")

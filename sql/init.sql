@@ -738,8 +738,8 @@ INSERT INTO `ai_prompt_template_version` (`id`, `template_id`, `version_number`,
 
 UPDATE `ai_prompt_template` SET `current_version_id` = 19 WHERE `id` = 15;
 
-DROP TABLE IF EXISTS `character_power_system`;
-CREATE TABLE `character_power_system` (
+DROP TABLE IF EXISTS `novel_character_power_system`;
+CREATE TABLE `novel_character_power_system` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
   `character_id` bigint NOT NULL COMMENT 'Character ID (novel_character.id)',
   `power_system_id` bigint NOT NULL COMMENT 'Power system ID (novel_power_system.id)',

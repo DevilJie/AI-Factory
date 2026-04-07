@@ -11,7 +11,7 @@ import lombok.Data;
  */
 @Data
 @Schema(description = "角色-力量体系关联请求")
-public class CharacterPowerSystemRequest {
+public class NovelCharacterPowerSystemRequest {
 
     @Schema(description = "力量体系ID", required = true, example = "1")
     private Long powerSystemId;

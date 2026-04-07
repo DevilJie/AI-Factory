@@ -15,8 +15,8 @@ import lombok.Data;
  * @Date 2026-04-06
  */
 @Data
-@TableName("character_power_system")
-public class CharacterPowerSystem {
+@TableName("novel_character_power_system")
+public class NovelCharacterPowerSystem {
 
     /** Primary key */
     @TableId(type = IdType.AUTO)

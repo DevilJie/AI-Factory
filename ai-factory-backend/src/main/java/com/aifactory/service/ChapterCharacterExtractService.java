@@ -7,23 +7,10 @@ import com.aifactory.dto.ChapterCharacterExtractXmlDto;
 import com.aifactory.dto.ChapterCharacterExtractXmlDto.CharacterExtractDto;
 import com.aifactory.dto.ChapterCharacterExtractXmlDto.CultivationSystemDto;
 import com.aifactory.dto.ChapterCharacterExtractXmlDto.FactionConnectionDto;
-import com.aifactory.entity.Chapter;
-import com.aifactory.entity.CharacterPowerSystem;
-import com.aifactory.entity.NovelCharacter;
-import com.aifactory.entity.NovelFaction;
-import com.aifactory.entity.NovelFactionCharacter;
-import com.aifactory.entity.NovelPowerSystem;
-import com.aifactory.entity.NovelPowerSystemLevel;
-import com.aifactory.entity.NovelPowerSystemLevelStep;
-import com.aifactory.entity.NovelWorldview;
-import com.aifactory.mapper.CharacterPowerSystemMapper;
-import com.aifactory.mapper.NovelCharacterMapper;
-import com.aifactory.mapper.NovelFactionCharacterMapper;
-import com.aifactory.mapper.NovelFactionMapper;
-import com.aifactory.mapper.NovelPowerSystemLevelMapper;
-import com.aifactory.mapper.NovelPowerSystemLevelStepMapper;
-import com.aifactory.mapper.NovelPowerSystemMapper;
-import com.aifactory.mapper.NovelWorldviewMapper;
+import com.aifactory.entity.*;
+import com.aifactory.entity.NovelCharacterPowerSystem;
+import com.aifactory.mapper.*;
+import com.aifactory.mapper.NovelCharacterPowerSystemMapper;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -69,7 +56,7 @@ public class ChapterCharacterExtractService {
     private final NovelCharacterChapterService characterChapterService;
     private final PromptTemplateService promptTemplateService;
     private final PowerSystemService powerSystemService;
-    private final CharacterPowerSystemMapper characterPowerSystemMapper;
+    private final NovelCharacterPowerSystemMapper novelCharacterPowerSystemMapper;
     private final NovelPowerSystemMapper novelPowerSystemMapper;
     private final NovelPowerSystemLevelMapper powerSystemLevelMapper;
     private final NovelPowerSystemLevelStepMapper powerSystemLevelStepMapper;
@@ -726,27 +713,27 @@ public class ChapterCharacterExtractService {
                 }
             }
 
-            // Step 4: Upsert character_power_system
-            CharacterPowerSystem existing = characterPowerSystemMapper.selectOne(
-                    new LambdaQueryWrapper<CharacterPowerSystem>()
-                            .eq(CharacterPowerSystem::getCharacterId, characterId)
-                            .eq(CharacterPowerSystem::getPowerSystemId, matchedSystem.getId()));
+            // Step 4: Upsert novel_character_power_system
+            NovelCharacterPowerSystem existing = novelCharacterPowerSystemMapper.selectOne(
+                    new LambdaQueryWrapper<NovelCharacterPowerSystem>()
+                            .eq(NovelCharacterPowerSystem::getCharacterId, characterId)
+                            .eq(NovelCharacterPowerSystem::getPowerSystemId, matchedSystem.getId()));
 
             if (existing != null) {
                 // Update existing record
                 existing.setCurrentRealmId(matchedLevelId);
                 existing.setCurrentSubRealmId(matchedStepId);
-                characterPowerSystemMapper.updateById(existing);
+                novelCharacterPowerSystemMapper.updateById(existing);
                 log.debug("更新力量体系关联: characterId={}, powerSystemId={}, realmId={}, stepId={}",
                         characterId, matchedSystem.getId(), matchedLevelId, matchedStepId);
             } else {
                 // Insert new record
-                CharacterPowerSystem newAssoc = new CharacterPowerSystem();
+                NovelCharacterPowerSystem newAssoc = new NovelCharacterPowerSystem();
                 newAssoc.setCharacterId(characterId);
                 newAssoc.setPowerSystemId(matchedSystem.getId());
                 newAssoc.setCurrentRealmId(matchedLevelId);
                 newAssoc.setCurrentSubRealmId(matchedStepId);
-                characterPowerSystemMapper.insert(newAssoc);
+                novelCharacterPowerSystemMapper.insert(newAssoc);
                 log.debug("新增力量体系关联: characterId={}, powerSystemId={}, realmId={}, stepId={}",
                         characterId, matchedSystem.getId(), matchedLevelId, matchedStepId);
             }

@@ -3,7 +3,7 @@ package com.aifactory.controller;
 import com.aifactory.common.UserContext;
 import com.aifactory.dto.CharacterDto;
 import com.aifactory.dto.CharacterFactionRequest;
-import com.aifactory.dto.CharacterPowerSystemRequest;
+import com.aifactory.dto.NovelCharacterPowerSystemRequest;
 import com.aifactory.entity.NovelCharacter;
 import com.aifactory.response.Result;
 import com.aifactory.service.NovelCharacterService;
@@ -234,7 +234,7 @@ public class NovelCharacterController {
     public Result<String> upsertPowerSystemAssociation(
             @Parameter(description = "角色ID", required = true, example = "1")
             @PathVariable Long characterId,
-            @RequestBody CharacterPowerSystemRequest request) {
+            @RequestBody NovelCharacterPowerSystemRequest request) {
         Long userId = UserContext.getUserId();
         log.info("用户 {} 更新角色 {} 的力量体系关联", userId, characterId);
 

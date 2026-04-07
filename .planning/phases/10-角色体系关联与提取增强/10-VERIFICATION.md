@@ -7,7 +7,7 @@ re_verification:
   previous_status: gaps_found
   previous_score: 2/7
   gaps_closed:
-    - "character_power_system table exists with unique index on (character_id, power_system_id)"
+    - "novel_character_power_system table exists with unique index on (character_id, power_system_id)"
     - "XML DTO parses FC tags from LLM response into FactionConnectionDto list"
     - "Extraction resolves and upserts power system and faction associations"
     - "Character detail API returns aggregated power_system + faction info"
@@ -29,7 +29,7 @@ re_verification:
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | character_power_system table exists with unique index on (character_id, power_system_id) | VERIFIED | DDL in git HEAD sql/init.sql: `CREATE TABLE character_power_system` with `UNIQUE KEY uk_character_system (character_id, power_system_id)`. Entity `CharacterPowerSystem.java` has `@TableName("character_power_system")`. Mapper extends `BaseMapper<CharacterPowerSystem>`. |
+| 1 | novel_character_power_system table exists with unique index on (character_id, power_system_id) | VERIFIED | DDL in git HEAD sql/init.sql: `CREATE TABLE novel_character_power_system` with `UNIQUE KEY uk_character_system (character_id, power_system_id)`. Entity `CharacterPowerSystem.java` has `@TableName("novel_character_power_system")`. Mapper extends `BaseMapper<CharacterPowerSystem>`. |
 | 2 | XML DTO parses FC tags from LLM response into FactionConnectionDto list | VERIFIED | `ChapterCharacterExtractXmlDto.java` lines 176-179: `factionConnections` field with `@JacksonXmlElementWrapper(useWrapping=false)` + `@JacksonXmlProperty(localName="FC")`. `FactionConnectionDto` inner class (lines 272-289) with `factionName` and `role` fields, XML-annotated as `<N>` and `<R>`. |
 | 3 | Extraction resolves power system names to IDs via exact then fuzzy match | VERIFIED | `ChapterCharacterExtractService.java` lines 647-754: `resolveAndSavePowerSystemAssociations` queries all systems for project, loops with exact match then `String.contains()` fuzzy match. Hierarchical level/step matching follows. Upsert logic: select by (characterId, powerSystemId), update if exists, insert if new. |
 | 4 | Extraction resolves faction names to IDs via existing faction name matching | VERIFIED | `ChapterCharacterExtractService.java` lines 771-836: `resolveAndSaveFactionAssociations` queries all factions for project, exact then fuzzy match on faction name. Upsert into `novel_faction_character` table with role field. |
@@ -43,7 +43,7 @@ re_verification:
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `CharacterPowerSystem.java` | CharacterPowerSystem join entity | VERIFIED | 37 lines, `@TableName("character_power_system")`, fields: id, characterId, powerSystemId, currentRealmId, currentSubRealmId |
+| `CharacterPowerSystem.java` | CharacterPowerSystem join entity | VERIFIED | 37 lines, `@TableName("novel_character_power_system")`, fields: id, characterId, powerSystemId, currentRealmId, currentSubRealmId |
 | `CharacterPowerSystemMapper.java` | Mapper interface | VERIFIED | 18 lines, extends `BaseMapper<CharacterPowerSystem>`, `@Mapper` annotation |
 | `ChapterCharacterExtractXmlDto.java` (FC extension) | FactionConnectionDto inner class | VERIFIED | FactionConnectionDto at lines 272-289 with factionName (`@JacksonXmlProperty localName="N"`) and role (`localName="R"`). factionConnections field at line 179 with `@JacksonXmlElementWrapper(useWrapping=false)` + `@JacksonXmlProperty(localName="FC")` |
 | `ChapterCharacterExtractService.java` (association logic) | Resolution and upsert methods | VERIFIED | 837 lines total. `resolveAndSavePowerSystemAssociations` (line 647) with exact->fuzzy name match, level/step hierarchy, upsert. `resolveAndSaveFactionAssociations` (line 771) with exact->fuzzy, upsert. Injected mappers: characterPowerSystemMapper, novelPowerSystemMapper, powerSystemLevelMapper, powerSystemLevelStepMapper, novelFactionMapper, novelFactionCharacterMapper. Extraction loop at lines 196/199 calls both resolve methods between matchOrCreate and createChapterRelation. |
@@ -53,7 +53,7 @@ re_verification:
 | `CharacterPowerSystemRequest.java` | Request DTO for power system CRUD | VERIFIED | File exists |
 | `CharacterFactionRequest.java` | Request DTO for faction CRUD | VERIFIED | File exists |
 | `CharacterDto.java` | DTO with aggregated fields | VERIFIED | Added `cultivationRealm` and `factionInfo` fields |
-| `sql/init.sql` (character_power_system DDL) | Table DDL + unique index | VERIFIED | In git HEAD: `CREATE TABLE character_power_system` with `UNIQUE KEY uk_character_system (character_id, power_system_id)`, `KEY idx_power_system_id (power_system_id)` |
+| `sql/init.sql` (novel_character_power_system DDL) | Table DDL + unique index | VERIFIED | In git HEAD: `CREATE TABLE novel_character_power_system` with `UNIQUE KEY uk_character_system (character_id, power_system_id)`, `KEY idx_power_system_id (power_system_id)` |
 | `sql/init.sql` (prompt template v2) | Template v2 with roleType defs + FC tags | VERIFIED | Template id=19, template_id=15, version_number=2 with Chinese roleType definitions, `{existingRoleDistribution}` placeholder, FC tag format instructions. V1 deactivated via UPDATE. current_version_id set to 19. |
 | `CharacterDrawer.vue` | Character detail drawer with 3 tabs | VERIFIED | File exists (489 lines in Characters.vue, drawer component present) |
 | `CharacterPowerSystemTab.vue` | Power system association management | VERIFIED | File exists |
@@ -80,7 +80,7 @@ re_verification:
 
 | Artifact | Data Variable | Source | Produces Real Data | Status |
 |----------|---------------|--------|--------------------|--------|
-| Characters.vue | cultivationRealm / factionInfo | getCharacterList API -> NovelCharacterService batch aggregation | Yes -- batch queries character_power_system + novel_faction_character, resolves names | FLOWING |
+| Characters.vue | cultivationRealm / factionInfo | getCharacterList API -> NovelCharacterService batch aggregation | Yes -- batch queries novel_character_power_system + novel_faction_character, resolves names | FLOWING |
 | CharacterDrawer.vue | detail (CharacterDetail) | getCharacterDetail API -> NovelCharacterService.getCharacterDetail | Yes -- queries associations by characterId, resolves names from IDs | FLOWING |
 | CharacterPowerSystemTab.vue | associations prop | CharacterDrawer -> getCharacterDetail -> powerSystemAssociations | Yes -- populated from DB via service | FLOWING |
 | CharacterFactionTab.vue | associations prop | CharacterDrawer -> getCharacterDetail -> factionAssociations | Yes -- populated from DB via service | FLOWING |
@@ -93,7 +93,7 @@ re_verification:
 | Frontend TypeScript compiles (phase 10 files) | `cd ai-factory-frontend && npx tsc --noEmit 2>&1 \| grep -c Character` | 0 errors in Character files (6 pre-existing errors in format.ts only) | PASS |
 | Backend compiles | `cd ai-factory-backend && mvn compile -q` | Exit 0, no output (success) | PASS |
 | All 9 task commits exist | `git log --oneline 6345d60 058a1ab 6ede6e7 b70fd84 71083ff b5ffc84 2e4f110 f12cd8c f95bd25` | All 9 commits found in log | PASS |
-| character_power_system DDL has unique index | `git show HEAD:sql/init.sql \| grep -c uk_character_system` | 1 match | PASS |
+| novel_character_power_system DDL has unique index | `git show HEAD:sql/init.sql \| grep -c uk_character_system` | 1 match | PASS |
 | Template v2 has existingRoleDistribution | `git show HEAD:sql/init.sql \| grep -c existingRoleDistribution` | 1 match | PASS |
 
 ### Requirements Coverage
@@ -102,7 +102,7 @@ Plans declare the following requirement IDs. No REQUIREMENTS.md exists; requirem
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |-------------|------------|-------------|--------|----------|
-| D-01 | 10-01 | character_power_system join table with unique index | SATISFIED | DDL in git HEAD with `uk_character_system` unique key |
+| D-01 | 10-01 | novel_character_power_system join table with unique index | SATISFIED | DDL in git HEAD with `uk_character_system` unique key |
 | D-02 | 10-01 | Power system name resolution during extraction | SATISFIED | `resolveAndSavePowerSystemAssociations` with exact then fuzzy match |
 | D-03 | 10-01 | Failed match does not discard text (preserved in cultivation_level JSON) | SATISFIED | Code at line 684: `continue` after match failure, text preserved in `parseCultivationLevelJson` stored via `characterChapterService` |
 | D-04 | 10-01 | Faction name resolution during extraction | SATISFIED | `resolveAndSaveFactionAssociations` with exact then fuzzy match |
@@ -150,7 +150,7 @@ No blocker or warning anti-patterns found. No TODO/FIXME/PLACEHOLDER markers in 
 
 No gaps found. All 5 previously-failed items have been addressed:
 
-1. **character_power_system table** -- DDL in git HEAD with unique index, entity and mapper both created
+1. **novel_character_power_system table** -- DDL in git HEAD with unique index, entity and mapper both created
 2. **XML DTO FC tag parsing** -- FactionConnectionDto inner class with proper Jackson XML annotations, factionConnections field in CharacterExtractDto
 3. **Extraction association resolution** -- Both resolveAndSavePowerSystemAssociations and resolveAndSaveFactionAssociations methods implemented with exact/fuzzy name matching and upsert logic, wired into the extraction loop
 4. **Character detail + list API aggregation** -- getCharacterDetail returns CharacterDetailVO with association lists, getCharacterList uses batch aggregation for cultivationRealm/factionInfo, 4 CRUD endpoints added to controller

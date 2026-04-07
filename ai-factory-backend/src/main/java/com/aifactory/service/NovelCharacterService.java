@@ -3,24 +3,10 @@ package com.aifactory.service;
 import com.aifactory.common.XmlParser;
 import com.aifactory.common.xml.CharacterArcXmlDto;
 import com.aifactory.dto.CharacterDto;
-import com.aifactory.entity.CharacterPowerSystem;
-import com.aifactory.entity.NovelCharacter;
-import com.aifactory.entity.NovelCharacterChapter;
-import com.aifactory.entity.NovelFaction;
-import com.aifactory.entity.NovelFactionCharacter;
-import com.aifactory.entity.NovelPowerSystem;
-import com.aifactory.entity.NovelPowerSystemLevel;
-import com.aifactory.entity.NovelPowerSystemLevelStep;
-import com.aifactory.entity.Project;
-import com.aifactory.entity.ProjectBasicSettings;
-import com.aifactory.mapper.ChapterMapper;
-import com.aifactory.mapper.CharacterPowerSystemMapper;
-import com.aifactory.mapper.NovelCharacterMapper;
-import com.aifactory.mapper.NovelFactionCharacterMapper;
-import com.aifactory.mapper.NovelFactionMapper;
-import com.aifactory.mapper.NovelPowerSystemLevelMapper;
-import com.aifactory.mapper.NovelPowerSystemLevelStepMapper;
-import com.aifactory.mapper.NovelPowerSystemMapper;
+import com.aifactory.entity.*;
+import com.aifactory.entity.NovelCharacterPowerSystem;
+import com.aifactory.mapper.*;
+import com.aifactory.mapper.NovelCharacterPowerSystemMapper;
 import com.aifactory.vo.ArcStageVO;
 import com.aifactory.vo.CharacterArcVO;
 import com.aifactory.vo.CharacterChapterVO;
@@ -72,7 +58,7 @@ public class NovelCharacterService {
     private ChapterMapper chapterMapper;
 
     @Autowired
-    private CharacterPowerSystemMapper characterPowerSystemMapper;
+    private NovelCharacterPowerSystemMapper novelCharacterPowerSystemMapper;
 
     @Autowired
     private NovelPowerSystemMapper novelPowerSystemMapper;
@@ -109,18 +95,18 @@ public class NovelCharacterService {
                 .collect(Collectors.toList());
 
         // Batch query power system associations
-        List<CharacterPowerSystem> allPowerAssocs = characterPowerSystemMapper.selectList(
-                new LambdaQueryWrapper<CharacterPowerSystem>()
-                        .in(CharacterPowerSystem::getCharacterId, characterIds));
-        Map<Long, List<CharacterPowerSystem>> powerAssocsByCharId = allPowerAssocs.stream()
-                .collect(Collectors.groupingBy(CharacterPowerSystem::getCharacterId));
+        List<NovelCharacterPowerSystem> allPowerAssocs = novelCharacterPowerSystemMapper.selectList(
+                new LambdaQueryWrapper<NovelCharacterPowerSystem>()
+                        .in(NovelCharacterPowerSystem::getCharacterId, characterIds));
+        Map<Long, List<NovelCharacterPowerSystem>> powerAssocsByCharId = allPowerAssocs.stream()
+                .collect(Collectors.groupingBy(NovelCharacterPowerSystem::getCharacterId));
 
         // Batch resolve power system names
         Map<Long, String> powerSystemNames = new HashMap<>();
         Map<Long, String> levelNames = new HashMap<>();
         if (!allPowerAssocs.isEmpty()) {
             List<Long> psIds = allPowerAssocs.stream()
-                    .map(CharacterPowerSystem::getPowerSystemId)
+                    .map(NovelCharacterPowerSystem::getPowerSystemId)
                     .distinct()
                     .collect(Collectors.toList());
             List<NovelPowerSystem> powerSystems = novelPowerSystemMapper.selectBatchIds(psIds);
@@ -129,7 +115,7 @@ public class NovelCharacterService {
             }
 
             List<Long> levelIds = allPowerAssocs.stream()
-                    .map(CharacterPowerSystem::getCurrentRealmId)
+                    .map(NovelCharacterPowerSystem::getCurrentRealmId)
                     .filter(id -> id != null)
                     .distinct()
                     .collect(Collectors.toList());
@@ -167,11 +153,11 @@ public class NovelCharacterService {
                     CharacterDto dto = convertToDto(character);
 
                     // Build cultivationRealm string
-                    List<CharacterPowerSystem> charPowerAssocs = powerAssocsByCharId.getOrDefault(
+                    List<NovelCharacterPowerSystem> charPowerAssocs = powerAssocsByCharId.getOrDefault(
                             character.getId(), new ArrayList<>());
                     if (!charPowerAssocs.isEmpty()) {
                         List<String> realmNames = new ArrayList<>();
-                        for (CharacterPowerSystem psa : charPowerAssocs) {
+                        for (NovelCharacterPowerSystem psa : charPowerAssocs) {
                             if (psa.getCurrentRealmId() != null) {
                                 String lvlName = levelNames.get(psa.getCurrentRealmId());
                                 if (lvlName != null) {
@@ -236,12 +222,12 @@ public class NovelCharacterService {
         CharacterDetailVO vo = CharacterDetailVO.fromCharacter(character);
 
         // Query power system associations
-        List<CharacterPowerSystem> powerSystemAssocs = characterPowerSystemMapper.selectList(
-                new LambdaQueryWrapper<CharacterPowerSystem>()
-                        .eq(CharacterPowerSystem::getCharacterId, characterId));
+        List<NovelCharacterPowerSystem> powerSystemAssocs = novelCharacterPowerSystemMapper.selectList(
+                new LambdaQueryWrapper<NovelCharacterPowerSystem>()
+                        .eq(NovelCharacterPowerSystem::getCharacterId, characterId));
 
         List<CharacterDetailVO.PowerSystemAssociation> powerSystemVOs = new ArrayList<>();
-        for (CharacterPowerSystem assoc : powerSystemAssocs) {
+        for (NovelCharacterPowerSystem assoc : powerSystemAssocs) {
             CharacterDetailVO.PowerSystemAssociation psVO = new CharacterDetailVO.PowerSystemAssociation();
             psVO.setId(assoc.getId());
             psVO.setPowerSystemId(assoc.getPowerSystemId());
@@ -540,22 +526,22 @@ public class NovelCharacterService {
     @Transactional
     public void upsertPowerSystemAssociation(Long characterId, Long powerSystemId,
                                               Long currentRealmId, Long currentSubRealmId) {
-        CharacterPowerSystem existing = characterPowerSystemMapper.selectOne(
-                new LambdaQueryWrapper<CharacterPowerSystem>()
-                        .eq(CharacterPowerSystem::getCharacterId, characterId)
-                        .eq(CharacterPowerSystem::getPowerSystemId, powerSystemId));
+        NovelCharacterPowerSystem existing = novelCharacterPowerSystemMapper.selectOne(
+                new LambdaQueryWrapper<NovelCharacterPowerSystem>()
+                        .eq(NovelCharacterPowerSystem::getCharacterId, characterId)
+                        .eq(NovelCharacterPowerSystem::getPowerSystemId, powerSystemId));
 
         if (existing != null) {
             existing.setCurrentRealmId(currentRealmId);
             existing.setCurrentSubRealmId(currentSubRealmId);
-            characterPowerSystemMapper.updateById(existing);
+            novelCharacterPowerSystemMapper.updateById(existing);
         } else {
-            CharacterPowerSystem newAssoc = new CharacterPowerSystem();
+            NovelCharacterPowerSystem newAssoc = new NovelCharacterPowerSystem();
             newAssoc.setCharacterId(characterId);
             newAssoc.setPowerSystemId(powerSystemId);
             newAssoc.setCurrentRealmId(currentRealmId);
             newAssoc.setCurrentSubRealmId(currentSubRealmId);
-            characterPowerSystemMapper.insert(newAssoc);
+            novelCharacterPowerSystemMapper.insert(newAssoc);
         }
         log.info("保存角色-力量体系关联: characterId={}, powerSystemId={}", characterId, powerSystemId);
     }
@@ -567,7 +553,7 @@ public class NovelCharacterService {
      */
     @Transactional
     public void deletePowerSystemAssociation(Long associationId) {
-        characterPowerSystemMapper.deleteById(associationId);
+        novelCharacterPowerSystemMapper.deleteById(associationId);
         log.info("删除角色-力量体系关联: associationId={}", associationId);
     }
 

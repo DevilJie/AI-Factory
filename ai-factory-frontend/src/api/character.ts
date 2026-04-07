@@ -1,5 +1,20 @@
 import request from '@/utils/request'
 
+/** 安全解析可能是 JSON 数组或纯文本的字段 */
+function safeParseArray(value: unknown): string[] {
+  if (!value) return []
+  if (Array.isArray(value)) return value
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return Array.isArray(parsed) ? parsed : [value]
+    } catch {
+      return [value]
+    }
+  }
+  return []
+}
+
 /**
  * 人物角色类型
  */
@@ -139,11 +154,11 @@ export const getCharacterDetail = async (projectId: string, characterId: string)
     role: response.role || '',
     roleType: (response.roleType as CharacterRoleType) || 'supporting',
     gender: (response.gender as CharacterGender) || 'other',
-    personality: response.personality ? (typeof response.personality === 'string' ? JSON.parse(response.personality) : response.personality) : [],
+    personality: safeParseArray(response.personality),
     appearance: response.appearance,
     background: response.background,
-    abilities: response.abilities ? (typeof response.abilities === 'string' ? JSON.parse(response.abilities) : response.abilities) : [],
-    tags: response.tags ? (typeof response.tags === 'string' ? JSON.parse(response.tags) : response.tags) : [],
+    abilities: safeParseArray(response.abilities),
+    tags: safeParseArray(response.tags),
     createdAt: response.createdAt || new Date().toISOString(),
     updatedAt: response.updatedAt || new Date().toISOString(),
     powerSystemAssociations: response.powerSystemAssociations || [],

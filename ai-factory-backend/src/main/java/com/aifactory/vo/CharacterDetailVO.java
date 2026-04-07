@@ -11,7 +11,7 @@ import java.util.List;
  * Character detail VO with aggregated power system and faction associations
  *
  * Extends basic NovelCharacter fields with structured association data
- * from character_power_system and novel_faction_character tables.
+ * from novel_character_power_system and novel_faction_character tables.
  *
  * @Author AI-Factory
  * @Date 2026-04-06

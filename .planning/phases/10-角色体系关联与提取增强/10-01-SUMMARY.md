@@ -9,7 +9,7 @@ requires:
   - phase: 01-09 (v1.0.2 + v1.0.3)
     provides: novel_faction, novel_faction_character, novel_power_system, novel_power_system_level, NovelCharacter entity/mapper
 provides:
-  - character_power_system join table with unique index on (character_id, power_system_id)
+  - novel_character_power_system join table with unique index on (character_id, power_system_id)
   - CharacterPowerSystem entity + mapper
   - FactionConnectionDto for FC tag XML parsing
   - resolveAndSavePowerSystemAssociations with exact/fuzzy name matching
@@ -62,7 +62,7 @@ completed: 2026-04-06
 
 # Phase 10 Plan 01: Character Association Data Layer Summary
 
-**character_power_system join table, FC tag XML DTO, name-to-ID resolution with upsert during extraction, and aggregated character detail/list APIs with 4 CRUD endpoints**
+**novel_character_power_system join table, FC tag XML DTO, name-to-ID resolution with upsert during extraction, and aggregated character detail/list APIs with 4 CRUD endpoints**
 
 ## Performance
 
@@ -73,7 +73,7 @@ completed: 2026-04-06
 - **Files modified:** 13
 
 ## Accomplishments
-- Created character_power_system join table with unique index preventing duplicate associations
+- Created novel_character_power_system join table with unique index preventing duplicate associations
 - Extended XML DTO with FactionConnectionDto supporting multiple FC tags per character
 - Implemented power system name resolution (exact then fuzzy) with hierarchical level/step matching
 - Implemented faction name resolution with upsert into existing novel_faction_character table
@@ -86,14 +86,14 @@ completed: 2026-04-06
 Each task was committed atomically:
 
 1. **Task 0: Create Wave 0 test stub files** - `6345d60` (test)
-2. **Task 1: Create character_power_system table, entity, and mapper** - `058a1ab` (feat)
+2. **Task 1: Create novel_character_power_system table, entity, and mapper** - `058a1ab` (feat)
 3. **Task 2: Extend XML DTO with FC tags and add association resolution to extraction service** - `6ede6e7` (feat)
 4. **Task 3: Extend character detail AND list APIs to return aggregated association data** - `b70fd84` (feat)
 
 ## Files Created/Modified
-- `sql/init.sql` - Added character_power_system table DDL with unique index
+- `sql/init.sql` - Added novel_character_power_system table DDL with unique index
 - `ai-factory-backend/src/main/java/com/aifactory/entity/CharacterPowerSystem.java` - Join entity with characterId, powerSystemId, currentRealmId, currentSubRealmId
-- `ai-factory-backend/src/main/java/com/aifactory/mapper/CharacterPowerSystemMapper.java` - BaseMapper for character_power_system
+- `ai-factory-backend/src/main/java/com/aifactory/mapper/CharacterPowerSystemMapper.java` - BaseMapper for novel_character_power_system
 - `ai-factory-backend/src/main/java/com/aifactory/dto/ChapterCharacterExtractXmlDto.java` - Added FactionConnectionDto inner class and factionConnections list field
 - `ai-factory-backend/src/main/java/com/aifactory/service/ChapterCharacterExtractService.java` - Added resolveAndSavePowerSystemAssociations and resolveAndSaveFactionAssociations methods with name resolution and upsert
 - `ai-factory-backend/src/main/java/com/aifactory/service/NovelCharacterService.java` - Extended getCharacterDetail with aggregated associations, getCharacterList with batch aggregation, added CRUD methods

@@ -20,7 +20,7 @@
 
 ### 修炼体系关联
 - **D-01:** 复用名称回查模式 — systemName 精确/模糊匹配 power_system ID，currentLevel 匹配 level ID。与 v1.0.2 的势力名称匹配同一策略
-- **D-02:** 提取时 upsert 关联 — 每次章节提取时更新 character_power_system 关联的 current_realm_id/current_sub_realm_id。角色可能修炼多个体系（多个关联记录）
+- **D-02:** 提取时 upsert 关联 — 每次章节提取时更新 novel_character_power_system 关联的 current_realm_id/current_sub_realm_id。角色可能修炼多个体系（多个关联记录）
 - **D-03:** 匹配失败时 ID 字段为 null，文本信息保留在 character_chapter 关联的 cultivation_level JSON 中。不丢弃数据
 
 ### 势力阵营提取与关联

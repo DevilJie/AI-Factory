@@ -1,6 +1,6 @@
 package com.aifactory.service;
 
-import com.aifactory.mapper.CharacterPowerSystemMapper;
+import com.aifactory.mapper.NovelCharacterPowerSystemMapper;
 import com.aifactory.mapper.NovelPowerSystemLevelMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,10 +20,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * @Date 2026-04-06
  */
 @ExtendWith(MockitoExtension.class)
-class CharacterPowerSystemServiceTest {
+class NovelCharacterPowerSystemServiceTest {
 
     @Mock
-    private CharacterPowerSystemMapper characterPowerSystemMapper;
+    private NovelCharacterPowerSystemMapper novelCharacterPowerSystemMapper;
 
     @Mock
     private NovelPowerSystemLevelMapper powerSystemLevelMapper;
@@ -43,9 +43,9 @@ class CharacterPowerSystemServiceTest {
     }
 
     @Test
-    @DisplayName("Stub: upsert new character_power_system record")
+    @DisplayName("Stub: upsert new novel_character_power_system record")
     void testUpsertAssociation_NewRecord() {
-        // TODO: Test inserting new character_power_system row
+        // TODO: Test inserting new novel_character_power_system row
         assertTrue(true, "Stub test - to be expanded with real logic");
     }
 }

@@ -1,6 +1,6 @@
 package com.aifactory.mapper;
 
-import com.aifactory.entity.CharacterPowerSystem;
+import com.aifactory.entity.NovelCharacterPowerSystem;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -14,5 +14,5 @@ import org.apache.ibatis.annotations.Mapper;
  * @Date 2026-04-06
  */
 @Mapper
-public interface CharacterPowerSystemMapper extends BaseMapper<CharacterPowerSystem> {
+public interface NovelCharacterPowerSystemMapper extends BaseMapper<NovelCharacterPowerSystem> {
 }
