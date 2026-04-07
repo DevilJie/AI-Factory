@@ -201,9 +201,10 @@ class NameMatchUtilTest {
         }
 
         @Test
-        @DisplayName("Greedy match — strips longest suffix first")
+        @DisplayName("Greedy match — strips longest suffix first (may produce empty string)")
         void testStripSuffixGreedy() {
-            assertEquals("大", NameMatchUtil.stripSuffix("大长老", List.of("长老", "大长老")));
+            // "大长老" ends with "大长老" (length 3 = whole string), greedy strips entire string -> ""
+            assertEquals("", NameMatchUtil.stripSuffix("大长老", List.of("长老", "大长老")));
         }
 
         @Test
