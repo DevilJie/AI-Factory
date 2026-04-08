@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { X, Edit3, Zap, Shield, Save } from 'lucide-vue-next'
-import type { Character, CharacterDetail } from '@/api/character'
-import { getCharacterDetail, updateCharacter, type CharacterForm } from '@/api/character'
+import { X, Edit3, Zap, Shield, Save, BookOpen } from 'lucide-vue-next'
+import type { Character, CharacterDetail, ChapterAssociation } from '@/api/character'
+import { getCharacterDetail, getCharacterChapters, updateCharacter, type CharacterForm } from '@/api/character'
 import { success, error } from '@/utils/toast'
 import CharacterPowerSystemTab from './CharacterPowerSystemTab.vue'
 import CharacterFactionTab from './CharacterFactionTab.vue'
@@ -22,6 +22,18 @@ const activeTab = ref<string>('info')
 const detail = ref<CharacterDetail | null>(null)
 const loading = ref(false)
 const saving = ref(false)
+
+// Chapters tab state
+const chapters = ref<ChapterAssociation[]>([])
+const chaptersLoading = ref(false)
+
+// Importance level labels
+const importanceLevelLabels: Record<string, string> = {
+  protagonist: '主角',
+  supporting: '配角',
+  antagonist: '反派',
+  npc: 'NPC'
+}
 
 // Edit form state (info tab)
 const editForm = ref<{
@@ -45,7 +57,8 @@ const editForm = ref<{
 const tabs = [
   { key: 'info', label: '基本信息', icon: Edit3 },
   { key: 'powerSystem', label: '修炼体系', icon: Zap },
-  { key: 'faction', label: '所属势力', icon: Shield }
+  { key: 'faction', label: '所属势力', icon: Shield },
+  { key: 'chapters', label: '出场章节', icon: BookOpen }
 ] as const
 
 const genderOptions = [
@@ -86,6 +99,19 @@ const loadDetail = async () => {
   } finally {
     loading.value = false
   }
+
+  // Load chapters data
+  chaptersLoading.value = true
+  getCharacterChapters(props.projectId, props.character.id)
+    .then(data => {
+      chapters.value = data.sort((a, b) => a.chapterNumber - b.chapterNumber)
+    })
+    .catch(() => {
+      error('加载章节关联失败')
+    })
+    .finally(() => {
+      chaptersLoading.value = false
+    })
 }
 
 const handleSave = async () => {
@@ -340,6 +366,86 @@ watch(() => props.modelValue, (open) => {
             :associations="detail.factionAssociations"
             @refresh="refreshDetail"
           />
+
+          <!-- Chapters Tab -->
+          <div v-if="!loading && activeTab === 'chapters'">
+            <div v-if="chaptersLoading" class="flex items-center justify-center py-12">
+              <svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+
+            <div v-else-if="chapters.length === 0" class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
+              <BookOpen class="w-10 h-10 mb-2 text-gray-300 dark:text-gray-600" />
+              <p>暂无章节关联数据</p>
+            </div>
+
+            <div v-else class="divide-y divide-gray-100 dark:divide-gray-700">
+              <div
+                v-for="chapter in chapters"
+                :key="chapter.id"
+                class="py-4"
+              >
+                <!-- Chapter header -->
+                <div class="flex items-center gap-2 mb-3">
+                  <h4 class="text-sm font-medium text-gray-900 dark:text-white">
+                    第{{ chapter.chapterNumber }}章 {{ chapter.chapterTitle }}
+                  </h4>
+                  <span
+                    v-if="chapter.isFirstAppearance"
+                    class="px-1.5 py-0.5 text-xs font-medium rounded bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400"
+                  >
+                    首次出场
+                  </span>
+                </div>
+
+                <!-- Detail fields grid -->
+                <div class="space-y-2">
+                  <div v-if="chapter.importanceLevel" class="flex items-start gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">重要程度</span>
+                    <span class="text-sm text-gray-900 dark:text-white">{{ importanceLevelLabels[chapter.importanceLevel] || chapter.importanceLevel }}</span>
+                  </div>
+                  <div v-if="chapter.statusInChapter" class="flex items-start gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">状态变化</span>
+                    <span class="text-sm text-gray-900 dark:text-white">{{ chapter.statusInChapter }}</span>
+                  </div>
+                  <div v-if="chapter.emotionChange" class="flex items-start gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">情绪变化</span>
+                    <span class="text-sm text-gray-900 dark:text-white">{{ chapter.emotionChange }}</span>
+                  </div>
+                  <div v-if="chapter.keyBehavior" class="flex items-start gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">关键行为</span>
+                    <span class="text-sm text-gray-900 dark:text-white">{{ chapter.keyBehavior }}</span>
+                  </div>
+                  <div v-if="chapter.appearanceChange" class="flex items-start gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">外貌变化</span>
+                    <span class="text-sm text-gray-900 dark:text-white">{{ chapter.appearanceChange }}</span>
+                  </div>
+                  <div v-if="chapter.personalityReveal" class="flex items-start gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">性格展现</span>
+                    <span class="text-sm text-gray-900 dark:text-white">{{ chapter.personalityReveal }}</span>
+                  </div>
+                  <div v-if="chapter.abilityShown" class="flex items-start gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">能力展现</span>
+                    <span class="text-sm text-gray-900 dark:text-white">{{ chapter.abilityShown }}</span>
+                  </div>
+                  <div v-if="chapter.characterDevelopment" class="flex items-start gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">角色成长</span>
+                    <span class="text-sm text-gray-900 dark:text-white">{{ chapter.characterDevelopment }}</span>
+                  </div>
+                  <div v-if="chapter.dialogueSummary" class="flex items-start gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">对话摘要</span>
+                    <span class="text-sm text-gray-900 dark:text-white">{{ chapter.dialogueSummary }}</span>
+                  </div>
+                  <div v-if="chapter.cultivationLevel" class="flex items-start gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">修为境界</span>
+                    <span class="text-sm text-gray-900 dark:text-white">{{ chapter.cultivationLevel }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </Transition>

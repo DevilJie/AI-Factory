@@ -492,6 +492,14 @@ public class NovelCharacterService {
                             .statusInChapter(relation.getStatusInChapter())
                             .isFirstAppearance(relation.getIsFirstAppearance())
                             .importanceLevel(relation.getImportanceLevel())
+                            .emotionChange(relation.getEmotionChange())
+                            .keyBehavior(relation.getKeyBehavior())
+                            .appearanceChange(relation.getAppearanceChange())
+                            .personalityReveal(relation.getPersonalityReveal())
+                            .abilityShown(relation.getAbilityShown())
+                            .characterDevelopment(relation.getCharacterDevelopment())
+                            .dialogueSummary(relation.getDialogueSummary())
+                            .cultivationLevel(relation.getCultivationLevel())
                             .build();
                 })
                 .collect(Collectors.toList());

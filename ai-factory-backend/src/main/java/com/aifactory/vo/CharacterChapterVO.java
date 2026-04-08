@@ -47,4 +47,44 @@ public class CharacterChapterVO {
      * 重要程度
      */
     private String importanceLevel;
+
+    /**
+     * 情绪变化
+     */
+    private String emotionChange;
+
+    /**
+     * 关键行为
+     */
+    private String keyBehavior;
+
+    /**
+     * 外貌变化
+     */
+    private String appearanceChange;
+
+    /**
+     * 性格展现
+     */
+    private String personalityReveal;
+
+    /**
+     * 能力展现
+     */
+    private String abilityShown;
+
+    /**
+     * 角色成长
+     */
+    private String characterDevelopment;
+
+    /**
+     * 对话摘要
+     */
+    private String dialogueSummary;
+
+    /**
+     * 修为境界（JSON格式）
+     */
+    private String cultivationLevel;
 }

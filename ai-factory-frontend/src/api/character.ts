@@ -117,6 +117,27 @@ export interface CharacterDetail extends Character {
 }
 
 /**
+ * 角色出场章节关联
+ */
+export interface ChapterAssociation {
+  id: number
+  chapterId: number
+  chapterNumber: number
+  chapterTitle: string
+  statusInChapter: string | null
+  isFirstAppearance: boolean
+  importanceLevel: string | null
+  emotionChange: string | null
+  keyBehavior: string | null
+  appearanceChange: string | null
+  personalityReveal: string | null
+  abilityShown: string | null
+  characterDevelopment: string | null
+  dialogueSummary: string | null
+  cultivationLevel: string | null
+}
+
+/**
  * 获取人物列表
  */
 export const getCharacterList = async (projectId: string): Promise<Character[]> => {
@@ -254,4 +275,14 @@ export const deleteFactionAssociation = async (
   projectId: string, characterId: string, associationId: number
 ): Promise<void> => {
   await request.delete(`/api/novel/${projectId}/characters/${characterId}/factions/${associationId}`)
+}
+
+/**
+ * 获取角色出场章节列表
+ */
+export const getCharacterChapters = async (projectId: string, characterId: string): Promise<ChapterAssociation[]> => {
+  const response = await request.get<ChapterAssociation[]>(
+    `/api/novel/${projectId}/characters/${characterId}/chapters`
+  )
+  return response || []
 }
