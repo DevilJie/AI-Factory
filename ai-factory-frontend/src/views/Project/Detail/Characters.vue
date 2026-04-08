@@ -171,6 +171,17 @@ const handleDrawerSaved = () => {
   loadData()
 }
 
+// 获取头像样式（基于角色类型）
+const getAvatarStyle = (roleType: CharacterRoleType) => {
+  const styles: Record<CharacterRoleType, string> = {
+    protagonist: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+    antagonist: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    supporting: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    npc: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+  }
+  return styles[roleType] || styles.npc
+}
+
 // 获取角色类型样式
 const getRoleTypeStyle = (roleType: CharacterRoleType) => {
   return roleTypes.find(r => r.value === roleType)?.color || roleTypes[3]?.color || 'bg-gray-100 text-gray-700'
@@ -285,14 +296,13 @@ watch(() => route.params.id, () => {
         >
           <!-- Avatar & Actions -->
           <div class="relative mb-3">
-            <div class="w-16 h-16 mx-auto rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700">
-              <img
-                v-if="character.avatar"
-                :src="character.avatar"
-                :alt="character.name"
-                class="w-full h-full object-cover"
-              />
-              <User v-else class="w-full h-full p-4 text-gray-400" />
+            <div
+              :class="[
+                'w-16 h-16 mx-auto rounded-full flex items-center justify-center font-semibold text-lg',
+                getAvatarStyle(character.roleType)
+              ]"
+            >
+              {{ character.name.charAt(0) }}
             </div>
             <!-- Role Type Badge -->
             <span
