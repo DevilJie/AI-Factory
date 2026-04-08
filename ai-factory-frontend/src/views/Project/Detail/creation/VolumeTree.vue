@@ -143,13 +143,26 @@ const handleChapterClick = async (chapter: Chapter) => {
   editorStore.setChapterPlan({
     id: chapter.id,
     volumeId: chapter.volumeId,
+    volumePlanId: (chapter as any).volumePlanId,
     projectId: chapter.projectId,
     chapterNumber: chapter.chapterNumber || 1,
     title: chapter.chapterTitle || chapter.title || '',
-    summary: chapter.summary,
+    plotOutline: (chapter as any).plotOutline || chapter.plotOutline,
+    chapterStartingScene: (chapter as any).chapterStartingScene,
+    chapterEndingScene: (chapter as any).chapterEndingScene,
     keyEvents: chapter.keyEvents,
-    characters: chapter.newCharacters ? chapter.newCharacters.split(',') : [],
-    foreshadowing: chapter.foreshadowingSetup
+    chapterGoal: (chapter as any).chapterGoal || chapter.chapterGoal,
+    wordCountTarget: (chapter as any).wordCountTarget || chapter.wordCountTarget,
+    chapterNotes: (chapter as any).chapterNotes || chapter.chapterNotes,
+    status: (chapter as any).status,
+    plotStage: (chapter as any).plotStage,
+    foreshadowingSetup: (chapter as any).foreshadowingSetup || chapter.foreshadowingSetup,
+    foreshadowingPayoff: (chapter as any).foreshadowingPayoff || chapter.foreshadowingPayoff,
+    plannedCharacters: (chapter as any).plannedCharacters,
+    characterArcs: (chapter as any).characterArcs,
+    hasContent,
+    chapterId: (chapter as any).chapterId,
+    wordCount: (chapter as any).wordCount,
   })
 
   // 尝试通过规划ID加载章节（无论是否有内容都尝试加载，让 store 处理）

@@ -834,7 +834,15 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
                     }
                 } else {
                     charData.put("characterId", null);
-                    charData.put("roleType", "supporting");
+                    // 未匹配时根据 AI 输出的 importance 推断 roleType，而非一律设为 supporting
+                    String importance = (String) charData.get("importance");
+                    if ("high".equalsIgnoreCase(importance)) {
+                        charData.put("roleType", "protagonist");
+                    } else if ("medium".equalsIgnoreCase(importance)) {
+                        charData.put("roleType", "supporting");
+                    } else {
+                        charData.put("roleType", "minor");
+                    }
                 }
             }
 

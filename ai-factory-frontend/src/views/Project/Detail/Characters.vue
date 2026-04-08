@@ -65,6 +65,15 @@ const genders = [
   { value: 'other', label: '其他' }
 ]
 
+// 角色排序优先级：主角 → 配角 → 反派 → NPC
+const roleTypeOrder: Record<string, number> = {
+  protagonist: 0,
+  supporting: 1,
+  antagonist: 2,
+  npc: 3,
+  minor: 4
+}
+
 // 筛选后的人物列表
 const filteredCharacters = computed(() => {
   let result = characters.value
@@ -73,7 +82,7 @@ const filteredCharacters = computed(() => {
     const keyword = searchKeyword.value.toLowerCase()
     result = result.filter(c =>
       c.name.toLowerCase().includes(keyword) ||
-      c.role.toLowerCase().includes(keyword)
+      (c.role || '').toLowerCase().includes(keyword)
     )
   }
 
@@ -81,7 +90,12 @@ const filteredCharacters = computed(() => {
     result = result.filter(c => c.roleType === selectedRoleType.value)
   }
 
-  return result
+  // 按 roleType 排序
+  return [...result].sort((a, b) => {
+    const orderA = roleTypeOrder[a.roleType] ?? 99
+    const orderB = roleTypeOrder[b.roleType] ?? 99
+    return orderA - orderB
+  })
 })
 
 // 获取项目ID
@@ -335,7 +349,12 @@ watch(() => route.params.id, () => {
           <!-- Info -->
           <div class="text-center">
             <h3 class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ character.name }}</h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">{{ character.role || '未设置角色' }}</p>
+            <p
+              class="text-xs truncate mt-1 inline-block px-1.5 py-0.5 rounded"
+              :class="getRoleTypeStyle(character.roleType)"
+            >
+              {{ getRoleTypeLabel(character.roleType) }}
+            </p>
             <p
               v-if="character.cultivationRealm || character.factionInfo"
               class="text-xs text-gray-400 truncate mt-0.5"

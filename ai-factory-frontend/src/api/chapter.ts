@@ -26,6 +26,28 @@ export const getChapterByPlanId = (projectId: string, planId: string) => {
   return request.get<Chapter>(`/api/novel/${projectId}/chapters/by-plan/${planId}`)
 }
 
+// 更新章节规划
+export interface ChapterPlanUpdateRequest {
+  chapterTitle?: string
+  plotOutline?: string
+  chapterStartingScene?: string
+  chapterEndingScene?: string
+  keyEvents?: string
+  chapterGoal?: string
+  wordCountTarget?: number
+  chapterNotes?: string
+  status?: string
+  plotStage?: string
+  foreshadowingSetup?: string
+  foreshadowingPayoff?: string
+  plannedCharacters?: string
+  characterArcs?: string
+}
+
+export const updateChapterPlan = (projectId: string, planId: string, data: ChapterPlanUpdateRequest) => {
+  return request.put<string>(`/api/novel/${projectId}/chapters/plan/${planId}`, data)
+}
+
 // 更新章节内容
 export const updateChapter = (projectId: string, chapterId: string, data: Partial<Chapter>) => {
   return request.put<Chapter>(`/api/novel/${projectId}/chapters/update/${chapterId}`, data)

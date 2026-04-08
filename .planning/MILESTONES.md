@@ -1,5 +1,17 @@
 # Milestones
 
+## v1.0.4 角色体系关联与提取增强 (Shipped: 2026-04-06)
+
+**Phases completed:** 1 phase, 3 plans
+
+**Key accomplishments:**
+
+- character_power_system 关联表 + 扩展 ChapterCharacterExtractXmlDto FC 标签 + 关联解析和 upsert 逻辑
+- 角色提取提示词模板 v2：添加 roleType 四级定义（protagonist/antagonist/supporting/minor）、势力标签 FC、roleType 分配逻辑
+- CharacterDrawer 角色详情抽屉：4 个 Tabs（基本信息、力量体系、势力、章节关联），卡片展示角色关联聚合数据
+
+---
+
 ## v1.0.3 世界观生成任务拆分 (Shipped: 2026-04-04)
 
 **Phases completed:** 4 phases, 6 plans, 11 tasks

@@ -7,6 +7,7 @@ import com.aifactory.dto.ChapterContext;
 import com.aifactory.dto.ChapterDto;
 import com.aifactory.dto.ChapterMemoryXmlDto;
 import com.aifactory.dto.ChapterPlanDto;
+import com.aifactory.dto.ChapterPlanUpdateRequest;
 import com.aifactory.dto.ChapterUpdateRequest;
 import com.aifactory.dto.VolumePlanDto;
 import com.aifactory.dto.AIGenerateRequest;
@@ -206,7 +207,14 @@ public class ChapterService {
                     dto.setKeyEvents(plan.getKeyEvents());
                     dto.setChapterGoal(plan.getChapterGoal());
                     dto.setWordCountTarget(plan.getWordCountTarget());
+                    dto.setChapterStartingScene(plan.getChapterStartingScene());
+                    dto.setChapterEndingScene(plan.getChapterEndingScene());
+                    dto.setChapterNotes(plan.getChapterNotes());
                     dto.setStatus(plan.getStatus());
+                    dto.setForeshadowingSetup(plan.getForeshadowingSetup());
+                    dto.setForeshadowingPayoff(plan.getForeshadowingPayoff());
+                    dto.setPlannedCharacters(plan.getPlannedCharacters());
+                    dto.setCharacterArcs(plan.getCharacterArcs());
                     dto.setCreateTime(plan.getCreateTime());
                     dto.setUpdateTime(plan.getUpdateTime());
 
@@ -270,6 +278,67 @@ public class ChapterService {
         }
 
         return convertToDto(chapter);
+    }
+
+    /**
+     * 更新章节规划
+     */
+    @Transactional
+    public void updateChapterPlan(Long planId, ChapterPlanUpdateRequest request) {
+        NovelChapterPlan plan = chapterPlanMapper.selectById(planId);
+        if (plan == null) {
+            throw new RuntimeException("章节规划不存在，planId: " + planId);
+        }
+
+        // 只更新非空字段
+        if (request.getChapterTitle() != null) {
+            plan.setChapterTitle(request.getChapterTitle());
+        }
+        if (request.getPlotOutline() != null) {
+            plan.setPlotOutline(request.getPlotOutline());
+        }
+        if (request.getChapterStartingScene() != null) {
+            plan.setChapterStartingScene(request.getChapterStartingScene());
+        }
+        if (request.getChapterEndingScene() != null) {
+            plan.setChapterEndingScene(request.getChapterEndingScene());
+        }
+        if (request.getKeyEvents() != null) {
+            plan.setKeyEvents(request.getKeyEvents());
+        }
+        if (request.getChapterGoal() != null) {
+            plan.setChapterGoal(request.getChapterGoal());
+        }
+        if (request.getWordCountTarget() != null) {
+            plan.setWordCountTarget(request.getWordCountTarget());
+        }
+        if (request.getChapterNotes() != null) {
+            plan.setChapterNotes(request.getChapterNotes());
+        }
+        if (request.getStatus() != null) {
+            plan.setStatus(request.getStatus());
+        }
+        if (request.getPlotStage() != null) {
+            plan.setPlotStage(request.getPlotStage());
+        }
+        if (request.getForeshadowingSetup() != null) {
+            plan.setForeshadowingSetup(request.getForeshadowingSetup());
+        }
+        if (request.getForeshadowingPayoff() != null) {
+            plan.setForeshadowingPayoff(request.getForeshadowingPayoff());
+        }
+        if (request.getPlannedCharacters() != null) {
+            String pc = request.getPlannedCharacters().trim();
+            plan.setPlannedCharacters(pc.isEmpty() ? null : pc);
+        }
+        if (request.getCharacterArcs() != null) {
+            String ca = request.getCharacterArcs().trim();
+            plan.setCharacterArcs(ca.isEmpty() ? null : ca);
+        }
+
+        plan.setUpdateTime(LocalDateTime.now());
+        chapterPlanMapper.updateById(plan);
+        log.info("更新章节规划成功，planId={}", planId);
     }
 
     /**
@@ -502,6 +571,10 @@ public class ChapterService {
         dto.setStatus(chapterPlan.getStatus());
         dto.setForeshadowingSetup(chapterPlan.getForeshadowingSetup());
         dto.setForeshadowingPayoff(chapterPlan.getForeshadowingPayoff());
+        dto.setChapterStartingScene(chapterPlan.getChapterStartingScene());
+        dto.setChapterEndingScene(chapterPlan.getChapterEndingScene());
+        dto.setPlannedCharacters(chapterPlan.getPlannedCharacters());
+        dto.setCharacterArcs(chapterPlan.getCharacterArcs());
         dto.setUpdateTime(chapterPlan.getUpdateTime());
         dto.setCreateTime(chapterPlan.getCreateTime());
 

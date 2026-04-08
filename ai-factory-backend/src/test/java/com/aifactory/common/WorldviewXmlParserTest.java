@@ -342,6 +342,134 @@ class WorldviewXmlParserTest {
         assertTrue(result.systems().isEmpty());
     }
 
+    @Test
+    void testParsePowerSystemXml_rawAmpersandInTextField() {
+        // LLM may generate raw & in non-CDATA fields like <cm> or <step>
+        String xml = "<p><ss><name>修仙</name><sf>天地灵气</sf><cr>灵石</cr>" +
+            "<cm>打坐冥想 & 战斗修炼</cm>" +
+            "<d><![CDATA[修仙体系描述]]></d>" +
+            "<ll><ln>练气期</ln><dd><![CDATA[吸收灵气]]></dd><bc><![CDATA[感悟天地]]></bc>" +
+            "<lsp>约150年</lsp><pr><![CDATA[战力描述]]></pr><la>灵气外放</la>" +
+            "<step>初期 & 中期</step></ll>" +
+            "</ss></p>";
+
+        WorldviewXmlParser.ParsedPowerSystems result = worldviewXmlParser.parsePowerSystemXml(xml, 1L);
+
+        assertEquals(1, result.systems().size());
+        NovelPowerSystem system = result.systems().get(0);
+        assertEquals("打坐冥想 & 战斗修炼", system.getCultivationMethod());
+        assertEquals(1, system.getLevels().size());
+        assertEquals("初期 & 中期", system.getLevels().get(0).getSteps().get(0).getLevelName());
+    }
+
+    @Test
+    void testParsePowerSystemXml_rawLessThanInTextField() {
+        // LLM may generate raw < in non-CDATA fields (e.g., mathematical comparison)
+        String xml = "<p><ss><name>修仙</name><sf>灵气</sf><cr>灵石</cr>" +
+            "<cm>灵气浓度<50%时冥想</cm>" +
+            "<d><![CDATA[描述]]></d>" +
+            "<ll><ln>练气期</ln><dd><![CDATA[描述]]></dd><bc><![CDATA[条件]]></bc>" +
+            "<lsp>约150年</lsp><pr><![CDATA[战力]]></pr><la>外放</la>" +
+            "<step>初期</step></ll>" +
+            "</ss></p>";
+
+        WorldviewXmlParser.ParsedPowerSystems result = worldviewXmlParser.parsePowerSystemXml(xml, 1L);
+
+        assertEquals(1, result.systems().size());
+        // The raw < should be escaped and the text preserved
+        assertNotNull(result.systems().get(0).getCultivationMethod());
+    }
+
+    @Test
+    void testParsePowerSystemXml_cdataPreserved() {
+        // CDATA sections should be preserved as-is, including any special chars inside
+        String xml = "<p><ss><name>修仙</name><sf>灵气</sf><cr>灵石</cr><cm>冥想</cm>" +
+            "<d><![CDATA[体系描述：使用 A&B 方法，包括 <特殊> 技巧]]></d>" +
+            "<ll><ln>练气期</ln><dd><![CDATA[描述 A&B]]></dd><bc><![CDATA[条件]]></bc>" +
+            "<lsp>约150年</lsp><pr><![CDATA[战力]]></pr><la>外放</la>" +
+            "<step>初期</step></ll>" +
+            "</ss></p>";
+
+        WorldviewXmlParser.ParsedPowerSystems result = worldviewXmlParser.parsePowerSystemXml(xml, 1L);
+
+        assertEquals(1, result.systems().size());
+        assertEquals("体系描述：使用 A&B 方法，包括 <特殊> 技巧", result.systems().get(0).getDescription());
+    }
+
+    // ======================== parsePowerSystemXml with real LLM output ========================
+
+    @Test
+    void testParsePowerSystemXml_realLlmOutput_demoFile() {
+        // Real LLM output from d:/work/ai/需求/demo.txt — 3 power systems, each with 5 levels
+        String xml = "<p>\n" +
+            "  <ss>\n" +
+            "    <name>灵能觉醒</name>\n" +
+            "    <sf>灵能潮汐辐射</sf>\n" +
+            "    <cr>灵能结晶、高能生物组织</cr>\n" +
+            "    <cm>吸收环境中的游离灵能、战斗与极限生存压力下的潜能激发、特定灵能结晶引导</cm>\n" +
+            "    <d><![CDATA[灵能潮汐后，人类幸存者中自然觉醒的力量体系。]]></d>\n" +
+            "\t\t<ll>\n" +
+            "\t\t  <ln>觉醒者</ln>\n" +
+            "\t\t  <dd><![CDATA[初步感知并引导体内灵能。]]></dd>\n" +
+            "\t\t  <bc><![CDATA[在灵能辐射环境下经历生死危机。]]></bc>\n" +
+            "\t\t  <lsp>约100-120年</lsp>\n" +
+            "\t\t  <pr><![CDATA[可对抗少量普通变异体。]]></pr>\n" +
+            "\t\t  <la>异能雏形显现</la>\n" +
+            "\t\t  <step>初醒期、稳固期、显化期</step>\n" +
+            "\t\t</ll>\n" +
+            "\t\t<ll>\n" +
+            "\t\t  <ln>掌控者</ln>\n" +
+            "\t\t  <dd><![CDATA[能稳定运用异能。]]></dd>\n" +
+            "\t\t  <bc><![CDATA[长期锻炼异能直至如臂使指。]]></bc>\n" +
+            "\t\t  <lsp>约120-150年</lsp>\n" +
+            "\t\t  <pr><![CDATA[可独立清理小股变异体群。]]></pr>\n" +
+            "\t\t  <la>异能稳定外放</la>\n" +
+            "\t\t  <step>熟练期、扩展期、精通期</step>\n" +
+            "\t\t</ll>\n" +
+            "  </ss>\n" +
+            "  <ss>\n" +
+            "    <name>科技重构</name>\n" +
+            "    <sf>灵能（作为特殊能源与催化媒介）、旧时代科技知识</sf>\n" +
+            "    <cr>完好的科技造物、精密零件、稀有材料、设计蓝图</cr>\n" +
+            "    <cm>学习与理解科技原理，使用【文明火种】类异能解析、修复、改造、优化乃至创造科技装备</cm>\n" +
+            "    <d><![CDATA[由极少数拥有技术类异能的觉醒者开创的体系。]]></d>\n" +
+            "\t\t<ll>\n" +
+            "\t\t  <ln>学徒</ln>\n" +
+            "\t\t  <dd><![CDATA[能理解基础原理。]]></dd>\n" +
+            "\t\t  <bc><![CDATA[成功独立修复一件复杂机械。]]></bc>\n" +
+            "\t\t  <lsp>约100-120年</lsp>\n" +
+            "\t\t  <pr><![CDATA[依赖自制武器和陷阱。]]></pr>\n" +
+            "\t\t  <la>物品解析（初步）、基础修复</la>\n" +
+            "\t\t  <step>认知期、动手期、应用期</step>\n" +
+            "\t\t</ll>\n" +
+            "  </ss>\n" +
+            "</p>";
+
+        WorldviewXmlParser.ParsedPowerSystems result = worldviewXmlParser.parsePowerSystemXml(xml, 1L);
+
+        // Should parse successfully — no SAXParseException
+        assertEquals(2, result.systems().size(), "Should parse 2 power systems");
+
+        // First system: 灵能觉醒
+        NovelPowerSystem sys1 = result.systems().get(0);
+        assertEquals("灵能觉醒", sys1.getName());
+        assertEquals("灵能潮汐辐射", sys1.getSourceFrom());
+        assertEquals("灵能结晶、高能生物组织", sys1.getCoreResource());
+        assertEquals(2, sys1.getLevels().size(), "灵能觉醒 should have 2 levels");
+        assertEquals("觉醒者", sys1.getLevels().get(0).getLevelName());
+        assertEquals("掌控者", sys1.getLevels().get(1).getLevelName());
+
+        // Second system: 科技重构
+        NovelPowerSystem sys2 = result.systems().get(1);
+        assertEquals("科技重构", sys2.getName());
+        assertEquals(1, sys2.getLevels().size(), "科技重构 should have 1 level");
+        assertEquals("学徒", sys2.getLevels().get(0).getLevelName());
+
+        // Verify step parsing — "初醒期、稳固期、显化期" is a single <step> text
+        assertEquals(1, sys1.getLevels().get(0).getSteps().size());
+        assertEquals("初醒期、稳固期、显化期", sys1.getLevels().get(0).getSteps().get(0).getLevelName());
+    }
+
     // ======================== buildNameToIdMap ========================
 
     @Test

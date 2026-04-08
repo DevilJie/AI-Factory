@@ -6,6 +6,7 @@ import com.aifactory.dto.ChapterAiFixResponse;
 import com.aifactory.dto.ChapterAiPolishRequest;
 import com.aifactory.dto.ChapterAiPolishResponse;
 import com.aifactory.dto.ChapterDto;
+import com.aifactory.dto.ChapterPlanUpdateRequest;
 import com.aifactory.dto.CreateTaskRequest;
 import com.aifactory.dto.TaskDto;
 import com.aifactory.response.Result;
@@ -179,6 +180,35 @@ public class ChapterController {
 
         ChapterDto chapter = chapterService.getChapterByPlanId(projectId, planId);
         return Result.ok(chapter);
+    }
+
+    /**
+     * 更新章节规划
+     */
+    @PutMapping("/plan/{planId}")
+    @Operation(
+        summary = "更新章节规划",
+        description = "更新指定章节规划的信息。支持部分更新，只传入需要修改的字段即可。可更新标题、情节大纲、场景、目标字数、伏笔、角色规划等所有规划字段。"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "成功更新章节规划"),
+        @ApiResponse(responseCode = "400", description = "参数错误"),
+        @ApiResponse(responseCode = "401", description = "未授权，请先登录"),
+        @ApiResponse(responseCode = "404", description = "章节规划不存在")
+    })
+    public Result<String> updateChapterPlan(
+            @Parameter(description = "项目ID，必须为有效的项目主键", required = true, example = "1")
+            @PathVariable Long projectId,
+            @Parameter(description = "章节规划ID，必须为有效的规划主键", required = true, example = "1")
+            @PathVariable Long planId,
+            @Parameter(description = "章节规划更新请求体", required = true)
+            @RequestBody ChapterPlanUpdateRequest request
+    ) {
+        Long userId = UserContext.getUserId();
+        log.info("用户 {} 更新章节规划，planId={}", userId, planId);
+
+        chapterService.updateChapterPlan(planId, request);
+        return Result.ok("更新成功");
     }
 
     /**

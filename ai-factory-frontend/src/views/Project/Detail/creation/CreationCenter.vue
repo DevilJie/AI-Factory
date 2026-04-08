@@ -93,13 +93,26 @@ const handleSelectChapter = async (chapter: Chapter) => {
   editorStore.setChapterPlan({
     id: chapter.id,
     volumeId: chapter.volumeId,
+    volumePlanId: (chapter as any).volumePlanId,
     projectId: chapter.projectId,
     chapterNumber: chapter.chapterNumber || 1,
     title: chapter.chapterTitle || chapter.title || '',
-    summary: chapter.summary,
+    plotOutline: (chapter as any).plotOutline || chapter.plotOutline,
+    chapterStartingScene: (chapter as any).chapterStartingScene,
+    chapterEndingScene: (chapter as any).chapterEndingScene,
     keyEvents: chapter.keyEvents,
-    characters: chapter.newCharacters ? chapter.newCharacters.split(',') : [],
-    foreshadowing: chapter.foreshadowingSetup
+    chapterGoal: (chapter as any).chapterGoal || chapter.chapterGoal,
+    wordCountTarget: (chapter as any).wordCountTarget || chapter.wordCountTarget,
+    chapterNotes: (chapter as any).chapterNotes || chapter.chapterNotes,
+    status: (chapter as any).status,
+    plotStage: (chapter as any).plotStage,
+    foreshadowingSetup: (chapter as any).foreshadowingSetup || chapter.foreshadowingSetup,
+    foreshadowingPayoff: (chapter as any).foreshadowingPayoff || chapter.foreshadowingPayoff,
+    plannedCharacters: (chapter as any).plannedCharacters,
+    characterArcs: (chapter as any).characterArcs,
+    hasContent: !!(chapter as any).hasContent || !!chapter.content,
+    chapterId: (chapter as any).chapterId,
+    wordCount: (chapter as any).wordCount,
   })
 
   // 使用 loadChapterByPlan 而不是 loadChapter，因为 chapter.id 是规划 ID

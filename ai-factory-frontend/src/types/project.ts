@@ -140,13 +140,29 @@ export interface Chapter {
 export interface ChapterPlan {
   id: string
   volumeId?: string
+  volumePlanId?: string
   projectId: string
   chapterNumber: number
   title: string
-  summary?: string
+  plotOutline?: string
+  chapterStartingScene?: string
+  chapterEndingScene?: string
   keyEvents?: string
-  characters?: string[]
-  foreshadowing?: string
+  chapterGoal?: string
+  wordCountTarget?: number
+  chapterNotes?: string
+  status?: string
+  plotStage?: string
+  foreshadowingSetup?: string
+  foreshadowingPayoff?: string
+  plannedCharacters?: string
+  characterArcs?: string
+  // 扩展字段（来自 ChapterPlanDto）
+  volumeTitle?: string
+  volumeNumber?: number
+  hasContent?: boolean
+  chapterId?: string
+  wordCount?: number
 }
 
 // AI润色请求

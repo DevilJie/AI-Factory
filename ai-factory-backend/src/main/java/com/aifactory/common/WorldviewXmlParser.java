@@ -193,6 +193,75 @@ public class WorldviewXmlParser {
 
     // ======================== Power System Parsing ========================
 
+    public static void main(String[] args) {
+        String ret = "<p>\n" +
+                "  <ss>\n" +
+                "    <name>古神道</name>\n" +
+                "    <sf>血脉之力、混沌之气、众生愿力（情感与生命力）</sf>\n" +
+                "    <cr>古神精血、混沌奇物、蕴含强烈情感的物品或生灵</cr>\n" +
+                "    <cm>唤醒并纯化体内古神血脉，吞噬混沌之气，或吸收众生愿力（正面负面皆可）以强化己身</cm>\n" +
+                "    <d><![CDATA[此体系为被污蔑为“魔”的古神后裔所传承。不依赖外在天道，而是挖掘自身血脉深处来自混沌古神的力量，或从世界本源（混沌）及众生情感中汲取能量。主修肉身与神魂本质，追求肉身成圣、意志不朽。战斗方式狂暴直接，近战无敌，神通多与血肉、灵魂、混沌相关，伴有精神污染特性。修炼越深，肉身越接近古神，会呈现非人特征，并承受来自血脉源头的混沌记忆冲击，但意识保持自我独立。]]></d>\n" +
+                "    <ll>\n" +
+                "      <ln>觉醒境</ln>\n" +
+                "      <dd><![CDATA[感应到体内稀薄的古神血脉，初步唤醒，身体素质全方位超越凡人，获得基础超凡特性。]]></dd>\n" +
+                "      <bc><![CDATA[经历生死危机或强烈情绪刺激，引动血脉共鸣。]]></bc>\n" +
+                "      <lsp>约150年</lsp>\n" +
+                "      <pr><![CDATA[力能扛鼎，迅如猎豹，恢复力惊人，不惧普通刀剑。]]></pr>\n" +
+                "      <la>血脉沸腾（临时强化）</la>\n" +
+                "      <step>血脉微动</step>\n" +
+                "      <step>血脉显化</step>\n" +
+                "      <step>血脉初醒</step>\n" +
+                "    </ll>\n" +
+                "    <ll>\n" +
+                "      <ln>蜕变境</ln>\n" +
+                "      <dd><![CDATA[血脉之力改造全身，完成第一次生命跃迁，可局部躯体异化（如鳞片、利爪），获得天赋神通雏形。]]></dd>\n" +
+                "      <bc><![CDATA[吸收足够能量（混沌气或愿力），引导血脉之力洗练周身骨骼、内脏、骨髓。]]></bc>\n" +
+                "      <lsp>约300年</lsp>\n" +
+                "      <pr><![CDATA[肉身硬抗法器，徒手拆楼，天赋神通初显威能。]]></pr>\n" +
+                "      <la>躯体异化，天赋神通雏形</la>\n" +
+                "      <step>皮膜蜕变</step>\n" +
+                "      <step>筋骨蜕变</step>\n" +
+                "      <step>脏腑蜕变</step>\n" +
+                "    </ll>\n" +
+                "    <ll>\n" +
+                "      <ln>真形境</ln>\n" +
+                "      <dd><![CDATA[凝聚血脉真形，可在身后显化古神虚影，大幅提升战力，并能初步运用混沌之力。]]></dd>\n" +
+                "      <bc><![CDATA[将觉醒的血脉之力凝聚、观想，形成稳定的本源真形，并成功引动一丝混沌之气入体。]]></bc>\n" +
+                "      <lsp>约800年</lsp>\n" +
+                "      <pr><![CDATA[真形加持下，战力飙升，可正面击破金丹修士的护体灵光。]]></pr>\n" +
+                "      <la>血脉真形显化，混沌之力加持</la>\n" +
+                "      <step>真形凝影</step>\n" +
+                "      <step>真形凝实</step>\n" +
+                "      <step>真形合一</step>\n" +
+                "    </ll>\n" +
+                "    <ln>法身境</ln>\n" +
+                "      <dd><![CDATA[将血脉真形与肉身彻底融合，铸就古神法身，肉身强度堪比法宝，断肢重生，并开始接触灵魂层面的力量。]]></dd>\n" +
+                "      <bc><![CDATA[以混沌之气为火，血脉为材，将真形烙印进每一寸血肉灵魂，完成法身铸造。]]></bc>\n" +
+                "      <lsp>约2000年</lsp>\n" +
+                "      <pr><![CDATA[法身不坏，硬抗元婴法术，近身可撕碎同阶修士。]]></pr>\n" +
+                "      <la>法身不坏，断肢重生</la>\n" +
+                "      <step>法身初铸</step>\n" +
+                "      <step>法身小成</step>\n" +
+                "      <step>法身圆满</step>\n" +
+                "    </ll>\n" +
+                "    <ll>\n" +
+                "      <ln>混沌境</ln>\n" +
+                "      <dd><![CDATA[肉身逐步向混沌形态转化，可在一定程度上化身混沌，免疫大多数物理和法则攻击，并能从虚空直接汲取混沌之气。此境界需直面血脉源头古神的混乱本质，保持自我清醒。]]></dd>\n" +
+                "      <bc><![CDATA[将法身、魂火与混沌之气深度融合，使自身生命形态向混沌过渡，并成功在体内开辟混沌旋涡。]]></bc>\n" +
+                "      <lsp>约10000年</lsp>\n" +
+                "      <pr><![CDATA[化身混沌，侵蚀现实，战力对标炼虚、合体，对仙道法则有极强抗性。]]></pr>\n" +
+                "      <la>混沌化身，法则免疫（部分）</la>\n" +
+                "      <step>混沌侵染</step>\n" +
+                "      <step>混沌共生</step>\n" +
+                "      <step>混沌一体</step>\n" +
+                "    </ll>\n" +
+                "  </ss>\n" +
+                "</p>";
+        WorldviewXmlParser p = new WorldviewXmlParser();
+        ParsedPowerSystems rr = p.parsePowerSystemXml(ret, 5L);
+        System.out.println(rr.systems().size());
+    }
+
     /**
      * Parse power system XML from AI response.
      * Extracts {@code <p>...</p>} fragment, wraps in {@code <root>}, DOM parses,
@@ -667,16 +736,23 @@ public class WorldviewXmlParser {
      * Common LLM issues:
      * 1. Extra closing tags (e.g., {@code </ll>} without matching {@code <ll>} opening)
      * 2. Missing closing tags (e.g., {@code <ll>} without {@code </ll>})
+     * 3. Raw {@code &} or {@code <} in non-CDATA text content
      * <p>
-     * Strategy: For each container tag, count opens vs closes and fix imbalances:
-     * - Extra closes: remove the last N excess closing tags
-     * - Missing closes: append closing tags at the end of the XML
+     * Strategy:
+     * 1. Escape illegal XML characters in text nodes (not inside tags or CDATA)
+     * 2. For each container tag, count opens vs closes and fix imbalances:
+     *    - Extra closes: remove the last N excess closing tags
+     *    - Missing closes: append closing tags at the end of the XML
      *
      * @param xml           the XML string to sanitize
      * @param containerTags tag names that are commonly repeated and may have balance issues
      * @return sanitized XML string
      */
     private String sanitizeXmlForDomParsing(String xml, String[] containerTags) {
+        // Step 1: Escape illegal XML characters in text nodes
+        xml = escapeIllegalXmlChars(xml);
+
+        // Step 2: Fix tag balance
         for (String tag : containerTags) {
             String openTag = "<" + tag + ">";
             String closeTag = "</" + tag + ">";
@@ -710,6 +786,71 @@ public class WorldviewXmlParser {
             }
         }
         return xml;
+    }
+
+    /**
+     * Escape illegal XML characters in text nodes (outside tags and CDATA sections).
+     * <p>
+     * LLM output may contain raw {@code &} or {@code <} in non-CDATA text content,
+     * which causes SAXParseException: "The content of elements must consist of
+     * well-formed character data or markup."
+     * <p>
+     * Strategy: Replace CDATA sections with placeholders, escape {@code &} and {@code <}
+     * in remaining text nodes, then restore CDATA sections.
+     *
+     * @param xml the XML string to escape
+     * @return XML string with illegal characters properly escaped
+     */
+    private String escapeIllegalXmlChars(String xml) {
+        // Phase 1: Extract and replace CDATA sections with placeholders
+        // CDATA content is already safe and must not be modified
+        List<String> cdataSections = new ArrayList<>();
+        StringBuilder buffer = new StringBuilder(xml);
+        String cdataOpen = "<![CDATA[";
+        String cdataClose = "]]>";
+
+        int searchStart = 0;
+        while (searchStart < buffer.length()) {
+            int cStart = buffer.indexOf(cdataOpen, searchStart);
+            if (cStart < 0) break;
+
+            int cEnd = buffer.indexOf(cdataClose, cStart + cdataOpen.length());
+            if (cEnd < 0) break;
+
+            // Extract the full CDATA section including delimiters
+            String cdata = buffer.substring(cStart, cEnd + cdataClose.length());
+            cdataSections.add(cdata);
+
+            // Replace with placeholder
+            String placeholder = "\u0000CDATA" + (cdataSections.size() - 1) + "\u0000";
+            buffer.replace(cStart, cEnd + cdataClose.length(), placeholder);
+            searchStart = cStart + placeholder.length();
+        }
+
+        // Phase 2: Escape illegal chars in remaining text
+        // Text nodes are content between > and < that doesn't start with </ (closing tag)
+        String result = buffer.toString();
+        // Escape & first (before <, since &amp; contains &)
+        // Only replace & that are NOT already part of an entity reference
+        result = result.replaceAll("&(?!(?:amp|lt|gt|quot|apos|#\\d+|#x[0-9a-fA-F]+);)", "&amp;");
+        // Escape < that are NOT part of tags (opening, closing, or self-closing)
+        // A < that is NOT followed by / or a letter (tag name) is illegal
+        // But we need to be careful: < followed by anything that could be a tag should remain
+        // Safer approach: replace < that is NOT followed by /, !, or a letter (i.e., not a tag)
+        // Actually, simplest safe approach: only escape < in clearly text positions
+        // Since CDATA is already removed, any < in text nodes IS illegal
+        // But we can't easily distinguish text < from tag < without a full parser
+        // The safest approach: < that appears between > and a closing context is likely text
+        // For now, we use a pragmatic regex: < not followed by / or a letter is illegal text
+        result = result.replaceAll("<(?![/!a-zA-Z])", "&lt;");
+
+        // Phase 3: Restore CDATA sections
+        for (int i = 0; i < cdataSections.size(); i++) {
+            String placeholder = "\u0000CDATA" + i + "\u0000";
+            result = result.replace(placeholder, cdataSections.get(i));
+        }
+
+        return result;
     }
 
     /**
