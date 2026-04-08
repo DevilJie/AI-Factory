@@ -604,6 +604,9 @@ public class ChapterCharacterExtractService {
             for (CultivationSystemDto system : cultivationSystems) {
                 Map<String, String> map = new HashMap<>();
                 map.put("systemName", system.getSystemName());
+                map.put("realmLevel", system.getEffectiveRealmLevel());
+                map.put("subLevel", system.getEffectiveSubLevel());
+                // 向后兼容：保留currentLevel字段
                 map.put("currentLevel", system.getCurrentLevel());
                 map.put("levelChange", system.getLevelChange());
                 cultivationList.add(map);
@@ -624,8 +627,9 @@ public class ChapterCharacterExtractService {
      *
      * 匹配策略（per D-01）：
      * 1. systemName精确匹配 -> powerSystemId
-     * 2. currentLevel精确匹配 -> levelId（在对应力量体系内）
-     * 3. 匹配失败时ID字段为null（per D-03），文本信息保留在cultivation_level JSON中
+     * 2. realmLevel精确匹配 -> levelId（大境界，在对应力量体系内）
+     * 3. subLevel精确匹配 -> stepId（小境界，在对应大境界内）
+     * 4. 匹配失败时ID字段为null（per D-03），文本信息保留在cultivation_level JSON中
      *
      * @param characterId 角色ID
      * @param cultivationSystems 修炼体系DTO列表
@@ -672,10 +676,12 @@ public class ChapterCharacterExtractService {
                 continue;
             }
 
-            // Step 2: 匹配境界等级（在对应力量体系内）
+            // Step 2: 使用realmLevel匹配大境界（在对应力量体系内）
             Long matchedLevelId = null;
             Long matchedStepId = null;
-            if (csDto.getCurrentLevel() != null && !csDto.getCurrentLevel().isBlank()) {
+            String effectiveRealmLevel = csDto.getEffectiveRealmLevel();
+
+            if (effectiveRealmLevel != null) {
                 List<NovelPowerSystemLevel> levels = powerSystemLevelMapper.selectList(
                         new LambdaQueryWrapper<NovelPowerSystemLevel>()
                                 .eq(NovelPowerSystemLevel::getPowerSystemId, matchedSystem.getId()));
@@ -683,7 +689,7 @@ public class ChapterCharacterExtractService {
                 // 先精确匹配levelName
                 NovelPowerSystemLevel matchedLevel = null;
                 for (NovelPowerSystemLevel lvl : levels) {
-                    if (lvl.getLevelName() != null && lvl.getLevelName().equals(csDto.getCurrentLevel().trim())) {
+                    if (lvl.getLevelName() != null && lvl.getLevelName().equals(effectiveRealmLevel)) {
                         matchedLevel = lvl;
                         break;
                     }
@@ -691,7 +697,7 @@ public class ChapterCharacterExtractService {
                 // Fuzzy match
                 if (matchedLevel == null) {
                     for (NovelPowerSystemLevel lvl : levels) {
-                        if (lvl.getLevelName() != null && lvl.getLevelName().contains(csDto.getCurrentLevel().trim())) {
+                        if (lvl.getLevelName() != null && lvl.getLevelName().contains(effectiveRealmLevel)) {
                             matchedLevel = lvl;
                             break;
                         }
@@ -700,14 +706,27 @@ public class ChapterCharacterExtractService {
                 if (matchedLevel != null) {
                     matchedLevelId = matchedLevel.getId();
 
-                    // Step 3: 尝试在境界内匹配子境界步骤
-                    List<NovelPowerSystemLevelStep> steps = powerSystemLevelStepMapper.selectList(
-                            new LambdaQueryWrapper<NovelPowerSystemLevelStep>()
-                                    .eq(NovelPowerSystemLevelStep::getPowerSystemLevelId, matchedLevel.getId()));
-                    for (NovelPowerSystemLevelStep step : steps) {
-                        if (step.getLevelName() != null && csDto.getCurrentLevel().contains(step.getLevelName())) {
-                            matchedStepId = step.getId();
-                            break;
+                    // Step 3: 使用subLevel匹配小境界（在对应大境界内）
+                    String effectiveSubLevel = csDto.getEffectiveSubLevel();
+                    if (effectiveSubLevel != null) {
+                        List<NovelPowerSystemLevelStep> steps = powerSystemLevelStepMapper.selectList(
+                                new LambdaQueryWrapper<NovelPowerSystemLevelStep>()
+                                        .eq(NovelPowerSystemLevelStep::getPowerSystemLevelId, matchedLevel.getId()));
+                        // 精确匹配step levelName
+                        for (NovelPowerSystemLevelStep step : steps) {
+                            if (step.getLevelName() != null && step.getLevelName().equals(effectiveSubLevel)) {
+                                matchedStepId = step.getId();
+                                break;
+                            }
+                        }
+                        // Fuzzy match
+                        if (matchedStepId == null) {
+                            for (NovelPowerSystemLevelStep step : steps) {
+                                if (step.getLevelName() != null && step.getLevelName().contains(effectiveSubLevel)) {
+                                    matchedStepId = step.getId();
+                                    break;
+                                }
+                            }
                         }
                     }
                 }

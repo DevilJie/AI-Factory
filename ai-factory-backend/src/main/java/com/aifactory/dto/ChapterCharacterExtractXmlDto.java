@@ -28,7 +28,8 @@ import java.util.List;
  *     <F>外貌特征</F>
  *     <V>
  *       <SYS>修炼体系名称</SYS>
- *       <LV>当前境界等级</LV>
+ *       <RL>大境界名称</RL>
+ *       <SL>小境界名称</SL>
  *       <CH>本章境界变化</CH>
  *     </V>
  *     <AP>外貌/装扮变化</AP>
@@ -53,7 +54,9 @@ import java.util.List;
  *   - F: Feature（外貌特征）
  *   - V: cultivation System（修炼体系，多个）
  *     - SYS: System（修炼体系名称）
- *     - LV: Level（当前境界等级）
+ *     - RL: Realm Level（大境界名称，如"醒血境"）
+ *     - SL: Sub Level（小境界名称，如"感血"）
+ *     - LV: Level（旧格式，向后兼容，如"醒血境（感血）"）
  *     - CH: Change（本章境界变化）
  *   - AP: Appearance change（外貌/装扮变化）
  *   - PR: Personality reveal（性格展现）
@@ -91,7 +94,8 @@ public class ChapterCharacterExtractXmlDto {
      *   <F>外貌特征</F>
      *   <V>
      *     <SYS>修炼体系名称</SYS>
-     *     <LV>当前境界等级</LV>
+     *     <RL>大境界名称</RL>
+     *     <SL>小境界名称</SL>
      *     <CH>本章境界变化</CH>
      *   </V>
      *   <AP>外貌/装扮变化</AP>
@@ -222,10 +226,18 @@ public class ChapterCharacterExtractXmlDto {
     /**
      * 修炼体系内部类
      *
-     * XML格式示例：
+     * XML格式示例（v3新格式，RL/SL拆分）：
      * <V>
      *   <SYS>修炼体系名称</SYS>
-     *   <LV>当前境界等级</LV>
+     *   <RL>大境界名称</RL>
+     *   <SL>小境界名称</SL>
+     *   <CH>本章境界变化</CH>
+     * </V>
+     *
+     * 旧格式（v2，向后兼容）：
+     * <V>
+     *   <SYS>修炼体系名称</SYS>
+     *   <LV>醒血境（感血）</LV>
      *   <CH>本章境界变化</CH>
      * </V>
      */
@@ -238,15 +250,34 @@ public class ChapterCharacterExtractXmlDto {
          */
         @JacksonXmlProperty(localName = "SYS")
         @Schema(description = "修炼体系名称，对应XML中的<SYS>标签",
-                example = "玄天剑道")
+                example = "古神道")
         private String systemName;
 
         /**
-         * 当前境界等级
+         * 大境界名称（v3新格式）
+         * 如"醒血境"、"筑基期"等，对应力量体系表中的level_name
+         */
+        @JacksonXmlProperty(localName = "RL")
+        @Schema(description = "大境界名称，对应XML中的<RL>标签，与力量体系等级划分中的大境界完全一致",
+                example = "醒血境")
+        private String realmLevel;
+
+        /**
+         * 小境界名称（v3新格式）
+         * 如"感血"、"初期"等，对应力量体系表中的step level_name
+         */
+        @JacksonXmlProperty(localName = "SL")
+        @Schema(description = "小境界名称，对应XML中的<SL>标签，与等级划分括号中的小境界完全一致",
+                example = "感血")
+        private String subLevel;
+
+        /**
+         * 当前境界等级（旧格式，向后兼容）
+         * 旧LLM响应可能使用"醒血境（感血）"格式
          */
         @JacksonXmlProperty(localName = "LV")
-        @Schema(description = "当前境界等级，对应XML中的<LV>标签",
-                example = "筑基初期")
+        @Schema(description = "当前境界等级（旧格式），对应XML中的<LV>标签，向后兼容旧模板输出",
+                example = "醒血境（感血）")
         private String currentLevel;
 
         /**
@@ -256,6 +287,61 @@ public class ChapterCharacterExtractXmlDto {
         @Schema(description = "本章境界变化，描述角色在本章中境界的变化情况，对应XML中的<CH>标签",
                 example = "从练气圆满突破到筑基初期")
         private String levelChange;
+
+        /**
+         * 获取有效的大境界名称。
+         * 优先使用realmLevel（新格式），如果为空则从currentLevel（旧格式"大境界（小境界）"）中提取大境界部分。
+         *
+         * @return 大境界名称，如"醒血境"
+         */
+        public String getEffectiveRealmLevel() {
+            if (realmLevel != null && !realmLevel.isBlank()) {
+                return realmLevel.trim();
+            }
+            // 从旧格式 "醒血境（感血）" 中提取大境界部分
+            if (currentLevel != null && !currentLevel.isBlank()) {
+                String trimmed = currentLevel.trim();
+                int parenIdx = trimmed.indexOf("（");
+                if (parenIdx < 0) {
+                    parenIdx = trimmed.indexOf("(");
+                }
+                if (parenIdx > 0) {
+                    return trimmed.substring(0, parenIdx).trim();
+                }
+                return trimmed;
+            }
+            return null;
+        }
+
+        /**
+         * 获取有效的小境界名称。
+         * 优先使用subLevel（新格式），如果为空则从currentLevel（旧格式"大境界（小境界）"）中提取小境界部分。
+         *
+         * @return 小境界名称，如"感血"；无法提取时返回null
+         */
+        public String getEffectiveSubLevel() {
+            if (subLevel != null && !subLevel.isBlank()) {
+                return subLevel.trim();
+            }
+            // 从旧格式 "醒血境（感血）" 中提取括号内的小境界部分
+            if (currentLevel != null && !currentLevel.isBlank()) {
+                String trimmed = currentLevel.trim();
+                int startIdx = trimmed.indexOf("（");
+                if (startIdx < 0) {
+                    startIdx = trimmed.indexOf("(");
+                }
+                if (startIdx >= 0) {
+                    int endIdx = trimmed.indexOf("）", startIdx);
+                    if (endIdx < 0) {
+                        endIdx = trimmed.indexOf(")", startIdx);
+                    }
+                    if (endIdx > startIdx) {
+                        return trimmed.substring(startIdx + 1, endIdx).trim();
+                    }
+                }
+            }
+            return null;
+        }
     }
 
     /**
