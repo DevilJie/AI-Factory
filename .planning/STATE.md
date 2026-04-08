@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0.2
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 260408-ss8 quick task
-last_updated: "2026-04-08T13:00:03.138Z"
+stopped_at: Completed 260408-tw4 quick task
+last_updated: "2026-04-08T13:49:44.000Z"
 last_activity: 2026-04-08
 progress:
   total_phases: 4
@@ -77,12 +77,21 @@ All decisions logged in PROJECT.md Key Decisions table (18 items, all Good).
 - [Phase 12-01]: parseSingleChapter accepts both <ed> and <f> for ending scene to handle prompt format variants
 - [Phase 12]: Template version id=20 used instead of plan-specified id=19 (id=19 already occupied by character extract template v2)
 - [Phase 12]: Injected full character list (name + roleType) into prompt rather than complex format to keep prompt concise
+- [260408-tw4]: Keep LV field with backward compat helpers (getEffectiveRealmLevel/getEffectiveSubLevel) to handle both old and new LLM responses
+- [260408-tw4]: Template version id=21 for RL/SL split, keeping exact-then-fuzzy matching strategy unchanged
 
 ### Pending Todos
 
 None.
 
 ### Blockers/Concerns
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260408-ss8 | 人物管理界面重构 | 2026-04-08 | 33b4394 | [260408-ss8](./quick/260408-ss8-人物管理界面重构/) |
+| 260408-tw4 | 角色提取提示词模板优化 | 2026-04-08 | 1602b70 | [260408-tw4](./quick/260408-tw4-角色提取提示词模板优化/) |
 
 - Phase 13 (章节生成约束注入) 是高风险阶段：修改提示词构建逻辑，需用真实 LLM 调用验证约束语言有效性
 - AI 提示词模板的角色规划 XML 格式未经 LLM 实际输出验证
@@ -95,6 +104,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-08T13:00:03.130Z
-Stopped at: Completed 260408-ss8 quick task
+Last session: 2026-04-08T13:49:44.000Z
+Stopped at: Completed 260408-tw4 quick task
 Resume file: None
