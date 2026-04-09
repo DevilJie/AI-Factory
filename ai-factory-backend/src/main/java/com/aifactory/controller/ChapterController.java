@@ -24,11 +24,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import com.aifactory.entity.NovelCharacter;
+import com.aifactory.entity.NovelCharacterChapter;
+import com.aifactory.mapper.NovelCharacterMapper;
+import com.aifactory.service.NovelCharacterChapterService;
+import com.aifactory.vo.ChapterCharacterVO;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 /**
  * 章节控制器
@@ -49,6 +56,12 @@ public class ChapterController {
 
     @Autowired
     private TaskService taskService;
+
+    @Autowired
+    private NovelCharacterChapterService characterChapterService;
+
+    @Autowired
+    private NovelCharacterMapper characterMapper;
 
     /**
      * 获取章节列表
@@ -153,6 +166,36 @@ public class ChapterController {
 
         ChapterDto chapter = chapterService.getChapterDetail(chapterId);
         return Result.ok(chapter);
+    }
+
+    /**
+     * 获取章节实际登场角色列表
+     * 用于前端对比视图，展示章节中实际出场的角色
+     */
+    @GetMapping("/{chapterId}/characters")
+    @Operation(
+        summary = "获取章节实际登场角色",
+        description = "获取指定章节中实际出场的角色列表，包含角色ID、名称和重要程度。用于与规划角色进行对比。"
+    )
+    public Result<List<ChapterCharacterVO>> getChapterCharacters(
+            @PathVariable Long projectId,
+            @PathVariable Long chapterId) {
+        Long userId = UserContext.getUserId();
+        log.info("用户 {} 获取章节 {} 的实际登场角色列表", userId, chapterId);
+
+        List<NovelCharacterChapter> relations = characterChapterService.getCharactersByChapterId(chapterId);
+
+        List<ChapterCharacterVO> result = relations.stream().map(rel -> {
+            NovelCharacter character = characterMapper.selectById(rel.getCharacterId());
+            return ChapterCharacterVO.builder()
+                .characterId(rel.getCharacterId())
+                .characterName(character != null ? character.getName() : "未知角色")
+                .roleType(rel.getImportanceLevel())
+                .importanceLevel(rel.getImportanceLevel())
+                .build();
+        }).collect(Collectors.toList());
+
+        return Result.ok(result);
     }
 
     /**
