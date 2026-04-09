@@ -111,3 +111,18 @@ export const fixChapterWithAIAsync = (projectId: string, chapterId: string, fixO
     fixOptions
   })
 }
+
+// 章节实际登场角色（对比视图用）
+export interface ChapterCharacter {
+  characterId: number
+  characterName: string
+  roleType: string
+  importanceLevel: string
+}
+
+// 获取章节实际登场角色列表
+export const getChapterCharacters = (projectId: string, chapterId: string) => {
+  return request.get<ChapterCharacter[]>(
+    `/api/novel/${projectId}/chapters/${chapterId}/characters`
+  )
+}
