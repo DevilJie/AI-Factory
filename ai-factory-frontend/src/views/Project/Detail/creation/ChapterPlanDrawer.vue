@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { X, Save } from 'lucide-vue-next'
+import { X, Save, ExternalLink, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-vue-next'
 import { useEditorStore } from '@/stores/editor'
-import { updateChapterPlan, type ChapterPlanUpdateRequest } from '@/api/chapter'
+import { updateChapterPlan, type ChapterPlanUpdateRequest, getChapterCharacters, type ChapterCharacter } from '@/api/chapter'
 import { success, error } from '@/utils/toast'
 import type { ChapterPlan } from '@/types/project'
 
 const editorStore = useEditorStore()
+
+const emit = defineEmits<{
+  openCharacter: [characterId: number | string]
+}>()
 
 // Local state
 const saving = ref(false)
@@ -131,6 +135,94 @@ const addCharacter = () => {
   })
   syncCharactersToForm()
 }
+
+// === Comparison View State (FE-02) ===
+const actualCharacters = ref<ChapterCharacter[]>([])
+const actualLoading = ref(false)
+const showComparison = ref(true)
+
+// The chapterId from currentChapterPlan -- only truthy when chapter is generated
+const chapterId = computed(() => currentChapterPlan.value?.chapterId)
+
+// Role type label mapping (for comparison view badges)
+const roleTypeLabels: Record<string, string> = {
+  protagonist: '主角',
+  supporting: '配角',
+  antagonist: '反派',
+  minor: '路人',
+  npc: 'NPC'
+}
+
+// Comparison matching logic (per D-15, D-16, D-17)
+interface ComparisonResult {
+  matched: Array<{ planned: any; actual: ChapterCharacter }>
+  plannedOnly: any[]
+  actualOnly: ChapterCharacter[]
+}
+
+const comparisonResult = computed<ComparisonResult>(() => {
+  const planned = editableCharacters.value
+  const actual = [...actualCharacters.value]
+  const matched: Array<{ planned: any; actual: ChapterCharacter }> = []
+  const plannedOnly: any[] = []
+
+  for (const p of planned) {
+    let found = false
+    // ID-first matching (per D-15)
+    if (p.characterId) {
+      const idx = actual.findIndex(a => a.characterId === Number(p.characterId))
+      if (idx !== -1) {
+        matched.push({ planned: p, actual: actual.splice(idx, 1)[0] })
+        found = true
+      }
+    }
+    // Name fallback (per D-15, D-17)
+    if (!found && p.characterName) {
+      const idx = actual.findIndex(a => a.characterName === p.characterName)
+      if (idx !== -1) {
+        matched.push({ planned: p, actual: actual.splice(idx, 1)[0] })
+        found = true
+      }
+    }
+    if (!found) {
+      plannedOnly.push(p)
+    }
+  }
+
+  return { matched, plannedOnly, actualOnly: actual }
+})
+
+// Summary text (per UI-SPEC copywriting contract)
+const comparisonSummary = computed(() => {
+  const total = editableCharacters.value.length
+  const matchedCount = comparisonResult.value.matched.length
+  const unplannedCount = comparisonResult.value.actualOnly.length
+  const parts: string[] = []
+  if (total > 0) {
+    parts.push(`${matchedCount}/${total} 规划角色已出场`)
+  }
+  if (unplannedCount > 0) {
+    parts.push(`${unplannedCount} 位计划外登场`)
+  }
+  return parts.join(' | ') || '暂无对比数据'
+})
+
+// Load actual characters when switching to character tab and chapter is generated
+watch([activeSection, chapterId], async ([section, cId]) => {
+  if (section === 'character' && cId && projectId.value) {
+    actualLoading.value = true
+    try {
+      const res = await getChapterCharacters(projectId.value, cId)
+      actualCharacters.value = res || []
+    } catch {
+      actualCharacters.value = []
+    } finally {
+      actualLoading.value = false
+    }
+  } else {
+    actualCharacters.value = []
+  }
+}, { immediate: true })
 
 // Parse character arcs JSON for display
 const parsedCharacterArcs = computed(() => {
@@ -471,6 +563,83 @@ const chapterNumber = computed(() => {
 
             <!-- Character Section -->
             <div v-show="activeSection === 'character'" class="space-y-5">
+              <!-- Comparison Region (FE-02) -->
+              <div v-if="chapterId && editableCharacters.length > 0" class="mb-4">
+                <!-- Summary bar (collapsible header) -->
+                <div
+                  class="flex items-center justify-between px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg cursor-pointer select-none"
+                  @click="showComparison = !showComparison"
+                >
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-blue-700 dark:text-blue-300">
+                      {{ comparisonSummary }}
+                    </span>
+                  </div>
+                  <component :is="showComparison ? ChevronUp : ChevronDown" class="w-4 h-4 text-blue-500" />
+                </div>
+
+                <!-- Comparison detail grid (collapsible) -->
+                <div v-if="showComparison" class="mt-2 grid grid-cols-2 gap-3">
+                  <!-- Left: Planned characters -->
+                  <div class="space-y-1">
+                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">规划角色</div>
+                    <!-- Matched (green check) -->
+                    <div
+                      v-for="item in comparisonResult.matched"
+                      :key="'m-' + item.planned.characterName"
+                      class="flex items-center gap-1.5 px-2 py-1 text-sm"
+                    >
+                      <CheckCircle2 class="w-3.5 h-3.5 text-green-500 shrink-0" />
+                      <span class="text-gray-900 dark:text-white truncate">{{ item.planned.characterName }}</span>
+                      <span v-if="item.planned.roleType" class="text-xs text-gray-400">
+                        {{ roleTypeLabels[item.planned.roleType] || item.planned.roleType }}
+                      </span>
+                    </div>
+                    <!-- Planned-only (red cross) -->
+                    <div
+                      v-for="item in comparisonResult.plannedOnly"
+                      :key="'p-' + item.characterName"
+                      class="flex items-center gap-1.5 px-2 py-1 text-sm"
+                    >
+                      <XCircle class="w-3.5 h-3.5 text-red-500 shrink-0" />
+                      <span class="text-gray-500 dark:text-gray-400 truncate">{{ item.characterName || '未命名' }}</span>
+                      <span v-if="item.roleType" class="text-xs text-gray-400">
+                        {{ roleTypeLabels[item.roleType] || item.roleType }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Right: Actual characters -->
+                  <div class="space-y-1">
+                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">实际登场</div>
+                    <!-- Matched (green check) -->
+                    <div
+                      v-for="item in comparisonResult.matched"
+                      :key="'ma-' + item.actual.characterId"
+                      class="flex items-center gap-1.5 px-2 py-1 text-sm"
+                    >
+                      <CheckCircle2 class="w-3.5 h-3.5 text-green-500 shrink-0" />
+                      <span class="text-gray-900 dark:text-white truncate">{{ item.actual.characterName }}</span>
+                      <span v-if="item.actual.roleType" class="text-xs text-gray-400">
+                        {{ roleTypeLabels[item.actual.roleType] || item.actual.roleType }}
+                      </span>
+                    </div>
+                    <!-- Actual-only (amber warning) -->
+                    <div
+                      v-for="item in comparisonResult.actualOnly"
+                      :key="'a-' + item.characterId"
+                      class="flex items-center gap-1.5 px-2 py-1 text-sm"
+                    >
+                      <AlertTriangle class="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      <span class="text-gray-900 dark:text-white truncate">{{ item.characterName }}</span>
+                      <span v-if="item.roleType" class="text-xs text-gray-400">
+                        {{ roleTypeLabels[item.roleType] || item.roleType }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Planned Characters -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -496,6 +665,14 @@ const chapterNumber = computed(() => {
                         class="flex-1 px-2 py-1 text-sm font-medium border border-gray-300 dark:border-gray-500 rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500"
                         placeholder="角色名称"
                       />
+                      <button
+                        v-if="char.characterId"
+                        class="p-1 text-blue-500 hover:text-blue-600 dark:text-blue-400"
+                        title="查看角色详情"
+                        @click.stop="emit('openCharacter', char.characterId)"
+                      >
+                        <ExternalLink class="w-3.5 h-3.5" />
+                      </button>
                       <select
                         :value="char.roleType || 'supporting'"
                         @change="updateCharField(idx, 'roleType', ($event.target as HTMLSelectElement).value)"
