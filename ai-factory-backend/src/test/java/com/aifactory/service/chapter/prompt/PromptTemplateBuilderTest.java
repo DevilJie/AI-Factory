@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.*;
@@ -34,8 +35,8 @@ class PromptTemplateBuilderTest {
     @Mock
     private ProjectBasicSettingsService projectBasicSettingsService;
 
-    @Mock
-    private ObjectMapper objectMapper;
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @Mock
     private NovelCharacterService novelCharacterService;
@@ -125,6 +126,21 @@ class PromptTemplateBuilderTest {
         when(powerSystemService.buildPowerSystemConstraint(PROJECT_ID)).thenReturn("");
     }
 
+    /**
+     * Setup mocks for planned character path tests (no character service needed)
+     */
+    private void setupPlannedCharacterMocks() {
+        // Mock project basic settings to return null (triggers default values path)
+        when(projectBasicSettingsService.getByProjectId(PROJECT_ID)).thenReturn(null);
+
+        // Mock continent region and faction to do nothing
+        doNothing().when(continentRegionService).fillGeography(any(NovelWorldview.class));
+        doNothing().when(factionService).fillForces(any(NovelWorldview.class));
+
+        // Mock power system
+        when(powerSystemService.buildPowerSystemConstraint(PROJECT_ID)).thenReturn("");
+    }
+
     // ==================== Tests ====================
 
     @Test
@@ -134,7 +150,7 @@ class PromptTemplateBuilderTest {
         String plannedJson = "[{\"characterName\":\"李云\",\"roleType\":\"protagonist\",\"roleDescription\":\"发现密室线索并决定深入调查\",\"importance\":\"high\",\"characterId\":42}]";
         NovelChapterPlan plan = buildTestChapterPlan(plannedJson);
 
-        setupFallbackMocks();
+        setupPlannedCharacterMocks();
 
         // When
         promptTemplateBuilder.buildChapterPrompt(
@@ -208,7 +224,7 @@ class PromptTemplateBuilderTest {
         // Given
         String plannedJson = "[{\"characterName\":\"李云\",\"roleType\":\"protagonist\",\"roleDescription\":\"调查线索\",\"importance\":\"high\",\"characterId\":42}]";
         NovelChapterPlan plan = buildTestChapterPlan(plannedJson);
-        setupFallbackMocks();
+        setupPlannedCharacterMocks();
 
         // When
         promptTemplateBuilder.buildChapterPrompt(
@@ -230,7 +246,7 @@ class PromptTemplateBuilderTest {
         // Given
         String plannedJson = "[{\"characterName\":\"李云\",\"roleType\":\"protagonist\",\"roleDescription\":\"调查线索\",\"importance\":\"high\",\"characterId\":42}]";
         NovelChapterPlan plan = buildTestChapterPlan(plannedJson);
-        setupFallbackMocks();
+        setupPlannedCharacterMocks();
 
         // When
         promptTemplateBuilder.buildChapterPrompt(
@@ -251,7 +267,7 @@ class PromptTemplateBuilderTest {
         // Given
         String plannedJson = "[{\"characterName\":\"李云\",\"roleType\":\"protagonist\",\"roleDescription\":\"发现密室线索并决定深入调查\",\"importance\":\"high\",\"characterId\":42}]";
         NovelChapterPlan plan = buildTestChapterPlan(plannedJson);
-        setupFallbackMocks();
+        setupPlannedCharacterMocks();
 
         // When
         promptTemplateBuilder.buildChapterPrompt(

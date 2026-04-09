@@ -200,11 +200,21 @@ public class PromptTemplateBuilder {
         // 项目基础设置（新增）
         addBasicSettingsVariables(projectId, variables);
 
-        // 角色信息（新增）
-        List<CharacterPromptInfo> characterPromptInfoList = buildCharacterPromptInfoList(
-            projectId, chapterPlan.getChapterNumber()
-        );
-        variables.put("characterInfo", buildCharacterInfoText(characterPromptInfoList));
+        // 角色信息：有规划角色时注入约束文本，否则走全量角色列表
+        String characterInfo;
+        if (hasPlannedCharacters(chapterPlan)) {
+            characterInfo = buildPlannedCharacterInfoText(chapterPlan.getPlannedCharacters());
+        } else {
+            characterInfo = null;
+        }
+        if (characterInfo == null || characterInfo.isEmpty()) {
+            // 无规划角色或解析失败，走原有全量角色注入
+            List<CharacterPromptInfo> characterPromptInfoList = buildCharacterPromptInfoList(
+                projectId, chapterPlan.getChapterNumber()
+            );
+            characterInfo = buildCharacterInfoText(characterPromptInfoList);
+        }
+        variables.put("characterInfo", characterInfo);
 
         return variables;
     }
@@ -639,6 +649,75 @@ public class PromptTemplateBuilder {
 
         log.debug("角色提示词信息构建完成, 共 {} 个角色", result.size());
         return result;
+    }
+
+    /**
+     * 检查章节规划是否包含有效的规划角色数据
+     */
+    private boolean hasPlannedCharacters(NovelChapterPlan chapterPlan) {
+        if (chapterPlan == null) return false;
+        String pc = chapterPlan.getPlannedCharacters();
+        if (pc == null || pc.trim().isEmpty()) return false;
+        return !pc.trim().equals("[]");
+    }
+
+    /**
+     * 构建规划角色约束文本
+     * 使用分段约束语言（D-01）+ NPC 允许提示（D-04）
+     * 每行格式（D-05）：角色名 (roleType) - 角色描述 [importance]
+     *
+     * @param plannedCharactersJson 规划角色 JSON 字符串
+     * @return 约束文本，解析失败时返回 null（触发全量角色回退）
+     */
+    private String buildPlannedCharacterInfoText(String plannedCharactersJson) {
+        try {
+            List<Map<String, Object>> plannedChars = objectMapper.readValue(
+                plannedCharactersJson,
+                objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class)
+            );
+
+            if (plannedChars == null || plannedChars.isEmpty()) {
+                return null;
+            }
+
+            StringBuilder sb = new StringBuilder();
+
+            // 开头约束（D-01）
+            sb.append("【角色约束 - 必须严格遵循】\n");
+            sb.append("以下是本章必须出场的角色，请严格按照此列表安排角色出场：\n\n");
+
+            // 角色列表（D-05）
+            for (Map<String, Object> charData : plannedChars) {
+                String name = String.valueOf(charData.getOrDefault("characterName", "未知角色"));
+                String roleType = charData.get("roleType") != null ? String.valueOf(charData.get("roleType")) : "";
+                String description = charData.get("roleDescription") != null ? String.valueOf(charData.get("roleDescription")) : "";
+                String importance = charData.get("importance") != null ? String.valueOf(charData.get("importance")) : "";
+
+                sb.append("- ").append(name);
+                if (!roleType.isEmpty()) {
+                    sb.append(" (").append(roleType).append(")");
+                }
+                if (!description.isEmpty()) {
+                    sb.append(" - ").append(description);
+                }
+                if (!importance.isEmpty()) {
+                    sb.append(" [").append(importance).append("]");
+                }
+                sb.append("\n");
+            }
+            sb.append("\n");
+
+            // NPC 允许提示（D-04）
+            sb.append("注：跑龙套、路人甲等 NPC 性质角色可根据情节需要自行安排。\n\n");
+
+            // 结尾提醒（D-01）
+            sb.append("请确认你的章节内容包含了上述所有必须出场的角色。\n");
+
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("解析规划角色JSON失败: {}", e.getMessage());
+            return null; // triggers fallback to full list
+        }
     }
 
     /**
