@@ -78,16 +78,19 @@ Plans:
 - [x] 12-02-PLAN.md — Wave 1: 提示词模板升级 + 角色列表注入
 
 ### Phase 13: 章节生成约束注入
-**Goal**: 章节生成严格按规划角色执行，避免 AI 自由发挥引入无关角色，新角色自动入库
+**Goal**: 章节生成严格按规划角色执行，避免 AI 自由发挥引入无关角色
 **Depends on**: Phase 12
-**Requirements**: CG-01, CG-02, CG-03
+**Requirements**: CG-01, CG-02
 **Success Criteria** (what must be TRUE):
   1. 有规划角色的章节生成提示词仅包含规划角色信息，不包含全量角色列表
   2. 章节生成提示词中规划角色部分使用"必须遵循"约束语言，AI 输出应严格遵循规划的角色和戏份
   3. 无规划角色的章节生成仍走原有全量角色注入逻辑，不产生兼容性问题
-  4. 规划中出现数据库中不存在的新角色名时，章节生成完成后系统自动创建角色记录并建立章节关联
-**Plans**: TBD
+**Plans**: 1 plan
 **Research flag**: This phase modifies prompt construction logic. The constraint language and character filtering must be validated with real LLM calls during execution.
+**Note**: CG-03 (新角色自动创建) deferred per user decision D-10.
+
+Plans:
+- [x] 13-01-PLAN.md — Wave 1: TDD planned character constraint injection in PromptTemplateBuilder (CG-01, CG-02)
 
 ### Phase 14: 前端展示 + 闭环验证
 **Goal**: 用户能在前端直观看到章节规划角色安排，并验证生成结果是否遵循了规划
@@ -97,8 +100,11 @@ Plans:
   1. 用户打开章节规划 Drawer 时，能看到规划角色列表卡片（显示角色名、戏份梗概、重要程度标签）
   2. 章节生成完成后，用户在章节详情中能看到规划角色与实际登场角色的对比视图，偏差角色有明显标记
   3. 规划角色卡片使用与现有 Drawer 一致的 Tailwind 样式，不破坏已有 UI 布局
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 2 plans
+
+Plans:
+- [x] 14-01-PLAN.md — Wave 1: 后端章节角色端点 + 前端 API 层 (FE-02)
+- [ ] 14-02-PLAN.md — Wave 2: 对比视图 + 角色链接 + CharacterDrawer 集成 + 人工验证 (FE-01, FE-02)
 
 </details>
 
@@ -118,5 +124,5 @@ Plans:
 | 10. 角色体系关联与提取增强 | v1.0.4 | 3/3 | Complete | 2026-04-06 |
 | 11. 数据基础 + 实体映射 | v1.0.5 | 2/2 | Complete    | 2026-04-07 |
 | 12. AI 规划输出 + XML 解析 | v1.0.5 | 2/2 | Complete    | 2026-04-08 |
-| 13. 章节生成约束注入 | v1.0.5 | 0/? | Not started | - |
-| 14. 前端展示 + 闭环验证 | v1.0.5 | 0/? | Not started | - |
+| 13. 章节生成约束注入 | v1.0.5 | 1/1 | Complete    | 2026-04-09 |
+| 14. 前端展示 + 闭环验证 | v1.0.5 | 1/2 | In Progress|  |

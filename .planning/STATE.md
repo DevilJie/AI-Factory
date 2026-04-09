@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.2
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 260408-tw4 quick task
-last_updated: "2026-04-08T13:49:44.000Z"
-last_activity: 2026-04-08
+status: executing
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-04-09T17:28:28.201Z"
+last_activity: 2026-04-09
 progress:
-  total_phases: 4
-  completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
+  total_phases: 6
+  completed_phases: 4
+  total_plans: 10
+  completed_plans: 9
   percent: 25
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** 世界观的模块化独立生成让用户能按需单独重新生成地理环境、力量体系或阵营势力
-**Current focus:** Phase 12 — AI规划输出-XML解析
+**Current focus:** Phase 14 — 前端展示-闭环验证
 
 ## Current Position
 
-Phase: 12
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-08
+Phase: 14 (前端展示-闭环验证) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-04-09
 
 Progress: [=====     ] 25%
 
@@ -51,6 +51,8 @@ Progress: [=====     ] 25%
 | 11 (v1.0.5) | 2 | Complete |
 | Phase 12 P01 | 6min | 1 tasks | 3 files |
 | Phase 12 P02 | 9min | 1 tasks | 3 files |
+| Phase 13 P01 | 2min | 2 tasks | 2 files |
+| Phase 14 P01 | 4min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -79,6 +81,10 @@ All decisions logged in PROJECT.md Key Decisions table (18 items, all Good).
 - [Phase 12]: Injected full character list (name + roleType) into prompt rather than complex format to keep prompt concise
 - [260408-tw4]: Keep LV field with backward compat helpers (getEffectiveRealmLevel/getEffectiveSubLevel) to handle both old and new LLM responses
 - [260408-tw4]: Template version id=21 for RL/SL split, keeping exact-then-fuzzy matching strategy unchanged
+- [Phase 13]: 13-01: Parse failure returns null triggering full character list fallback (graceful degradation)
+- [Phase 13]: 13-01: Test uses @Spy ObjectMapper for real JSON parsing instead of mocking deserialization
+- [Phase 14]: 14-01: roleType in ChapterCharacterVO mapped from NovelCharacterChapter.importanceLevel (per-chapter role)
+- [Phase 14]: 14-01: Direct NovelCharacterMapper injection in controller follows existing direct-mapper pattern
 
 ### Pending Todos
 
@@ -104,6 +110,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-08T13:49:44.000Z
-Stopped at: Completed 260408-tw4 quick task
+Last session: 2026-04-09T17:28:28.193Z
+Stopped at: Completed 14-01-PLAN.md
 Resume file: None

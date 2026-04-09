@@ -16,14 +16,14 @@ Requirements for milestone v1.0.5 章节角色规划体系. Each maps to roadmap
 
 ### 章节生成 (CG)
 
-- [ ] **CG-01**: 章节生成提示词有规划角色时，仅注入规划角色信息（替换全量角色列表注入），避免矛盾信号
-- [ ] **CG-02**: 章节生成提示词使用"必须遵循"约束语言，强制 AI 严格按规划的角色和戏份生成内容
+- [x] **CG-01**: 章节生成提示词有规划角色时，仅注入规划角色信息（替换全量角色列表注入），避免矛盾信号
+- [x] **CG-02**: 章节生成提示词使用"必须遵循"约束语言，强制 AI 严格按规划的角色和戏份生成内容
 - [ ] **CG-03**: 规划中包含数据库中不存在的新角色时，章节生成后自动创建角色并建立章节关联
 
 ### 前端展示 (FE)
 
 - [ ] **FE-01**: 用户在章节规划 Drawer 中能看到规划角色列表及其戏份梗概
-- [ ] **FE-02**: 用户章节生成后能看到规划角色 vs 实际登场角色的对比，标记偏差
+- [x] **FE-02**: 用户章节生成后能看到规划角色 vs 实际登场角色的对比，标记偏差
 
 ## Future Requirements
 
@@ -67,11 +67,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CP-02 | Phase 12 | Complete |
 | CP-03 | Phase 11 | Complete |
 | CP-04 | Phase 11 | Complete |
-| CG-01 | Phase 13 | Pending |
-| CG-02 | Phase 13 | Pending |
+| CG-01 | Phase 13 | Complete |
+| CG-02 | Phase 13 | Complete |
 | CG-03 | Phase 13 | Pending |
 | FE-01 | Phase 14 | Pending |
-| FE-02 | Phase 14 | Pending |
+| FE-02 | Phase 14 | Complete |
 
 **Coverage:**
 - v1.0.5 requirements: 9 total
