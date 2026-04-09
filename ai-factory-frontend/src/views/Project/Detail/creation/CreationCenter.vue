@@ -6,6 +6,8 @@ import VolumeTree from './VolumeTree.vue'
 import VolumeDetail from './VolumeDetail.vue'
 import ChapterEditor from './ChapterEditor.vue'
 import ChapterPlanDrawer from './ChapterPlanDrawer.vue'
+import CharacterDrawer from '../components/CharacterDrawer.vue'
+import { getCharacterDetail, type Character } from '@/api/character'
 import { useEditorStore } from '@/stores/editor'
 import { useProjectStore } from '@/stores/project'
 import type { Chapter, Volume } from '@/types/project'
@@ -26,6 +28,10 @@ const volumeDetailRef = ref<InstanceType<typeof VolumeDetail> | null>(null)
 const selectedChapterId = ref<string | null>(null)
 const selectedVolume = ref<Volume | null>(null)
 const viewMode = ref<'volume' | 'chapter'>('volume')
+
+// CharacterDrawer state (for FE-01 character detail link)
+const showCharacterDrawer = ref(false)
+const selectedCharacter = ref<Character | null>(null)
 
 // AI优化状态
 const optimizingVolumeId = ref<string | null>(null)
@@ -278,6 +284,21 @@ const handleOpenDrawer = () => {
   editorStore.setDrawerVisible(true)
 }
 
+// Character detail link handler (FE-01)
+const handleOpenCharacter = async (characterId: number | string) => {
+  try {
+    const res = await getCharacterDetail(projectId.value, String(characterId))
+    selectedCharacter.value = res || null
+    showCharacterDrawer.value = true
+  } catch (e: any) {
+    error(e.message || '获取角色详情失败')
+  }
+}
+
+const handleCharacterSaved = () => {
+  showCharacterDrawer.value = false
+}
+
 // 检查正在进行的AI优化任务
 const checkRunningOptimizeTasks = async () => {
   if (!projectId.value) return
@@ -491,7 +512,15 @@ onMounted(async () => {
     </div>
 
     <!-- Chapter Plan Drawer -->
-    <ChapterPlanDrawer />
+    <ChapterPlanDrawer @open-character="handleOpenCharacter" />
+
+    <!-- Character Drawer (for character detail link from ChapterPlanDrawer) -->
+    <CharacterDrawer
+      v-model="showCharacterDrawer"
+      :character="selectedCharacter"
+      :project-id="String(route.params.projectId || '')"
+      @saved="handleCharacterSaved"
+    />
 
     <!-- AI剧情修复预览弹窗 -->
     <div
