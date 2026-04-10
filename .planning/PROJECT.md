@@ -55,11 +55,24 @@ AI Factory 世界观模块已完成势力阵营结构化重构、世界观生成
 
 ### Active
 
-(No active requirements — all shipped in v1.0.5)
+- [ ] novel_foreshadowing 增加分卷编号字段（plantedVolume, plannedCallbackVolume）
+- [ ] 移除 novel_chapter_plan 的 foreshadowingSetup / foreshadowingPayoff 字段
+- [ ] 章节规划 LLM 输出伏笔规划（埋设 + 回收）
+- [ ] 章节创作注入伏笔约束（本章节埋设 + 回收）
+- [ ] ChapterPlanDrawer 伏笔管理区（查看/编辑/添加/删除）
+- [ ] 侧边栏伏笔管理菜单（项目级伏笔总览）
 
-## Current Milestone: Planning next milestone
+## Current Milestone: v1.0.6 伏笔管理
 
-v1.0.5 shipped. Run `/gsd:new-milestone` to define next milestone.
+**Goal:** 激活 novel_foreshadowing 表为章节规划和生成的核心驱动，让 LLM 自动规划伏笔埋设/回收，用户可跨卷管理伏笔。
+
+**Target features:**
+- novel_foreshadowing 增加分卷编号字段，支持跨卷伏笔
+- 移除 novel_chapter_plan 冗余伏笔字段，统一使用伏笔表
+- 章节规划生成时 LLM 输出伏笔规划（埋设 + 回收）
+- 章节创作时注入伏笔约束（本章节需埋设 + 需回收的伏笔）
+- ChapterPlanDrawer 增加伏笔管理区（查看/编辑/添加/删除）
+- 侧边栏新增「伏笔管理」菜单（项目级伏笔总览）
 
 ### Out of Scope
 
@@ -119,4 +132,4 @@ Post-v1.0.5 fixes: chapterPlanId matching fix, 章节序号显示, WorldviewXmlP
 This document evolves at phase transitions and milestone boundaries.
 
 ---
-*Last updated: 2026-04-10 after v1.0.5 milestone completion*
+*Last updated: 2026-04-10 after milestone v1.0.6 started*

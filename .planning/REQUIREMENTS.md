@@ -1,0 +1,77 @@
+# Requirements: AI Factory v1.0.6 伏笔管理
+
+**Defined:** 2026-04-10
+**Core Value:** 激活 novel_foreshadowing 表为章节规划和生成的核心驱动，让 LLM 自动规划伏笔埋设/回收，用户可跨卷管理伏笔
+
+## v1 Requirements
+
+Requirements for v1.0.6. Each maps to roadmap phases.
+
+### Data Model (DATA)
+
+- [ ] **DATA-01**: novel_foreshadowing 表增加 planted_volume 和 planned_callback_volume 字段（Integer），支持跨卷伏笔引用
+- [ ] **DATA-02**: 彻底删除 novel_chapter_plan 的 foreshadowingSetup / foreshadowingPayoff 字段（数据库列 + 实体类 + DTO + 前端类型），统一使用伏笔表
+- [ ] **DATA-03**: 伏笔创建/更新时校验埋设-回收最小距离（至少跨 N 章节），防止瞬发回收
+
+### AI Planning (AIP)
+
+- [ ] **AIP-01**: 章节规划提示词注入已有活跃伏笔上下文（待埋设 + 待回收），让 LLM 了解当前伏笔状态
+- [ ] **AIP-02**: 章节规划 LLM 输出新增 <fs>（伏笔埋设）和 <fp>（伏笔回收）XML 标签，包含标题、描述、类型、布局线等子标签
+- [ ] **AIP-03**: DOM 解析器扩展处理 <fs>/<fp> 标签，解析伏笔数据并批量保存到 novel_foreshadowing 表
+
+### AI Constraints (AIC)
+
+- [ ] **AIC-01**: 章节生成提示词注入伏笔约束——"本章节需埋设的伏笔"和"本章节需回收的伏笔"——作为硬性创作指令
+- [ ] **AIC-02**: 伏笔约束文本使用简洁格式，仅注入当前章节相关项，避免上下文窗口溢出
+
+### Frontend Chapter (FC)
+
+- [ ] **FC-01**: ChapterPlanDrawer 伏笔管理区替换现有 textarea，展示本章节相关伏笔卡片（需埋设 + 需回收）
+- [ ] **FC-02**: 用户可在章节伏笔管理区编辑、添加、删除伏笔（调用伏笔 API）
+
+### Frontend Project (FP)
+
+- [ ] **FP-01**: 侧边栏新增「伏笔管理」菜单项，位于人物管理下方
+- [ ] **FP-02**: 项目级伏笔总览页面，展示所有伏笔列表，支持按类型/布局线/状态/分卷筛选
+- [ ] **FP-03**: 伏笔总览页面支持新增、删除、修改伏笔（包括修改回收分卷/章节）
+- [ ] **FP-04**: 伏笔健康度评分展示（埋设/回收比例、逾期数、平均埋设-回收距离）
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| 伏笔自动状态同步（从 ChapterPlotMemory 到结构化表） | 手动管理更安全，自动化留给后续版本 |
+| 分卷摘要中的伏笔统计 | 非核心，留给 v1.0.7+ |
+| 分卷规划建议伏笔布局 | 过于复杂，LLM 章节规划已覆盖 |
+| 章节生成后伏笔回收自动验证 | 需要额外 NLP 逻辑，成本高 |
+| sanitizeXml 统一重构 | 已有技术债务标记，单独处理 |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| DATA-01 | Phase 15 | Pending |
+| DATA-02 | Phase 15 | Pending |
+| DATA-03 | Phase 15 | Pending |
+| AIP-01 | Phase 16 | Pending |
+| AIP-02 | Phase 16 | Pending |
+| AIP-03 | Phase 16 | Pending |
+| AIC-01 | Phase 17 | Pending |
+| AIC-02 | Phase 17 | Pending |
+| FC-01 | Phase 18 | Pending |
+| FC-02 | Phase 18 | Pending |
+| FP-01 | Phase 19 | Pending |
+| FP-02 | Phase 19 | Pending |
+| FP-03 | Phase 19 | Pending |
+| FP-04 | Phase 19 | Pending |
+
+**Coverage:**
+- v1 requirements: 14 total
+- Mapped to phases: 14
+- Unmapped: 0
+
+---
+*Requirements defined: 2026-04-10*
+*Last updated: 2026-04-10 after roadmap creation*
