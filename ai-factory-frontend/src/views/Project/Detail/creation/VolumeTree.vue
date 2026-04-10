@@ -514,7 +514,7 @@ watch(() => props.projectId, async () => {
                 class="text-sm truncate"
                 :class="isSelected(chapter.id) ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-700 dark:text-gray-300'"
               >
-                {{ chapter.chapterTitle || chapter.title || '未命名章节' }}
+                第{{chapter.chapterNumber}}章：{{ chapter.chapterTitle || chapter.title || '未命名章节' }}
               </span>
             </div>
             <!-- 暂无章节 -->
