@@ -14,7 +14,7 @@
 
 | Phase | Name | Plans | Status |
 |-------|------|-------|--------|
-| 15 | Data Foundation | 1/2 | In Progress |
+| 15 | Data Foundation | Complete    | 2026-04-10 |
 | 16 | AI Chapter Planning | 0/2 | Not Started |
 | 17 | AI Generation Constraints | 0/1 | Not Started |
 | 18 | Frontend Chapter Foreshadowing | 0/2 | Not Started |
@@ -64,7 +64,7 @@
 
 **Milestone Goal:** 激活 novel_foreshadowing 表为章节规划和生成的核心驱动，让 LLM 自动规划伏笔埋设/回收，用户可跨卷管理伏笔。
 
-- [ ] **Phase 15: Data Foundation** — 伏笔表扩展 + 旧字段删除 + 距离校验
+- [x] **Phase 15: Data Foundation** — 伏笔表扩展 + 旧字段删除 + 距离校验 (completed 2026-04-10)
 - [ ] **Phase 16: AI Chapter Planning** — 章节规划伏笔上下文注入 + XML 输出 + 解析保存
 - [ ] **Phase 17: AI Generation Constraints** — 章节生成伏笔约束注入
 - [ ] **Phase 18: Frontend Chapter Foreshadowing** — ChapterPlanDrawer 伏笔管理区
@@ -88,7 +88,7 @@
   1. novel_foreshadowing 表包含 planted_volume 和 planned_callback_volume 字段，可按分卷查询伏笔
   2. novel_chapter_plan 的 foreshadowingSetup/foreshadowingPayoff 字段从数据库列、实体类、DTO、前端类型中完全删除
   3. 创建/更新伏笔时，若埋设章节与回收章节距离不足 N 章，返回校验错误
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 15-01-PLAN.md — 伏笔表扩展(分卷字段) + 距离校验 + 回调章节上限校验 [DATA-01, DATA-03]
