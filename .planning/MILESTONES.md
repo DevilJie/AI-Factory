@@ -1,5 +1,21 @@
 # Milestones
 
+## v1.0.5 章节角色规划体系 (Shipped: 2026-04-10)
+
+**Phases completed:** 6 phases, 10 plans, 20 tasks
+
+**Key accomplishments:**
+
+- Character detail drawer with 3 tabs (info/power system/faction) for association management, plus list cards showing cultivation realm and faction info
+- Added planned_characters JSON column to novel_chapter_plan, mapped plannedCharacters and characterArcs in entity and DTO, deleted unused common.xml.ChapterPlanXmlDto duplicate
+- Generic three-tier Chinese name matching utility (NameMatchUtil) with 22 passing tests, greedy suffix stripping, and NamedEntity interface for reuse in Phase 12 character name association
+- DOM-based parseChaptersXml replacing Jackson XML, with <ch> character tag extraction, NameMatchUtil name resolution, and plannedCharacters JSON persistence
+- Conditional planned character constraint injection in chapter prompt with fallback to full character list, constraint language wrapping, and 6 TDD tests
+- REST endpoint and frontend API for fetching actual characters that appeared in a generated chapter, enabling plan-vs-actual comparison
+- Collapsible comparison region with green/red/amber markers for planned vs actual characters, plus ExternalLink icon opening CharacterDrawer from ChapterPlanDrawer
+
+---
+
 ## v1.0.4 角色体系关联与提取增强 (Shipped: 2026-04-06)
 
 **Phases completed:** 1 phase, 3 plans

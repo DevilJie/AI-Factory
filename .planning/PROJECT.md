@@ -2,7 +2,7 @@
 
 ## What This Is
 
-AI Factory 世界观模块已完成势力阵营结构化重构和世界观生成任务拆分。包含 4 张势力关联表、14 个 REST 端点、3 个独立 AI 生成策略（地理环境/力量体系/阵营势力各配独立提示词模板）、WorldviewTaskStrategy 9 步编排器（从 ~920 行精简至 ~250 行）、前端递归树组件和关联管理 Drawer，以及 3 个独立 AI 生成按钮（互斥执行 + localStorage 恢复）。
+AI Factory 世界观模块已完成势力阵营结构化重构、世界观生成任务拆分、角色体系关联增强、以及章节角色规划体系。包含势力阵营 4 张关联表、3 个独立 AI 生成策略、章节角色规划闭环（规划 → 约束生成 → 对比验证）、NameMatchUtil 三级中文名称匹配、前端规划-实际角色对比视图。
 
 ## Core Value
 
@@ -46,39 +46,37 @@ AI Factory 世界观模块已完成势力阵营结构化重构和世界观生成
 - ✓ 章节生成提示词注入规划角色信息（hasPlannedCharacters + buildPlannedCharacterInfoText + fallback） — v1.0.5 Phase 13
 - ✓ 章节实际登场角色后端端点 + 前端 API（ChapterCharacterVO + getChapterCharacters） — v1.0.5 Phase 14
 - ✓ 前端角色对比视图 + 角色详情链接（ChapterPlanDrawer 对比区 + CharacterDrawer） — v1.0.5 Phase 14
+- ✓ planned_characters JSON 字段映射 + characterArcs 已有字段映射 — v1.0.5 Phase 11
+- ✓ NameMatchUtil 三级中文名称匹配（22 个测试用例） — v1.0.5 Phase 11
+- ✓ DOM parseChaptersXml 替代 Jackson XML（<ch> 角色标签提取 + plannedCharacters JSON 持久化） — v1.0.5 Phase 12
+- ✓ 章节规划模板升级（<ch>/<cn>/<cd>/<ci> XML 输出指令 + characterInfo 角色列表注入） — v1.0.5 Phase 12
+- ✓ 章节生成约束注入（hasPlannedCharacters + 约束语言 + fallback 全量角色列表） — v1.0.5 Phase 13
+- ✓ 章节实际登场角色后端端点 + 前端 API（ChapterCharacterVO） — v1.0.5 Phase 14
 
 ### Active
 
 (No active requirements — all shipped in v1.0.5)
 
-## Current Milestone: v1.0.5 章节角色规划体系
+## Current Milestone: Planning next milestone
 
-**Goal:** 在章节规划阶段预置登场角色和戏份安排，生成章节时严格按规划执行，形成"规划角色 → 按规划生成 → 提取验证"的闭环
-
-**Target features:**
-- 章节规划模板升级（角色规划输出）
-- novel_chapter_plan 表扩展（planned_characters + character_arcs）
-- 章节规划 XML 解析增强
-- 章节生成提示词注入规划角色
-- 前端章节规划展示角色安排
+v1.0.5 shipped. Run `/gsd:new-milestone` to define next milestone.
 
 ### Out of Scope
 
-- 时间线（timeline）结构化 — 本次只做势力，时间线保持文本
-- 世界规则（rules）结构化 — 本次只做势力，规则保持文本
-- 势力-人物 AI 自动关联 — 世界观生成时人物可能未创建
-- 势力地图可视化 — 前端成本高，简单关联即可
-- 独立生成的撤销/回滚 — 复杂度高，用户可手动删除或重新生成
-- 批量独立生成调度 — 当前场景按需生成即可
-- 生成历史版本管理 — 超出本次范围
+- 时间线（timeline）结构化 — 保持文本
+- 世界规则（rules）结构化 — 保持文本
+- 角色关系图谱可视化 — 前端成本高
+- 角色出场统计仪表盘 — 需要聚合查询优化
+- 章节生成后新角色自动创建 (CG-03) — deferred per D-10
 
 ## Context
 
-Shipped v1.0.2 + v1.0.3 with ~12,300 LOC added across Java, TypeScript, Vue, SQL.
+Shipped v1.0.2–v1.0.5 across 14 phases, 30+ plans, 14 days (2026-03-28 → 2026-04-10).
+~54,500 LOC total (39,579 Java + 14,915 TypeScript/Vue).
 Tech stack: Spring Boot 3.2 + MyBatis-Plus + Vue 3 + Vite + Tailwind CSS.
-Timeline: 8 days (2026-03-28 → 2026-04-05), 9 phases, 18 plans.
-All 53 requirements verified complete (37 v1.0.2 + 16 v1.0.3).
-Post-milestone quick fixes: cascade faction re-generation (geography/power system → faction), indeterminate region tree state, ConfirmDialog, XML parser adaptation.
+All milestones verified complete.
+Technical debt: sanitizeXml ~80 lines duplicated in ChapterGenerationTaskStrategy (unify with WorldviewXmlParser).
+Post-v1.0.5 fixes: chapterPlanId matching fix, 章节序号显示, WorldviewXmlParser enhancement.
 
 ## Constraints
 
@@ -109,10 +107,16 @@ Post-milestone quick fixes: cascade faction re-generation (geography/power syste
 | Single generatingModule union-type ref | 3 个布尔 → 1 个联合类型，互斥更清晰 | ✓ Good — 状态管理 |
 | localStorage 10 分钟过期恢复 | 匹配轮询超时 (60×3s=180s+buffer)，页面刷新后继续 | ✓ Good — 用户体验 |
 | DOM 解析代码先复制后提取 | Phase 7 先保证功能正确，Phase 8 统一重构 | ✓ Good — 渐进重构 |
+| plannedCharacters 用 String 类型 | 匹配现有 JSON 列模式（keyEvents, foreshadowingSetup） | ✓ Good — 一致性 |
+| NameMatchUtil 通用化 NamedEntity 接口 | Phase 12 复用名称匹配逻辑 | ✓ Good — 复用 |
+| parseChaptersXml 专有 sanitizeXml 副本 | ~80 行复制而非抽取共享工具（Phase 8 重构后再统一） | ⚠ Revisit — 未来统一 sanitizeXml |
+| 模板版本 id=20 而非 id=19 | id=19 已被角色提取模板 v2 占用 | ✓ Good — 避免冲突 |
+| CG-03 新角色自动创建 deferred | 简化闭环范围，避免生成时自动创建角色的不确定性 | ✓ Good — 范围控制 |
+| ID-first + 精确名称回退匹配 | 规划 vs 实际角色对比优先用 ID，回退用名称 | ✓ Good — 准确匹配 |
 
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
 
 ---
-*Last updated: 2026-04-10 after Phase 14 (前端展示-闭环验证) completed — milestone v1.0.5 finished*
+*Last updated: 2026-04-10 after v1.0.5 milestone completion*

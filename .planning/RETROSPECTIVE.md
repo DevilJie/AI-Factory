@@ -89,7 +89,81 @@
 - Sessions: 3 (Phase 6-7, Phase 8, Phase 9)
 - Notable: Phase 8-02 orchestrator rewrite completed in 5 minutes — clear plan + familiar codebase
 
-## Cross-Milestone Trends
+---
+
+## Milestone: v1.0.4 — 角色体系关联与提取增强
+
+**Shipped:** 2026-04-06
+**Phases:** 1 | **Plans:** 3
+
+### What Was Built
+- character_power_system 关联表 + ChapterCharacterExtractXmlDto FC 标签 + 关联解析和 upsert 逻辑
+- 角色提取提示词模板 v2：roleType 四级定义（protagonist/antagonist/supporting/minor）、势力标签 FC
+- CharacterDrawer 角色详情抽屉：4 个 Tabs（基本信息、力量体系、势力、章节关联）
+
+### What Worked
+- Single-phase milestone kept scope tight — 3 plans, 1 day, no drift
+- CharacterDrawer modeled on FactionDrawer for UI consistency — zero design decisions needed
+- Cascading dropdown pattern (system → realm → sub-realm) for PowerSystemTab
+
+### What Was Inefficient
+- No inefficiencies noted — straightforward extension of existing patterns
+
+### Patterns Established
+- CharacterDetailVO with fromCharacter() factory method for clean VO construction
+- getCharacterDetail handling personality/abilities/tags as JSON string or parsed array
+- PowerSystemTab cascading dropdowns: system → realm → sub-realm
+
+### Key Lessons
+1. Single-phase milestones are efficient for focused enhancements
+2. Modeling new drawers on existing ones eliminates UI design work
+
+### Cost Observations
+- Model mix: 100% sonnet (balanced profile)
+- Sessions: 1
+- Notable: Quick task (人物管理界面重构 + RL/SL template split) run inline during v1.0.5 prep
+
+---
+
+## Milestone: v1.0.5 — 章节角色规划体系
+
+**Shipped:** 2026-04-10
+**Phases:** 4 | **Plans:** 7 | **Tasks:** ~14
+
+### What Was Built
+- planned_characters JSON column + entity/DTO mapping + DTO merge (Phase 11)
+- NameMatchUtil 三级中文名称匹配工具（22 个测试用例，NamedEntity 接口）（Phase 11）
+- DOM parseChaptersXml 替代 Jackson XML（<ch> 角色标签提取 + 名称匹配关联 + 持久化）（Phase 12）
+- 章节规划模板升级（<ch>/<cn>/<cd>/<ci> XML 输出指令 + characterInfo 注入）（Phase 12）
+- 章节生成约束注入（条件注入规划角色 + 约束语言 + fallback）（Phase 13）
+- 前端规划-实际角色对比视图（green/red/amber markers + CharacterDrawer 集成）（Phase 14）
+
+### What Worked
+- TDD-first approach for NameMatchUtil — 22 tests written before implementation, caught edge cases early
+- Conditional constraint injection with graceful fallback — no breaking changes to existing chapter generation
+- Two quick tasks (人物管理界面重构, RL/SL template split) run inline between phases without context loss
+- ID-first + name fallback matching strategy for plan-vs-actual comparison — robust against name variations
+
+### What Was Inefficient
+- sanitizeXmlForDomParsing ~80 lines duplicated from WorldviewXmlParser into ChapterGenerationTaskStrategy — should have been extracted to shared utility
+- Phase 12 summary-extract tool failed to extract one_liner — format inconsistency in 12-02-SUMMARY.md
+- No milestone audit run before completion — pre-flight check flagged missing audit
+
+### Patterns Established
+- NamedEntity interface for reusable name matching across domains
+- Conditional prompt injection with hasXxx flag + fallback pattern
+- Collapsible comparison region with summary bar for plan-vs-actual views
+
+### Key Lessons
+1. TDD for utility classes catches edge cases early — 22 NameMatchUtil tests discovered suffix stripping and single-char guard needs
+2. Conditional injection with fallback prevents breaking changes — hasPlannedCharacters pattern reusable for future prompt variations
+3. Duplicated utility code should be flagged immediately as tech debt — sanitizeXml duplication noted for future consolidation
+4. Quick tasks between phases maintain momentum without context cost
+
+### Cost Observations
+- Model mix: ~85% sonnet, ~15% opus (planning/review)
+- Sessions: 3 (Phase 11, Phase 12-13, Phase 14)
+- Notable: Phase 13 (约束注入) was flagged high-risk but completed in 2min — clear TDD plan reduced risk
 
 ### Process Evolution
 
@@ -97,6 +171,8 @@
 |-----------|----------|--------|------------|
 | v1.0.2 | 3+ | 5 | Third worldview structuring — pattern fully mature |
 | v1.0.3 | 3 | 4 | Generation decomposition — orchestrator pattern proven |
+| v1.0.4 | 1 | 1 | Focused enhancement — single-phase milestone efficiency |
+| v1.0.5 | 3 | 4 | Chapter planning loop — TDD + conditional injection patterns |
 
 ### Cumulative Quality
 
@@ -104,6 +180,8 @@
 |-----------|-------|----------|-------------------|
 | v1.0.2 | 0 | n/a | 37 requirements, all met |
 | v1.0.3 | 40+ | parser+orchestrator | 16 requirements, all met |
+| v1.0.4 | ~10 | extractor+UI | 3 requirements, all met |
+| v1.0.5 | 28+ | NameMatch+constraint | 8/9 requirements met (CG-03 deferred) |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -111,3 +189,5 @@
 2. Tree table + transient field + DOM parsing is a proven stack for worldview structuring
 3. Orchestrator + Strategy pattern decomposes monoliths cleanly — 920 → 250 LOC
 4. Copy-first extract-later is safe for cross-cutting refactors
+5. TDD for utility classes catches edge cases — test count correlates with edge case discovery
+6. Conditional injection + fallback prevents breaking changes in prompt engineering
