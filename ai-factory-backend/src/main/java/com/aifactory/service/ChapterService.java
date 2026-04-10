@@ -215,8 +215,6 @@ public class ChapterService {
                     dto.setChapterEndingScene(plan.getChapterEndingScene());
                     dto.setChapterNotes(plan.getChapterNotes());
                     dto.setStatus(plan.getStatus());
-                    dto.setForeshadowingSetup(plan.getForeshadowingSetup());
-                    dto.setForeshadowingPayoff(plan.getForeshadowingPayoff());
                     dto.setPlannedCharacters(plan.getPlannedCharacters());
                     dto.setCharacterArcs(plan.getCharacterArcs());
                     dto.setCreateTime(plan.getCreateTime());
@@ -318,12 +316,6 @@ public class ChapterService {
         }
         if (request.getPlotStage() != null) {
             plan.setPlotStage(request.getPlotStage());
-        }
-        if (request.getForeshadowingSetup() != null) {
-            plan.setForeshadowingSetup(request.getForeshadowingSetup());
-        }
-        if (request.getForeshadowingPayoff() != null) {
-            plan.setForeshadowingPayoff(request.getForeshadowingPayoff());
         }
         if (request.getPlannedCharacters() != null) {
             String pc = request.getPlannedCharacters().trim();
@@ -567,8 +559,6 @@ public class ChapterService {
         dto.setWordCountTarget(chapterPlan.getWordCountTarget());
         dto.setChapterNotes(chapterPlan.getChapterNotes());
         dto.setStatus(chapterPlan.getStatus());
-        dto.setForeshadowingSetup(chapterPlan.getForeshadowingSetup());
-        dto.setForeshadowingPayoff(chapterPlan.getForeshadowingPayoff());
         dto.setChapterStartingScene(chapterPlan.getChapterStartingScene());
         dto.setChapterEndingScene(chapterPlan.getChapterEndingScene());
         dto.setPlannedCharacters(chapterPlan.getPlannedCharacters());
@@ -1286,12 +1276,6 @@ public class ChapterService {
             prompt.append("3. 如果发现字数接近上限，立即进入结尾场景，不要再展开新情节\n");
             prompt.append("4. 宁可稍微少写，也不要严重超字数！\n");
             prompt.append("####################################################################\n\n");
-        }
-        if (plan.getForeshadowingSetup() != null) {
-            prompt.append("- 埋伏笔：").append(plan.getForeshadowingSetup()).append("\n");
-        }
-        if (plan.getForeshadowingPayoff() != null) {
-            prompt.append("- 填伏笔：").append(plan.getForeshadowingPayoff()).append("\n");
         }
         if (plan.getChapterNotes() != null) {
             prompt.append("- 备注：").append(plan.getChapterNotes()).append("\n");

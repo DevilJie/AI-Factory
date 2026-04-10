@@ -171,8 +171,6 @@ CREATE TABLE `novel_chapter_plan`  (
   `status` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'planned' COMMENT '状态',
   `plot_stage` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '情节阶段',
   `stage_completed` tinyint(1) NULL DEFAULT 0 COMMENT '阶段是否完成',
-  `foreshadowing_setup` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '埋伏笔',
-  `foreshadowing_payoff` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '填伏笔',
   `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `character_arcs` json NULL COMMENT '人物弧光变化',

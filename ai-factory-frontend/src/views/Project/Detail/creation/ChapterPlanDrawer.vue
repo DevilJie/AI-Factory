@@ -27,8 +27,6 @@ const form = ref<{
   chapterNotes: string
   status: string
   plotStage: string
-  foreshadowingSetup: string
-  foreshadowingPayoff: string
   plannedCharacters: string
   characterArcs: string
 }>({
@@ -42,8 +40,6 @@ const form = ref<{
   chapterNotes: '',
   status: '',
   plotStage: '',
-  foreshadowingSetup: '',
-  foreshadowingPayoff: '',
   plannedCharacters: '',
   characterArcs: ''
 })
@@ -63,7 +59,6 @@ const sections = [
   { key: 'basic', label: '基本信息' },
   { key: 'plot', label: '情节规划' },
   { key: 'scene', label: '场景设定' },
-  { key: 'foreshadow', label: '伏笔管理' },
   { key: 'character', label: '角色规划' }
 ] as const
 
@@ -247,8 +242,6 @@ const updateFormFromPlan = (plan: ChapterPlan) => {
     chapterNotes: plan.chapterNotes || '',
     status: plan.status || 'pending',
     plotStage: plan.plotStage || '',
-    foreshadowingSetup: plan.foreshadowingSetup || '',
-    foreshadowingPayoff: plan.foreshadowingPayoff || '',
     plannedCharacters: plan.plannedCharacters || '',
     characterArcs: plan.characterArcs || ''
   }
@@ -276,8 +269,6 @@ watch(currentChapter, (chapter) => {
       chapterNotes: chapter.chapterNotes || '',
       status: '',
       plotStage: '',
-      foreshadowingSetup: chapter.foreshadowingSetup || '',
-      foreshadowingPayoff: chapter.foreshadowingPayoff || '',
       plannedCharacters: '',
       characterArcs: ''
     }
@@ -305,8 +296,6 @@ const handleSave = async () => {
       chapterNotes: form.value.chapterNotes,
       status: form.value.status || undefined,
       plotStage: form.value.plotStage || undefined,
-      foreshadowingSetup: form.value.foreshadowingSetup,
-      foreshadowingPayoff: form.value.foreshadowingPayoff,
       plannedCharacters: form.value.plannedCharacters,
       characterArcs: form.value.characterArcs
     }
@@ -476,41 +465,6 @@ const chapterNumber = computed(() => {
                   rows="4"
                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
                   placeholder="地点：城外树林；时间：深夜；状态：主角与神秘人对话"
-                />
-              </div>
-            </div>
-
-            <!-- Foreshadow Section -->
-            <div v-show="activeSection === 'foreshadow'" class="space-y-5">
-              <!-- Foreshadowing Setup -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  埋伏笔（待埋设）
-                </label>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  本章需要埋下的伏笔线索
-                </p>
-                <textarea
-                  v-model="form.foreshadowingSetup"
-                  rows="4"
-                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
-                  placeholder="用分号分隔多个伏笔"
-                />
-              </div>
-
-              <!-- Foreshadowing Payoff -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  填伏笔（待回收）
-                </label>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  本章需要回收的前文伏笔
-                </p>
-                <textarea
-                  v-model="form.foreshadowingPayoff"
-                  rows="4"
-                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
-                  placeholder="用分号分隔需要回收的伏笔"
                 />
               </div>
             </div>

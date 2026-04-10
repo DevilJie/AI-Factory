@@ -93,16 +93,6 @@ public class NovelChapterPlan {
     private Boolean stageCompleted;
 
     /**
-     * 埋伏笔（JSON格式）
-     */
-    private String foreshadowingSetup;
-
-    /**
-     * 填伏笔（JSON格式）
-     */
-    private String foreshadowingPayoff;
-
-    /**
      * 规划角色（JSON格式）
      * 存储 AI 章节规划中计划登场的角色列表
      * Schema: [{"characterName":"李云","roleType":"protagonist","roleDescription":"...","importance":"high","characterId":42}]

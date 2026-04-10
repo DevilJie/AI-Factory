@@ -54,12 +54,6 @@ public class ChapterPlanDto {
     @Schema(description = "规划状态", example = "pending", allowableValues = {"pending", "in_progress", "completed", "skipped"})
     private String status;
 
-    @Schema(description = "待埋设的伏笔，用分号分隔", example = "主角腰间的玉佩;老者的神秘身份")
-    private String foreshadowingSetup;
-
-    @Schema(description = "待回收的伏笔，用分号分隔", example = "第一章提到的失踪父亲线索")
-    private String foreshadowingPayoff;
-
     @Schema(description = "规划角色列表，JSON格式，包含 AI 规划中计划登场的角色信息")
     private String plannedCharacters;
 

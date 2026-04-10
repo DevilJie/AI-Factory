@@ -41,12 +41,6 @@ public class ChapterPlanUpdateRequest {
     @Schema(description = "情节阶段", allowableValues = {"introduction", "development", "climax", "conclusion"})
     private String plotStage;
 
-    @Schema(description = "埋伏笔")
-    private String foreshadowingSetup;
-
-    @Schema(description = "填伏笔")
-    private String foreshadowingPayoff;
-
     @Schema(description = "规划角色，JSON格式")
     private String plannedCharacters;
 

@@ -70,6 +70,14 @@
 - [ ] **Phase 18: Frontend Chapter Foreshadowing** — ChapterPlanDrawer 伏笔管理区
 - [ ] **Phase 19: Frontend Project Management** — 项目级伏笔总览页面 + 健康度评分
 
+## v1.0.6 伏笔管理 (Phases 15-19) — IN PROGRESS
+
+- [x] Phase 15: 数据基础 (2/2 plans) — completed 2026-04-11
+- [ ] Phase 16: AI 章节规划伏笔
+- [ ] Phase 17: AI 生成伏笔约束
+- [ ] Phase 18: 前端章节伏笔管理
+- [ ] Phase 19: 前端项目伏笔管理
+
 ## Phase Details
 
 ### Phase 15: Data Foundation
