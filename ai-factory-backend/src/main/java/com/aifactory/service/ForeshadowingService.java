@@ -6,8 +6,10 @@ import com.aifactory.dto.ForeshadowingQueryDto;
 import com.aifactory.dto.ForeshadowingUpdateDto;
 import com.aifactory.entity.ChapterPlotMemory;
 import com.aifactory.entity.Foreshadowing;
+import com.aifactory.entity.NovelVolumePlan;
 import com.aifactory.mapper.ChapterPlotMemoryMapper;
 import com.aifactory.mapper.ForeshadowingMapper;
+import com.aifactory.mapper.NovelVolumePlanMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,10 +42,63 @@ public class ForeshadowingService {
     private ForeshadowingMapper foreshadowingMapper;
 
     @Autowired
+    private NovelVolumePlanMapper volumePlanMapper;
+
+    @Autowired
     private ChapterPlotMemoryMapper plotMemoryMapper;
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    private static final int MIN_FORESHADOWING_DISTANCE = 3;
+
+    /**
+     * 校验伏笔回收距离（明线至少间隔3章，暗线豁免）
+     * Per D-06, D-07, D-08
+     */
+    private void validateForeshadowingDistance(Integer plantedChapter, Integer plannedCallbackChapter, String layoutType) {
+        // D-07: dark lines exempt
+        if ("dark".equals(layoutType)) {
+            return;
+        }
+        // Only validate when both chapters are specified
+        if (plantedChapter == null || plannedCallbackChapter == null) {
+            return;
+        }
+        // D-04: global sequence, simple subtraction
+        int distance = plannedCallbackChapter - plantedChapter;
+        if (distance < MIN_FORESHADOWING_DISTANCE) {
+            throw new RuntimeException(
+                "明线伏笔回收距离不足：埋设章节(" + plantedChapter
+                + ")与回收章节(" + plannedCallbackChapter
+                + ")至少需间隔" + MIN_FORESHADOWING_DISTANCE + "章"
+            );
+        }
+    }
+
+    /**
+     * 校验回收章节不超过该卷规划章节数
+     * Per D-03: plannedCallbackChapter cannot exceed volume's targetChapterCount
+     */
+    private void validateCallbackChapterBounds(Long projectId, Integer plannedCallbackVolume, Integer plannedCallbackChapter) {
+        if (plannedCallbackVolume == null || plannedCallbackChapter == null) {
+            return;
+        }
+        LambdaQueryWrapper<NovelVolumePlan> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(NovelVolumePlan::getProjectId, projectId)
+               .eq(NovelVolumePlan::getVolumeNumber, plannedCallbackVolume);
+        NovelVolumePlan volumePlan = volumePlanMapper.selectOne(wrapper);
+        // If volume plan not found, skip validation (volume not yet planned)
+        if (volumePlan != null && volumePlan.getTargetChapterCount() != null) {
+            if (plannedCallbackChapter > volumePlan.getTargetChapterCount()) {
+                throw new RuntimeException(
+                    "回收章节超出范围：第" + plannedCallbackVolume + "卷规划"
+                    + volumePlan.getTargetChapterCount() + "章，无法设置回收章节为"
+                    + plannedCallbackChapter
+                );
+            }
+        }
+    }
 
     /**
      * 获取伏笔列表
@@ -83,6 +138,16 @@ public class ForeshadowingService {
             );
         }
 
+        // 按埋设分卷筛选
+        if (queryDto.getPlantedVolume() != null) {
+            queryWrapper.eq(Foreshadowing::getPlantedVolume, queryDto.getPlantedVolume());
+        }
+
+        // 按回收分卷筛选
+        if (queryDto.getPlannedCallbackVolume() != null) {
+            queryWrapper.eq(Foreshadowing::getPlannedCallbackVolume, queryDto.getPlannedCallbackVolume());
+        }
+
         // 按优先级和创建时间排序
         queryWrapper.orderByDesc(Foreshadowing::getPriority)
                 .orderByDesc(Foreshadowing::getCreateTime);
@@ -105,6 +170,11 @@ public class ForeshadowingService {
      */
     @Transactional
     public Long createForeshadowing(Long projectId, ForeshadowingCreateDto createDto) {
+        // Per D-06, D-07: validate foreshadowing distance
+        validateForeshadowingDistance(createDto.getPlantedChapter(), createDto.getPlannedCallbackChapter(), createDto.getLayoutType());
+        // Per D-03: validate callback chapter bounds
+        validateCallbackChapterBounds(projectId, createDto.getPlannedCallbackVolume(), createDto.getPlannedCallbackChapter());
+
         Foreshadowing foreshadowing = new Foreshadowing();
         BeanUtils.copyProperties(createDto, foreshadowing);
 
@@ -139,6 +209,14 @@ public class ForeshadowingService {
         foreshadowing.setProjectId(existingForeshadowing.getProjectId());
         foreshadowing.setPlantedChapter(existingForeshadowing.getPlantedChapter());
         foreshadowing.setUpdateTime(LocalDateTime.now());
+
+        // Per D-06, D-07: validate foreshadowing distance for update
+        // plantedChapter comes from existing (immutable), callbackChapter from updateDto
+        Integer effectiveCallbackChapter = foreshadowing.getPlannedCallbackChapter();
+        String effectiveLayoutType = foreshadowing.getLayoutType();
+        Integer effectiveCallbackVolume = updateDto.getPlannedCallbackVolume();
+        validateForeshadowingDistance(foreshadowing.getPlantedChapter(), effectiveCallbackChapter, effectiveLayoutType);
+        validateCallbackChapterBounds(existingForeshadowing.getProjectId(), effectiveCallbackVolume, effectiveCallbackChapter);
 
         foreshadowingMapper.updateById(foreshadowing);
         log.info("更新伏笔成功，foreshadowingId={}", foreshadowingId);

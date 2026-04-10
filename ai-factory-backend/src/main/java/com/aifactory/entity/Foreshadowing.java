@@ -56,9 +56,19 @@ public class Foreshadowing {
     private Integer plantedChapter;
 
     /**
+     * 埋伏笔的分卷编号
+     */
+    private Integer plantedVolume;
+
+    /**
      * 计划填坑的章节
      */
     private Integer plannedCallbackChapter;
+
+    /**
+     * 计划回收伏笔的分卷编号
+     */
+    private Integer plannedCallbackVolume;
 
     /**
      * 实际填坑的章节

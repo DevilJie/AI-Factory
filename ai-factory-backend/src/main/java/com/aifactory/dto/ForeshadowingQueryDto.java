@@ -52,4 +52,16 @@ public class ForeshadowingQueryDto {
     @Schema(description = "当前章节号，用于查询该章节需要填坑的伏笔（plannedCallbackChapter <= currentChapter 且状态为pending）",
             example = "50")
     private Integer currentChapter;
+
+    /**
+     * 埋设伏笔的分卷编号筛选
+     */
+    @Schema(description = "埋设伏笔的分卷编号筛选", example = "1")
+    private Integer plantedVolume;
+
+    /**
+     * 计划回收伏笔的分卷编号筛选
+     */
+    @Schema(description = "计划回收伏笔的分卷编号筛选", example = "2")
+    private Integer plannedCallbackVolume;
 }

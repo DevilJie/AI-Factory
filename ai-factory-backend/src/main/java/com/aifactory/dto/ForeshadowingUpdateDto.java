@@ -61,6 +61,12 @@ public class ForeshadowingUpdateDto {
     private Integer plannedCallbackChapter;
 
     /**
+     * 计划回收伏笔的分卷编号
+     */
+    @Schema(description = "计划回收伏笔的分卷编号", example = "2")
+    private Integer plannedCallbackVolume;
+
+    /**
      * 实际填坑的章节
      */
     @Schema(description = "实际填坑（揭示伏笔）的章节号，完成后填写",

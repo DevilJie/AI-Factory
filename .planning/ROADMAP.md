@@ -8,6 +8,18 @@
 - ✅ **v1.0.5 章节角色规划体系** — Phases 11-14 (shipped 2026-04-10)
 - 🚧 **v1.0.6 伏笔管理** — Phases 15-19 (in progress)
 
+## Current: v1.0.6 伏笔管理
+
+**Status:** IN PROGRESS
+
+| Phase | Name | Plans | Status |
+|-------|------|-------|--------|
+| 15 | Data Foundation | 1/2 | In Progress |
+| 16 | AI Chapter Planning | 0/2 | Not Started |
+| 17 | AI Generation Constraints | 0/1 | Not Started |
+| 18 | Frontend Chapter Foreshadowing | 0/2 | Not Started |
+| 19 | Frontend Project Management | 0/1 | Not Started |
+
 ## Phases
 
 <details>
