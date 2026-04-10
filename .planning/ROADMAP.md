@@ -68,11 +68,11 @@
   1. novel_foreshadowing 表包含 planted_volume 和 planned_callback_volume 字段，可按分卷查询伏笔
   2. novel_chapter_plan 的 foreshadowingSetup/foreshadowingPayoff 字段从数据库列、实体类、DTO、前端类型中完全删除
   3. 创建/更新伏笔时，若埋设章节与回收章节距离不足 N 章，返回校验错误
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 15-01: TBD
-- [ ] 15-02: TBD
+- [ ] 15-01-PLAN.md — 伏笔表扩展(分卷字段) + 距离校验 + 回调章节上限校验 [DATA-01, DATA-03]
+- [ ] 15-02-PLAN.md — 彻底删除 foreshadowingSetup/foreshadowingPayoff (DB+实体+DTO+前端) [DATA-02]
 
 ### Phase 16: AI Chapter Planning
 **Goal**: LLM 章节规划时感知已有伏笔状态，自动输出新伏笔的埋设和回收决策，解析并持久化到伏笔表
@@ -137,7 +137,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 15. Data Foundation | v1.0.6 | 0/? | Not started | - |
+| 15. Data Foundation | v1.0.6 | 0/2 | Planned | - |
 | 16. AI Chapter Planning | v1.0.6 | 0/? | Not started | - |
 | 17. AI Generation Constraints | v1.0.6 | 0/? | Not started | - |
 | 18. Frontend Chapter Foreshadowing | v1.0.6 | 0/? | Not started | - |
