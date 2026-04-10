@@ -45,6 +45,14 @@
 - [x] **Phase 13: 章节生成约束注入** — 提示词注入规划角色、严格约束语言 (completed 2026-04-09)
 - [x] **Phase 14: 前端展示 + 闭环验证** — 规划角色展示、规划-实际对比、闭环验证 (completed 2026-04-09)
 
+## v1.0.6 伏笔管理 (Phases 15-19) — IN PROGRESS
+
+- [x] Phase 15: 数据基础 (2/2 plans) — completed 2026-04-11
+- [ ] Phase 16: AI 章节规划伏笔
+- [ ] Phase 17: AI 生成伏笔约束
+- [ ] Phase 18: 前端章节伏笔管理
+- [ ] Phase 19: 前端项目伏笔管理
+
 ## Phase Details
 
 (All phase details archived — see .planning/milestones/ for historical data)
