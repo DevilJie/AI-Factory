@@ -52,11 +52,11 @@ AI Factory 世界观模块已完成势力阵营结构化重构、世界观生成
 - ✓ 章节规划模板升级（<ch>/<cn>/<cd>/<ci> XML 输出指令 + characterInfo 角色列表注入） — v1.0.5 Phase 12
 - ✓ 章节生成约束注入（hasPlannedCharacters + 约束语言 + fallback 全量角色列表） — v1.0.5 Phase 13
 - ✓ 章节实际登场角色后端端点 + 前端 API（ChapterCharacterVO） — v1.0.5 Phase 14
+- ✓ novel_foreshadowing 分卷字段 + 距离校验 + 回收章节边界校验 — v1.0.6 Phase 15
+- ✓ 移除 novel_chapter_plan foreshadowingSetup/foreshadowingPayoff 冗余字段 — v1.0.6 Phase 15
 
 ### Active
 
-- [ ] novel_foreshadowing 增加分卷编号字段（plantedVolume, plannedCallbackVolume）
-- [ ] 移除 novel_chapter_plan 的 foreshadowingSetup / foreshadowingPayoff 字段
 - [ ] 章节规划 LLM 输出伏笔规划（埋设 + 回收）
 - [ ] 章节创作注入伏笔约束（本章节埋设 + 回收）
 - [ ] ChapterPlanDrawer 伏笔管理区（查看/编辑/添加/删除）
