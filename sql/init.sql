@@ -348,7 +348,9 @@ CREATE TABLE `novel_foreshadowing`  (
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '伏笔描述',
   `layout_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '布局类型',
   `planted_chapter` int NULL DEFAULT NULL COMMENT '埋伏笔的章节',
+  `planted_volume` int NULL DEFAULT NULL COMMENT '埋设伏笔的分卷编号',
   `planned_callback_chapter` int NULL DEFAULT NULL COMMENT '计划填坑的章节',
+  `planned_callback_volume` int NULL DEFAULT NULL COMMENT '计划回收伏笔的分卷编号',
   `actual_callback_chapter` int NULL DEFAULT NULL COMMENT '实际填坑的章节',
   `status` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'pending' COMMENT '状态',
   `priority` int NULL DEFAULT 0 COMMENT '优先级',
@@ -356,7 +358,9 @@ CREATE TABLE `novel_foreshadowing`  (
   `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
-  INDEX `idx_project_id`(`project_id` ASC) USING BTREE
+  INDEX `idx_project_id`(`project_id` ASC) USING BTREE,
+  INDEX `idx_planted_volume`(`project_id`, `planted_volume`),
+  INDEX `idx_callback_volume`(`project_id`, `planned_callback_volume`)
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '伏笔表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------

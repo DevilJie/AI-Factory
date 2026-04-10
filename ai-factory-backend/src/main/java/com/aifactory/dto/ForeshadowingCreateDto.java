@@ -62,11 +62,23 @@ public class ForeshadowingCreateDto {
     private Integer plantedChapter;
 
     /**
+     * 埋设伏笔的分卷编号
+     */
+    @Schema(description = "埋设伏笔的分卷编号", example = "1")
+    private Integer plantedVolume;
+
+    /**
      * 计划填坑的章节
      */
     @Schema(description = "计划填坑（揭示伏笔）的章节号，可选",
             example = "50")
     private Integer plannedCallbackChapter;
+
+    /**
+     * 计划回收伏笔的分卷编号
+     */
+    @Schema(description = "计划回收伏笔的分卷编号", example = "2")
+    private Integer plannedCallbackVolume;
 
     /**
      * 优先级，数值越大优先级越高
