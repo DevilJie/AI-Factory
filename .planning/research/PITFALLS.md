@@ -1,242 +1,288 @@
 # Pitfalls Research
 
-**Domain:** Faction/Force structured refactoring for AI novel generation app (tree-structured data + relationship tables + AI XML parsing)
-**Researched:** 2026-04-01
-**Confidence:** HIGH (derived from direct codebase analysis of existing patterns, not external sources)
+**Domain:** Adding foreshadowing (伏笔) management to existing novel generation system -- cross-volume references, AI constraint injection, frontend integration
+**Researched:** 2026-04-10
+**Confidence:** HIGH (derived from direct codebase analysis of existing patterns, data model, and v1.0.5 character planning precedent)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: getElementsByTagName Silently Collects All Descendants (Not Just Direct Children)
+### Pitfall 1: Chapter-Number-Only References Break When Volumes Are Regenerated or Reordered
 
 **What goes wrong:**
-When parsing nested faction XML like `<faction><name>X</name><faction><name>Y</name></faction></faction>`, calling `element.getElementsByTagName("name")` returns ALL descendant `<name>` elements across the entire subtree. The parent faction gets assigned the child faction's name, or the first match is used incorrectly. This is the exact bug pattern already present in `WorldviewTaskStrategy#parseSingleRegion` at lines 434 and 442, where `getElementsByTagName("n")` and `getElementsByTagName("d")` would grab nested region names/descriptions from grandchildren if the XML ever contained them.
+The existing `novel_foreshadowing` table uses `plantedChapter` (Integer) and `plannedCallbackChapter` (Integer) to reference where a foreshadowing is planted and when it should be resolved. These are global chapter numbers. The milestone adds `plantedVolume` and `plannedCallbackVolume` fields. But the codebase already has `ChapterGenerationTaskStrategy.saveChaptersToDatabase()` which auto-assigns `chapterNumber` starting from `nextChapterNumber`. If a user regenerates a volume's chapters (which the system supports via per-stage regeneration), the global chapter numbers shift: what was chapter 15 in volume 2 becomes chapter 12 after volume 1 chapters are regenerated with fewer entries. All foreshadowing references with `plantedChapter=15` now point to the wrong chapter.
+
+The new volume fields only partially mitigate this: they tell you WHICH volume a foreshadowing belongs to, but the chapter number within that volume can still shift.
 
 **Why it happens:**
-`Element.getElementsByTagName()` is a DOM method that searches the entire subtree recursively. Developers assume it works like `querySelector` with direct-child semantics, but it does not. The geography code partially avoids this for `<r>` child nodes by using `getChildNodes()` at line 449, but still uses the greedy `getElementsByTagName` for `<n>` and `<d>` fields. For factions with nested sub-factions, this bug is guaranteed to manifest.
+Chapter numbers are relative position identifiers that change when earlier content is regenerated. The system has no stable chapter ID at planning time -- `NovelChapterPlan` rows are only created AFTER AI generation, so foreshadowing planned during outline generation cannot reference a plan ID that does not exist yet.
 
 **How to avoid:**
-Always use `getChildNodes()` iteration with node name checks for direct-child access. Write a helper method:
-```java
-private String getDirectChildText(Element parent, String tagName) {
-    NodeList children = parent.getChildNodes();
-    for (int i = 0; i < children.getLength(); i++) {
-        Node child = children.item(i);
-        if (child.getNodeType() == Node.ELEMENT_NODE && tagName.equals(child.getNodeName())) {
-            return child.getTextContent().trim();
-        }
-    }
-    return null;
-}
+1. During chapter plan generation (when LLM outputs foreshadowing XML), store the foreshadowing with volume number + relative chapter number within that volume (e.g., "Volume 2, Chapter 3" not "Chapter 23")
+2. After chapter plans are saved and have stable IDs, run a post-processing step that resolves `(volumeNumber, relativeChapterNumber)` to an actual `novel_chapter_plan.id`
+3. Store BOTH the volume reference AND the chapter plan ID once available. The chapter plan ID is the stable reference
+4. When a volume is regenerated, foreshadowing references into that volume must be re-resolved (or the user must be warned that foreshadowing targets changed)
+5. The `plantedChapter` (global number) field remains useful for display but should NOT be the primary join key
+
+**Warning signs:**
+- Foreshadowing "planted in chapter 15" but chapter 15 content is completely unrelated after a regeneration
+- Volume 2 foreshadowing marked as "to be resolved in chapter 30" but chapter 30 is now in volume 3
+- `ForeshadowingService.getForeshadowingList(currentChapter=X)` returns foreshadowing meant for a different chapter
+
+**Phase to address:**
+Data model phase (first phase). The volume-aware fields must be designed with stable references from the start.
+
+---
+
+### Pitfall 2: Dual Foreshadowing Sources (Structured Table + ChapterPlotMemory Text) Diverge
+
+**What goes wrong:**
+The system currently has TWO independent foreshadowing tracking mechanisms:
+
+1. **`novel_foreshadowing` table** -- structured rows with title, type, status, plantedChapter, plannedCallbackChapter (the target of this milestone)
+2. **`chapter_plot_memory` table** -- has `foreshadowingPlanted` (JSON array), `foreshadowingResolved` (JSON array), `pendingForeshadowing` (JSON array) as text fields
+
+`ForeshadowingService.getPendingForeshadowingFromMemories()` reads from `chapter_plot_memory` and does set arithmetic (planted minus resolved) to find pending foreshadowing. `ChapterContext.pendingForeshadowing` feeds this text into the prompt via `buildPendingForeshadowingText()`.
+
+After the milestone activates the structured `novel_foreshadowing` table, these two sources will diverge:
+- LLM chapter planning creates rows in `novel_foreshadowing` (structured)
+- LLM chapter content generation writes to `chapter_plot_memory.foreshadowingPlanted` (text)
+- The text in memory may describe the SAME foreshadowing differently than the structured row
+- If only one source is queried during chapter generation, foreshadowing context is incomplete
+- If both are queried, the AI receives conflicting descriptions of the same foreshadowing
+
+**Why it happens:**
+The memory-based system was built as the FIRST foreshadowing mechanism (pre-structured-table). It uses free-text descriptions that the AI writes post-generation. The structured table uses pre-planned titles and descriptions from chapter planning. They serve different lifecycle stages (planning vs. post-generation analysis) but both feed into chapter generation context.
+
+**How to avoid:**
+1. Designate the structured `novel_foreshadowing` table as the SINGLE source of truth for foreshadowing status
+2. When injecting foreshadowing context into chapter generation prompts, query ONLY from `novel_foreshadowing` (not from `chapter_plot_memory`)
+3. Keep `chapter_plot_memory.foreshadowingPlanted/Resolved` for the AI memory summarization feature but do NOT use them for foreshadowing constraint injection
+4. After each chapter is generated and memory is rebuilt, cross-check: update the structured table's `status` field based on whether the memory records the foreshadowing as resolved
+5. Alternatively, after chapter generation, use the memory's foreshadowing data to update the structured table (sync from memory to structured)
+
+**Warning signs:**
+- AI receives foreshadowing instructions that conflict with what actually happened in previous chapters
+- Structured table shows a foreshadowing as "pending" but chapter memory shows it was already resolved
+- Foreshadowing count in the management UI differs from what the AI believes is pending
+
+**Phase to address:**
+Chapter generation constraint injection phase. The constraint injection must exclusively use the structured table.
+
+---
+
+### Pitfall 3: Removing foreshadowingSetup/foreshadowingPayoff Fields Breaks Existing Data
+
+**What goes wrong:**
+The milestone calls for removing `foreshadowingSetup` and `foreshadowingPayoff` from `novel_chapter_plan`. These fields currently store free-text foreshadowing data in existing projects. The fields are referenced in:
+
+- `NovelChapterPlan.java` entity (lines 97-103)
+- `ChapterPlanUpdateRequest.java` DTO (lines 45-48)
+- `ChapterPlanDto.java` DTO (lines 58-61)
+- `ChapterPlanDrawer.vue` frontend form (lines 30-31, 250-251, 279, 484-516)
+- `project.ts` TypeScript types (lines 132-133, 157-158)
+
+If the database columns are dropped without migrating data, any existing project with foreshadowing data in those fields loses it permanently. The structured `novel_foreshadowing` table will be empty for these projects because the migration from text fields to structured rows has not occurred.
+
+**Why it happens:**
+The text fields and the structured table serve different lifecycle stages. The text fields were the ORIGINAL mechanism (manual/AI text in chapter plans). The structured table is the NEW mechanism. There is no automatic migration path from "semicolon-separated text in foreshadowingSetup" to "rows in novel_foreshadowing".
+
+**How to avoid:**
+1. Do NOT drop the `foreshadowingSetup` and `foreshadowingPayoff` database columns immediately
+2. Keep the columns in the schema but mark them as deprecated in code comments
+3. Remove the Java entity fields and DTO fields, but use `@TableField(exist = false)` if needed for backward compatibility during transition
+4. Add a migration endpoint or script that: (a) reads existing `foreshadowingSetup` text, (b) splits by semicolons, (c) creates `novel_foreshadowing` rows for each entry
+5. Only drop the columns in a future release after confirming all active projects have migrated
+6. The frontend `ChapterPlanDrawer` must continue to display old foreshadowing data (read from memory/API) during the transition period
+
+**Warning signs:**
+- Existing projects show empty foreshadowing section after deployment
+- Chapter generation no longer injects foreshadowing constraints for old projects
+- Database still has text in `foreshadowing_setup` column but the entity no longer maps it
+
+**Phase to address:**
+Data model phase (first phase). The removal strategy must be defined before any code changes.
+
+---
+
+### Pitfall 4: New XML Tags for Foreshadowing Break Existing Chapter Plan Parsing
+
+**What goes wrong:**
+The chapter plan XML format currently uses tags: `<c>`, `<o>`, `<n>`, `<t>`, `<p>`, `<e>`, `<g>`, `<w>`, `<s>`, `<ed>`, `<ch>`, `<cn>`, `<cd>`, `<ci>`. Adding new tags for foreshadowing (e.g., `<fs>` for foreshadowing setup, `<fr>` for foreshadowing resolution) must be done carefully because:
+
+1. `ChapterGenerationTaskStrategy.parseSingleChapter()` uses a switch statement on tag names. New tags that are not in the switch are silently ignored -- no error, no data. If the new tag is accidentally named the same as an existing tag's content abbreviation, it collides.
+
+2. The `sanitizeXmlForDomParsing()` function has `containerTags` parameter `["o", "ch"]` that fixes tag balance. If foreshadowing tags use container semantics (parent with children), they must be added to this array or the sanitizer will not fix their tag mismatches.
+
+3. The LLM prompt explicitly lists the tag order: `n -> t -> p -> e -> g -> w -> s -> ed`. Adding new tags changes this order. The LLM must be told the correct position, and the parser must handle tags appearing in any order (current parser iterates `getChildNodes()` and uses a switch, so order-independent -- but the prompt example suggests a fixed order that the LLM tries to follow).
+
+4. The `parseSingleChapter` method accumulates data into a `Map<String, String>`. Foreshadowing may need structured data (multiple foreshadowing items per chapter), not a single string. The character planning solved this with `<ch>` sub-tags. Foreshadowing needs a similar nested approach.
+
+**Why it happens:**
+The XML format is a contract between the LLM prompt and the DOM parser. Changing one side without updating the other causes silent data loss. The LLM may produce the new tags but the parser ignores them, or the parser expects new tags but the LLM prompt was not updated.
+
+**How to avoid:**
+1. Design the foreshadowing XML tags following the character planning precedent: use container tags like `<fs>` (foreshadowing setup) with child tags for structured data
+2. Add new tags to the `sanitizeXmlForDomParsing` container tags array
+3. Update BOTH the prompt template AND the parser in the SAME phase -- never update one without the other
+4. Write the parser to handle the new tags before writing the prompt -- this way the parser is ready when the LLM output arrives
+5. Keep the prompt's tag order list updated
+6. Test with real LLM output -- generate a few chapter plans with the new tags and verify parsing extracts all data
+
+**Warning signs:**
+- Chapter plans are created but have no foreshadowing data in the structured table
+- XML parsing logs show "unknown tag" warnings (currently there are no such warnings -- unknown tags are just skipped silently)
+- The LLM output contains `<fs>` tags but the parser's switch statement falls through to the default case
+
+**Phase to address:**
+Chapter plan LLM output phase (XML parsing). Parser must be updated BEFORE prompt template changes.
+
+---
+
+### Pitfall 5: Cross-Volume Foreshadowing Query Performance Degrades with Project Scale
+
+**What goes wrong:**
+The milestone adds `plantedVolume` and `plannedCallbackVolume` to support cross-volume foreshadowing. When generating chapter content for chapter N in volume M, the system must query:
+
+1. All foreshadowing planted in volumes 1..M (or earlier in volume M) that are still pending
+2. All foreshadowing whose `plannedCallbackVolume` == M and `plannedCallbackChapter` == N (due for resolution in this chapter)
+3. The status of each foreshadowing (has it been resolved in a previous chapter?)
+
+The current `ForeshadowingService.getForeshadowingList()` uses a single `LambdaQueryWrapper` with an `eq` on `projectId` and optional filters. The `currentChapter` filter uses a complex OR condition. With cross-volume queries, the conditions become:
+
+```sql
+WHERE project_id = ?
+AND (
+  planned_callback_volume < ?
+  OR (planned_callback_volume = ? AND planned_callback_chapter <= ?)
+)
+AND status IN ('pending', 'in_progress')
 ```
-Use this consistently for ALL tag reads within the faction parsing code.
+
+This query runs for every chapter generation. With a 10-volume, 300-chapter novel with 100+ foreshadowing entries, this becomes a significant query without proper indexes.
+
+**Why it happens:**
+The current table has only `idx_project_id` as an index. No composite index exists for `(project_id, status)` or `(project_id, planned_callback_volume, planned_callback_chapter)`. The query optimizer falls back to full table scan filtered by project_id, then applies the complex WHERE conditions in memory.
+
+**How to avoid:**
+1. Add composite indexes during the schema migration:
+   - `idx_project_status` on `(project_id, status)` -- for "all pending foreshadowing in project X"
+   - `idx_callback_target` on `(project_id, planned_callback_volume, planned_callback_chapter)` -- for "foreshadowing due in this chapter"
+   - `idx_planted_source` on `(project_id, planted_volume, planted_chapter)` -- for "foreshadowing planted in this volume/chapter"
+2. Write the query with proper pagination for large projects (though foreshadowing count is typically < 200)
+3. Consider caching the pending foreshadowing list per project, invalidated only when foreshadowing status changes
 
 **Warning signs:**
-- A faction with sub-factions gets its name set to a sub-faction's name
-- `description` field contains concatenated text from multiple nested descriptions
-- Tests pass for flat faction lists but fail when factions have children
+- Chapter generation takes noticeably longer for volume 5+ compared to volume 1
+- Database slow query log shows the foreshadowing query taking > 100ms
+- Foreshadowing list API response time increases with project chapter count
 
 **Phase to address:**
-Phase 1 (Backend: Faction entity + DOM parsing). The parsing helper must be correct from the first commit.
+Data model phase (first phase). Indexes must be part of the schema migration DDL.
 
 ---
 
-### Pitfall 2: Incomplete Migration of worldview.getForces() Call Sites
+### Pitfall 6: Foreshadowing Constraint Injection Overloads the LLM Context Window
 
 **What goes wrong:**
-After making `worldview.forces` transient and adding `fillForces()`, some callers are missed. Codebase grep shows `worldview.getForces()` is read in at least 10 different locations across 7 files:
-- `ChapterService.java` (lines 1003-1004)
-- `PromptTemplateBuilder.java` (lines 382-383)
-- `ChapterPromptBuilder.java` (lines 160-161)
-- `PromptContextBuilder.java` (lines 178-179)
-- `ChapterFixTaskStrategy.java` (lines 421-422)
-- `ChapterGenerationTaskStrategy.java` (lines 423-424, 557-558)
-- `VolumeOptimizeTaskStrategy.java` (lines 367-368)
-- `OutlineTaskStrategy.java` (lines 907-908, 977-978, 1672, 1723-1724, 1770-1771)
-- `WorldviewTaskStrategy.java` (line 337 -- writer)
+When injecting foreshadowing constraints into chapter generation prompts, the system must include:
+1. Foreshadowing to PLANT in this chapter (from chapter plan)
+2. Foreshadowing to RESOLVE in this chapter (from chapter plan + structured table)
+3. Currently pending foreshadowing that should remain unresolved (context awareness)
 
-Missing even one of these means that in some chapter generation flows, the AI receives no faction information, producing chapters that ignore faction relationships entirely. The symptom is intermittent -- chapters generated via some code paths reference factions, others do not.
+The current `PromptTemplateBuilder.buildTemplateVariables()` already injects: worldview (500+ words), volume info (200+ words), recent chapters (500+ words), character info (300+ words with planned characters), basic settings (200+ words). Adding foreshadowing context could add another 200-500 words depending on how many foreshadowing items are active.
+
+If the total prompt exceeds the LLM's effective context window (typically 4K-8K tokens for generation), the model truncates or loses later instructions. Since foreshadowing instructions would be added AFTER character info (last in the variable map), they are the most likely to be truncated.
 
 **Why it happens:**
-The callers are spread across multiple strategy classes with no shared interface for "build worldview context." Each strategy independently constructs its prompt string. There is no single point where `fillForces()` can be called -- it must be called before every `getForces()` usage, matching the pattern of `fillGeography()` which is called at 8+ separate locations.
+The prompt template system in `PromptTemplateService.executeTemplate()` does string interpolation without checking total length. There is no token counting or prompt length budget. Each new feature adds more context without considering the cumulative effect.
 
 **How to avoid:**
-1. Do a comprehensive grep for `getForces()` before starting the migration
-2. For each call site, add `factionService.fillForces(worldview)` immediately before it, following the exact pattern of `continentRegionService.fillGeography(worldview)` calls
-3. After making `forces` transient (`@TableField(exist = false)`), the compiler will NOT catch missed sites because Lombok generates the getter regardless -- only runtime testing will reveal gaps
-4. Write an integration test that exercises each strategy and asserts that faction text appears in the prompt
+1. Establish a prompt budget: measure the typical template length, subtract from the LLM's effective context window, and allocate the remaining budget across features
+2. For foreshadowing injection, use a concise format:
+   ```
+   【伏笔约束】
+   埋设：1. 主角玉佩的秘密来历
+   回收：1. 第一章老者身份揭晓
+   注意：以下伏笔仍在进行中，请勿提前回收：龙纹匕首的来历、师门密令
+   ```
+3. Do NOT inject the FULL list of all pending foreshadowing -- only inject those directly relevant to the current chapter (to plant or to resolve) plus a brief mention of "do not resolve" items
+4. Monitor prompt length in development and add a warning log if it exceeds a threshold (e.g., 6000 characters)
 
 **Warning signs:**
-- A chapter generation produces content that ignores all faction relationships
-- The behavior differs between "generate chapter" and "fix chapter" flows
-- Some strategies produce faction-aware output, others do not
+- LLM ignores foreshadowing instructions entirely (prompt was too long, instructions truncated)
+- LLM resolves foreshadowing that should remain unresolved (context was cut off)
+- Generated chapters become shorter or lower quality as prompt grows (model compensating for context pressure)
 
 **Phase to address:**
-Phase 2 (Backend: WorldviewTaskStrategy refactor + transient migration). Must be verified before Phase 4 (Frontend).
+Chapter generation constraint injection phase. The constraint format must be designed for brevity from the start.
 
 ---
 
-### Pitfall 3: Name-to-ID Resolution Fails on Non-Exact Matches
+### Pitfall 7: ChapterPlanDrawer Foreshadowing Section Overwhelms an Already Complex UI
 
 **What goes wrong:**
-The plan specifies that AI outputs faction names (not IDs), and the backend resolves names to IDs by querying the database. But AI-generated text is inherently imprecise. The LLM might output "紫阳宗" in the faction list but reference "紫阳宗门" or "紫阳宗（正道）" in the relationship table. The name lookup returns null, the faction-region or faction-faction relation is silently dropped, and the structured data ends up incomplete with no error reported.
+The `ChapterPlanDrawer.vue` is already 725 lines with 5 tab sections (basic, plot, scene, foreshadow, character). The existing "foreshadow" tab shows two textareas for `foreshadowingSetup` and `foreshadowingPayoff` (lines 484-516). Replacing these simple textareas with a structured foreshadowing management section (list of foreshadowing items with title, type, status, volume/chapter references, edit/delete buttons) significantly increases complexity.
 
-This is especially critical because the PROJECT.md specifies: "AI outputs names for power systems and geography, backend looks up by name." But power systems have unique, unambiguous names within a single project. Factions may have ambiguous or similar names (e.g., "青龙会" vs "青龙帮").
+The character tab already demonstrates this pattern: it went from simple text to an editable list with comparison view, requiring ~200 lines of additional code (editableCharacters, sync logic, comparison matching, role type labels). The foreshadowing section needs similar complexity but with additional dimensions:
+- Each foreshadowing item has more fields than a character entry (title, type, layoutType, description, plantedVolume, plantedChapter, plannedCallbackVolume, plannedCallbackChapter, status, priority)
+- Cross-volume references require displaying volume context
+- Status transitions (pending -> in_progress -> completed) need UI affordances
+
+Adding all this to the existing drawer risks making it unwieldy, slow to render, and confusing for users.
 
 **Why it happens:**
-LLMs do not guarantee exact string reproduction across different parts of the same response. A faction name defined in one `<faction>` block might be referenced with slight variations in a `<relation>` block. The name-as-natural-key assumption breaks when the key producer is a probabilistic model.
+The drawer pattern works well for simple data but does not scale to rich structured data with multiple fields and cross-references. Each new structured data type (characters, now foreshadowing) adds a full CRUD sub-interface inside a tab.
 
 **How to avoid:**
-1. Build a fuzzy name matcher: after exact-match fails, try normalized comparison (trim whitespace, strip parenthetical annotations, remove common suffixes like "门" / "派" / "宗")
-2. When a name cannot be resolved, LOG the failure at WARN level with the exact string -- do not silently skip
-3. Include all faction names in the prompt template as a reference list before asking AI to generate relationships, so the AI has the exact names available
-4. Consider a post-processing validation step that counts how many names were resolved vs. failed, and includes this in the task result
+1. Do NOT build a full CRUD interface inside the drawer. Instead, show a READ-ONLY summary of foreshadowing in the drawer tab:
+   - List of foreshadowing to plant this chapter (with title and type badge)
+   - List of foreshadowing to resolve this chapter (with title and type badge)
+   - Link/button to open a dedicated ForeshadowingDrawer for full editing
+2. The dedicated ForeshadowingDrawer follows the same Teleport pattern as CharacterDrawer
+3. Keep the ChapterPlanDrawer's foreshadow tab under 100 lines
+4. Use the same approach as the character comparison view: summary bar + expandable detail
+5. CRUD operations (add/edit/delete) live in the project-level foreshadowing management view (sidebar menu), not in the chapter plan drawer
 
 **Warning signs:**
-- Faction relationship table has fewer rows than expected
-- Some factions have no associated regions despite the AI response clearly mentioning territory
-- Log files show no errors but faction-region associations are incomplete
+- ChapterPlanDrawer.vue exceeds 900 lines
+- The foreshadow tab takes > 2 seconds to render
+- Users cannot find the foreshadowing edit controls among all the UI elements
+- Foreshadow tab code duplicates CRUD logic that should be in a shared component
 
 **Phase to address:**
-Phase 1 (Backend: entity + service). The name resolution logic must be designed from the start with fuzzy matching in mind.
+Frontend phase. The UI architecture decision (drawer vs. dedicated component) must be made before writing any template code.
 
 ---
 
-### Pitfall 4: Cascade Delete Misses Relationship Tables
+### Pitfall 8: AI Foreshadowing Plan Output Produces Unrealistic Volume/Chapter References
 
 **What goes wrong:**
-When a user re-generates worldview or deletes a project, the `checkExisting` method must delete all faction-related data. Looking at the existing pattern in `WorldviewTaskStrategy#checkExisting` (lines 141-207), it manually deletes: worldview-power-system associations, power system levels, steps, the power system itself, continent regions, and the worldview. For factions, there are FOUR tables to clean up: `novel_faction`, `novel_faction_region`, `novel_faction_character`, `novel_faction_relation`. If any one is missed in the cascade, orphan rows remain in the database. When new factions are inserted with auto-increment IDs, these orphans create phantom associations.
+When the chapter planning LLM is asked to plan foreshadowing, it must specify where (volume/chapter) each foreshadowing should be planted and resolved. For a novel with 10 volumes and 30+ chapters per volume, the LLM has no accurate model of the future plot. It may:
+- Plan a foreshadowing to be resolved in "Volume 3, Chapter 15" but volume 3 does not have 15 chapters in the plan
+- Create foreshadowing that spans 5+ volumes but the novel only has 3 volumes planned
+- Produce `plannedCallbackChapter` values that are before `plantedChapter` within the same volume (temporal impossibility)
 
-This is especially dangerous because `ContinentRegionServiceImpl` handles deletion via `deleteByProjectId` but this is a single table. The faction system has 4 tables with interdependencies.
-
-**Why it happens:**
-The delete cascade is implemented as procedural code in `checkExisting`, not as database foreign key constraints. There are no FK constraints in the current schema (based on the codebase pattern). Developers must remember every table in the right order. When a new table is added later (e.g., a `novel_faction_item` table for faction artifacts), the delete cascade code must be updated in multiple places.
-
-**How to avoid:**
-1. Centralize faction deletion in `FactionService.deleteByProjectId(Long projectId)` which deletes ALL four faction tables in the correct order (relations first, then character associations, then region associations, then factions themselves)
-2. Call this single method from `WorldviewTaskStrategy#checkExisting` -- do NOT inline the delete logic
-3. Write the deletion order as: `novel_faction_relation` -> `novel_faction_character` -> `novel_faction_region` -> `novel_faction` (delete dependent tables before the main table)
-4. Test with a fixture that has data in all four tables, delete, then assert all four tables are empty for that project
-
-**Warning signs:**
-- After worldview regeneration, old faction relationships appear alongside new ones
-- Auto-increment ID gaps suggest orphan rows
-- Faction count on frontend differs from expected after regeneration
-
-**Phase to address:**
-Phase 1 (Backend: entity + service). The `deleteByProjectId` method must be implemented before any other CRUD.
-
----
-
-### Pitfall 5: GeographyTree.vue Hard-Coded Depth Levels Create Unmaintainable Copy-Paste
-
-**What goes wrong:**
-The existing `GeographyTree.vue` (357 lines) renders tree depth through explicit template nesting: Level 0, Level 1, Level 2, Level 3+ are each separate `<template v-for>` blocks with hard-coded padding (`paddingLeft: '40px'`, `'60px'`, `'80px'`). This is a massive copy-paste pattern where each depth level duplicates the entire node template (edit mode, add-child form, delete button, icon logic). For the faction tree, if the same approach is used, any UI change (e.g., adding a faction type badge, power system indicator) must be replicated across 4+ template blocks.
-
-The faction tree has MORE data per node than geography (type, core_power_system, inherited fields). Hard-coding depth levels with this richer data model would make the component nearly unmaintainable.
+The chapter planning prompt only knows about the CURRENT batch of chapters being generated (typically 5 at a time per `ChapterGenerationTaskStrategy`). It cannot accurately reference chapters that do not exist yet.
 
 **Why it happens:**
-Vue 2 had limited recursive component support. Vue 3 supports recursive components natively, but the GeographyTree developer chose the explicit-nesting approach, likely for simplicity or to avoid recursive component complexity. Once established, the pattern gets copied to new components.
+The LLM has limited context about the overall chapter structure. During volume 1 planning, it does not know how many chapters volume 3 will have. The foreshadowing plan is aspirational, not precise. The system treats LLM output as precise data, but foreshadowing timing is inherently approximate.
 
 **How to avoid:**
-Build `FactionTree.vue` as a proper recursive Vue 3 component from the start:
-1. Create a `FactionTreeNode.vue` component that accepts a single node and renders itself, then recursively renders `FactionTreeNode` for each child
-2. Pass `depth` as a prop to compute indentation dynamically: `paddingLeft: ${20 + depth * 20}px`
-3. Keep all node-specific logic (type badge, power system label, edit/delete/add actions) in the single recursive component
-4. This eliminates the 4x template duplication entirely
+1. Do NOT require the LLM to specify exact chapter numbers for callback. Instead, ask it to specify a RELATIVE position: "resolve in volume N, approximately chapter M" or "resolve approximately 10-15 chapters after planting"
+2. Store the LLM's callback estimate as a HINT, not a hard constraint. The actual resolution chapter is determined by the user or by a later planning pass
+3. When injecting foreshadowing constraints into chapter generation, use the HINT to determine which foreshadowing are "approximately due" rather than requiring exact chapter matches
+4. Consider a two-pass approach: first pass plants foreshadowing, second pass (when later volumes are planned) assigns specific resolution chapters
+5. Validate LLM output: if `plannedCallbackChapter < plantedChapter` (within same volume), reject and ask for correction
 
 **Warning signs:**
-- FactionTree.vue exceeds 300 lines
-- The same edit/delete/add markup appears more than twice
-- A UI change requires edits in 3+ places within the same file
+- Foreshadowing table has entries with `plannedCallbackChapter` values that exceed the volume's actual chapter count
+- The "foreshadowing due this chapter" query returns zero results for most chapters because the planned chapter numbers do not match reality
+- LLM generates the same callback chapter number for 10+ foreshadowing items (loss of specificity)
 
 **Phase to address:**
-Phase 4 (Frontend: FactionTree component). Must be the first design decision before writing any template code.
-
----
-
-### Pitfall 6: Top-Level-Only Fields (type, core_power_system) Not Properly Inherited on Read
-
-**What goes wrong:**
-The PROJECT.md specifies that `type` and `core_power_system` are set only on top-level factions; sub-factions inherit these values from their top-level ancestor. When building the prompt text (via `fillForces()` or `buildFactionText()`), if the code reads `faction.getType()` on a sub-faction, it gets `null` because the sub-faction's `type` column is empty in the database. The prompt either omits the sub-faction's type or outputs "null", confusing the AI.
-
-Even worse: when displaying in the frontend tree, sub-factions without an explicit type appear untyped, breaking the UI consistency.
-
-**Why it happens:**
-The "inherit from top-level ancestor" requirement is a display/inference rule, not a storage rule. The database stores `NULL` for sub-faction type. But the code that reads faction data for prompt building or API responses must walk up the tree to find the top-level ancestor and read its type. This ancestor-walk is easy to forget or implement incorrectly (especially for deeply nested factions).
-
-**How to avoid:**
-1. Implement `FactionService.getTopLevelAncestor(Long factionId)` that walks the `parent_id` chain until `parent_id IS NULL`
-2. Use this in `buildFactionText()` to prefix each faction with its inherited type
-3. In the API response for the tree, either: (a) add a computed `inheritedType` and `inheritedPowerSystemId` field that is populated during tree assembly, or (b) let the frontend compute inheritance from the tree structure
-4. Prefer option (b) for the API -- simpler backend, and the frontend already has the full tree in memory
-
-**Warning signs:**
-- Sub-factions appear without a type badge in the frontend
-- AI-generated chapters refer to sub-factions without knowing if they are good/evil/neutral
-- The `fillForces()` prompt text has "null" where type should be
-
-**Phase to address:**
-Phase 1 (Backend: entity + service). The inheritance logic must be in `buildFactionText()` from the start.
-
----
-
-### Pitfall 7: AI Prompt Template Change Breaks Existing Projects
-
-**What goes wrong:**
-The worldview generation prompt template (id=3 in `ai_prompt_template_version`) will be modified to request structured XML output for factions instead of plain text. But existing projects that already have a worldview with plain-text `forces` field will break in two ways:
-1. If the user re-generates worldview, the new template expects different XML structure
-2. If the user does NOT re-generate, the old plain-text `forces` data remains in the DB column which is about to become transient
-
-Worse: making `forces` transient (`@TableField(exist = false)`) means the column data becomes unreadable via MyBatis-Plus. Any existing project with `forces` text in the DB column loses that data permanently. Since there is no structured faction data to replace it (no rows in `novel_faction`), these projects have zero faction information.
-
-**Why it happens:**
-The migration assumes a clean "re-generate worldview" flow. But users may have projects at any stage -- some with chapters already written that reference specific faction descriptions. Losing the forces text corrupts their story's continuity.
-
-**How to avoid:**
-1. Do NOT drop the `forces` column immediately. Keep it in the schema alongside the new transient field
-2. The migration should: (a) add new faction tables, (b) keep `novel_worldview.forces` column, (c) mark it as deprecated
-3. In `fillForces()`, first check if structured faction data exists. If yes, build text from it. If no, fall back to reading the old `forces` column directly (via a raw SQL query or a separate mapper)
-4. Only drop the `forces` column in a future migration after all active projects have been regenerated or manually migrated
-5. Consider a one-time migration script that parses old `forces` text into structured faction rows for existing projects
-
-**Warning signs:**
-- Existing project shows "no faction data" after deployment
-- Chapters generated for old projects no longer reference any factions
-- The `forces` column still exists in DB but the entity field is marked transient
-
-**Phase to address:**
-Phase 2 (Backend: transient migration + SQL migration). The migration script MUST include backward compatibility handling.
-
----
-
-### Pitfall 8: Faction-Faction Relation Table Creates Bidirectional Confusion
-
-**What goes wrong:**
-The `novel_faction_relation` table stores a relationship between two factions (ally/hostile/neutral). If faction A is hostile to faction B, there are two ways to store this:
-1. One row: `{faction_a_id: 1, faction_b_id: 2, type: "hostile"}`
-2. Two rows: `{faction_a_id: 1, faction_b_id: 2, type: "hostile"}` AND `{faction_a_id: 2, faction_b_id: 1, type: "hostile"}`
-
-If the design stores one row but the query checks both directions, some relationships are missed. If the design stores two rows but the AI generates asymmetric relationships (A is hostile to B, but B is neutral toward A -- common in complex politics), the bidirectional insert overwrites one direction. The frontend "edit relationship" dialog also becomes confusing: does editing A's view of B also change B's view of A?
-
-**Why it happens:**
-Faction relationships are conceptually undirected (alliance is mutual) but AI may generate them as directed (A fears B, B despises A). The table design must choose one model and enforce it consistently. The PROJECT.md says the relation table has "relationship type (ally/hostile/neutral)" which implies undirected, but AI-generated descriptions may be asymmetric.
-
-**How to avoid:**
-1. Store relationships as undirected: enforce `faction_a_id < faction_b_id` (smaller ID first) as a convention
-2. Add a unique constraint on `(faction_a_id, faction_b_id)` where `faction_a_id < faction_b_id`
-3. In the service layer, when inserting a relation, always normalize so the smaller ID is first
-4. When querying relations for faction X, check both columns: `WHERE faction_a_id = X OR faction_b_id = X`
-5. The `description` field captures any asymmetric nuance (e.g., "A distrusts B due to past betrayal, but B seeks reconciliation")
-
-**Warning signs:**
-- The same faction pair appears twice in the relationship table with different types
-- Deleting a relationship from faction A's perspective does not remove it from faction B's perspective
-- The relation count in the database grows faster than expected
-
-**Phase to address:**
-Phase 1 (Backend: entity + table design). The constraint and normalization must be in the initial schema.
+Chapter plan LLM output phase. The prompt must be designed to elicit approximate, not exact, resolution targets.
 
 ---
 
@@ -244,91 +290,88 @@ Phase 1 (Backend: entity + table design). The constraint and normalization must 
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Copy GeographyTree.vue's explicit nesting instead of recursive component | Ship faster, familiar pattern | 4x code duplication, every UI change requires 4 edits | Never -- do it right once |
-| Keep `forces` DB column and mark transient without migration | No backward compatibility work | Existing projects lose faction data silently | Never -- must handle migration |
-| Use `getElementsByTagName` for faction XML parsing | Less code, works for flat structures | Breaks when factions have sub-factions | Never -- use direct-child iteration |
-| Skip fuzzy name matching in AI name-to-ID resolution | Simpler code, exact match only | Silent data loss when AI uses slightly different names | Only if AI output format is extremely constrained |
-| Inline faction cascade delete in WorldviewTaskStrategy | No new service method needed | Must update multiple places when adding tables | Never -- centralize in FactionService |
+| Drop `foreshadowingSetup`/`foreshadowingPayoff` columns immediately | Cleaner schema, no deprecated columns | Existing projects lose foreshadowing data | Never -- must migrate first |
+| Reuse `chapter_plot_memory.foreshadowingPlanted` for constraint injection instead of structured table | No new query needed | Dual source of truth diverges over time | Never -- structured table must be sole source |
+| Copy-paste editable list pattern from character tab into foreshadow tab | Ship faster, familiar pattern | 200+ lines of duplicated CRUD code in ChapterPlanDrawer | Never -- use read-only summary + dedicated drawer |
+| Skip cross-volume foreshadowing in v1, only support within-volume | Simpler query logic, simpler UI | Users with multi-volume novels cannot manage cross-volume arcs | Only if time-constrained, add in v1.1 |
+| Use free-text foreshadowing descriptions in XML output instead of structured fields | Simpler XML parsing | Cannot programmatically match planted vs. resolved foreshadowing | Never -- structured fields enable status tracking |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Jackson XML (XmlParser) for faction parsing | Using it for nested same-name tags (e.g., `<faction>` inside `<faction>`) -- Jackson XML cannot handle this, same as `<r>` in geography | Use DOM parsing for faction tree, same as `saveGeographyRegionsFromXml` pattern |
-| DOM parsing AI response | Extracting `<f>` fragment with `indexOf("<f>")` / `indexOf("</f>")` which breaks if `<f>` appears inside a description | Use the same pattern as geography: wrap in `<root>`, parse full DOM, then navigate to the correct element by position |
-| Prompt template update (id=3) | Changing the template without versioning, breaking projects that were mid-generation | Create a new template version; do not modify the existing one in-place |
-| Faction-to-region name lookup | Assuming region names are unique across the entire geography tree | Use `projectId` scope AND handle duplicate names by matching the first or logging ambiguity |
+| Chapter plan XML parsing | Adding `<fs>` tags but not adding them to `sanitizeXmlForDomParsing` container tags array | Add `"fs"` (or whatever container tag name is chosen) to the `containerTags` parameter so tag balance is fixed automatically |
+| Foreshadowing status sync | Only updating `novel_foreshadowing.status` when user manually marks it, not when chapter generation resolves it | After chapter memory is built, check `foreshadowingResolved` against structured table and auto-update status to "completed" |
+| ChapterContext.pendingForeshadowing | Leaving the old `ChapterContext.pendingForeshadowing` (List<String>) active while adding new structured injection | Replace `ChapterContext.pendingForeshadowing` population with a query from `novel_foreshadowing` table, keep the field but change the data source |
+| Frontend ChapterPlanDrawer save | Saving `foreshadowingSetup`/`foreshadowingPayoff` text fields alongside new structured foreshadowing | Remove text field saving from the update request; only save structured foreshadowing via dedicated API |
+| Volume regeneration | Not warning about foreshadowing targets that reference chapters being regenerated | Before volume regeneration, query foreshadowing referencing that volume and warn the user |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| N+1 queries in `fillForces()` when building text for each faction with its inherited type | Slow prompt construction, especially for worlds with 50+ factions | Batch-load all factions for the project, build a parentId->faction map, resolve inheritance in memory | 30+ factions in a single project |
-| Recursive `collectDescendantIds` in delete (same pattern as geography `deleteByProjectId`) | Stack overflow or slow delete for deeply nested faction trees | Use a single `DELETE WHERE project_id = ?` for each table (the geography code already does this correctly) | 5+ levels of nesting |
-| Loading full faction tree + relations + regions + characters for every chapter generation | Prompt construction takes 5+ seconds due to multiple DB queries | Cache the faction text in the worldview object, invalidate only on faction data change | More of a concern as project count grows |
-
-## Security Mistakes
-
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| No project-scoping on faction API endpoints | User A reads User B's factions by guessing IDs | Always filter by `projectId` AND verify the project belongs to the authenticated user (follow existing pattern in controllers) |
-| SQL injection in name-based lookup | Maliciously crafted faction name could exploit raw SQL for name resolution | Use parameterized queries even for name lookups: `WHERE name = ? AND project_id = ?` |
-| XSS via faction description in frontend | AI-generated faction descriptions contain HTML/JS that executes in the tree view | Use `v-text` or sanitize AI output before display, not `v-html` |
+| Full-table scan for pending foreshadowing per chapter generation | Chapter generation latency increases as project grows | Composite index on `(project_id, status, planned_callback_volume)` | 50+ foreshadowing entries across 5+ volumes |
+| Loading ALL foreshadowing for a project when only current-chapter items are needed | API response for "foreshadowing this chapter" is slow for large projects | Query with `WHERE planted_volume <= ? AND status IN ('pending', 'in_progress')` with proper index | 100+ foreshadowing entries |
+| Foreshadowing section in ChapterPlanDrawer re-fetches full project list on every tab switch | Frontend feels sluggish when switching to foreshadow tab | Cache foreshadowing list per project, refresh only on explicit action | Noticeable at 30+ items |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Frontend shows empty tree after worldview generation (faction data exists but tree is not refreshed) | User thinks generation failed, re-generates unnecessarily | Auto-refresh tree after worldview generation completes, same as geography tree refresh pattern |
-| Edit faction inline shows type/power system fields for sub-factions (which should inherit, not set) | User sets type on sub-faction, creating data inconsistency with the inheritance rule | Hide type and core_power_system fields for non-root factions, show inherited value as read-only badge |
-| Deleting a faction with relations does not warn about cascading relation deletion | User loses faction relationship data without realizing | Show confirmation: "Deleting X will also remove 3 alliance/hostile relationships" |
-| Faction tree with 50+ nodes loads slowly and is hard to navigate | User cannot find specific factions, gives up on managing them | Add search/filter, collapse-all/expand-all controls from the start |
+| Showing all 50+ foreshadowing items in the chapter plan drawer | User cannot find relevant items, cognitive overload | Show ONLY foreshadowing relevant to THIS chapter (to plant + to resolve + summary count of total pending) |
+| Requiring manual status updates for foreshadowing resolution | User forgets to mark foreshadowing as completed, system shows stale "pending" status | Auto-detect resolution from chapter content analysis (via memory rebuild), let user confirm/override |
+| No visual distinction between "planted this chapter" vs "due for resolution this chapter" vs "background pending" | User cannot quickly understand what action is needed | Use color coding: green = to plant, red = to resolve, gray = background pending |
+| Volume number displayed without volume title in foreshadowing references | User does not know which volume "Volume 3" refers to | Display "第3卷 少年游" (volume number + title) wherever volume references appear |
+| No foreshadowing timeline or Gantt-like view for cross-volume arcs | User cannot visualize foreshadowing spanning multiple volumes | Start with a simple list view sorted by planted volume/chapter; add timeline view as enhancement |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Faction CRUD:** Often missing cascade delete of child factions when parent is deleted -- verify delete with nested children
-- [ ] **Faction XML parsing:** Often works for flat faction lists but breaks for nested sub-factions -- verify with 3+ levels of nesting
-- [ ] **Transient forces field:** Often marked `@TableField(exist = false)` but `fillForces()` is not called at ALL call sites -- verify every strategy that uses `getForces()`
-- [ ] **Faction-region association:** Often created during AI generation but not displayed in the frontend tree -- verify region names appear in faction tree view
-- [ ] **Faction-faction relation:** Often created in one direction only -- verify querying from either faction returns the relationship
-- [ ] **SQL migration:** Often adds new tables but does not handle the old `forces` column data -- verify existing projects still have faction info after migration
-- [ ] **Tree sort order:** Often factions are inserted in correct order but displayed in wrong order -- verify `sort_order` is set during AI generation and used in `ORDER BY`
-- [ ] **checkExisting cascade:** Often deletes factions but forgets relation/region/character association tables -- verify all four tables are clean after worldview re-generation
+- [ ] **Volume fields added:** Often `plantedVolume`/`plannedCallbackVolume` are added to entity but NOT to the XML parsing switch statement -- verify new fields are populated from parsed XML
+- [ ] **Old fields removed:** Often `foreshadowingSetup`/`foreshadowingPayoff` are removed from entity but still referenced in DTO or frontend types -- verify full removal across all layers
+- [ ] **Constraint injection active:** Often the structured table is populated during planning but NOT injected into chapter generation prompts -- verify prompt contains foreshadowing section
+- [ ] **Cross-volume query works:** Often foreshadowing with `plannedCallbackVolume > plantedVolume` is not returned by the "pending" query -- verify query handles volume ordering correctly
+- [ ] **Status auto-update:** Often foreshadowing status is only updated manually, not automatically after chapter generation -- verify memory rebuild triggers status check
+- [ ] **Frontend shows structured data:** Often the drawer still shows old textareas instead of structured foreshadowing list -- verify UI displays rows from `novel_foreshadowing`
+- [ ] **Prompt template updated:** Often the template is updated but the old version is cached in Redis -- verify template cache is invalidated after update
+- [ ] **Backward compatibility:** Often new foreshadowing injection breaks chapter generation for projects without any structured foreshadowing data -- verify null/empty fallback works
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Missed getForces() call site | LOW | Add `factionService.fillForces(worldview)` before the missed call. No data migration needed. |
-| AI name mismatch causing dropped relations | MEDIUM | Re-run worldview generation. Alternatively, manually fix in database by inserting missing relations. |
-| getElementsByTagName bug in parsing | MEDIUM | Fix the parsing method, delete worldview, re-generate. No data loss if caught before production. |
-| Old forces data lost by premature column drop | HIGH | Restore from database backup, then implement proper migration with backward compatibility. |
-| Hard-coded depth levels in frontend | MEDIUM | Refactor to recursive component. Functional regression risk during refactor. |
-| Bidirectional relation confusion | LOW | Add normalization constraint, run cleanup script to merge duplicate/reversed rows. |
-| Cascade delete missing a table | LOW | Add the missing delete to FactionService.deleteByProjectId. Run cleanup for existing orphans. |
+| Dual foreshadowing source divergence | LOW | Switch to single source (structured table). No data loss, just query path change. |
+| XML parsing ignores new tags | MEDIUM | Update parser, re-run chapter plan generation for affected volumes. Old chapter plans remain valid without foreshadowing data. |
+| Dropped columns with data loss | HIGH | Restore from database backup, add migration script to convert text to structured rows before re-dropping. |
+| LLM context window overflow | LOW | Reduce foreshadowing injection to concise format. No data changes needed. |
+| Cross-volume query returns wrong results | MEDIUM | Fix query logic, re-index. Foreshadowing data is not corrupt, just query was wrong. |
+| ChapterPlanDrawer too complex | MEDIUM | Refactor to read-only summary + dedicated drawer. Functional regression risk during refactor. |
+| Unrealistic LLM volume/chapter references | LOW | These are hints, not hard constraints. Add validation, let user override. No data corruption. |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| getElementsByTagName descendant bleed | Phase 1: Backend entity + service + DOM parsing | Unit test with 3-level nested faction XML, assert each level gets correct name/description |
-| Incomplete getForces() migration | Phase 2: Transient field migration | Grep for all `getForces()` call sites, verify each has `fillForces()` before it |
-| Name-to-ID fuzzy match failure | Phase 1: Name resolution in FactionService | Test with AI output that uses slightly different names than the faction list |
-| Cascade delete missing tables | Phase 1: FactionService.deleteByProjectId | Integration test: create data in all 4 tables, delete, assert all empty |
-| GeographyTree copy-paste pattern | Phase 4: Frontend FactionTree | Component line count < 200, single template block, recursive child rendering |
-| Type/power system inheritance not read | Phase 1: buildFactionText | Test that sub-faction text includes inherited type from root ancestor |
-| Prompt template breaks existing projects | Phase 2: Template update + SQL migration | Deploy to staging with existing project data, verify old projects still work |
-| Bidirectional relation confusion | Phase 1: Table schema + constraint | Unit test: insert relation A->B, query from B, verify relation found; insert duplicate, verify constraint blocks |
+| Chapter number instability across volumes | Phase 1: Data model + volume-aware fields | Test: create foreshadowing in volume 1 targeting volume 3, regenerate volume 2, verify reference still resolves |
+| Dual foreshadowing source divergence | Phase 2: Constraint injection | Test: chapter generation prompt contains foreshadowing from structured table only, not from memory text |
+| Old field removal breaks data | Phase 1: Data model + migration | Test: existing project with text foreshadowing still shows data after migration |
+| XML parsing breaks with new tags | Phase 2: Chapter plan XML | Test: generate chapters with new foreshadowing tags, verify all data extracted |
+| Cross-volume query performance | Phase 1: Schema migration | Test: EXPLAIN query plan shows index usage, not full table scan |
+| LLM context window overflow | Phase 2: Constraint injection | Test: measure prompt length with 20 active foreshadowing items, verify < 6000 chars |
+| ChapterPlanDrawer complexity | Phase 3: Frontend | Test: foreshadowing tab renders in < 200ms, drawer < 900 lines total |
+| Unrealistic AI foreshadowing targets | Phase 2: Chapter plan prompt | Test: validate LLM output for temporal consistency (callback after planting) |
 
 ## Sources
 
-- Direct codebase analysis of `WorldviewTaskStrategy.java` -- DOM parsing pattern at lines 368-461, cascade delete at lines 141-207
-- Direct codebase analysis of `ContinentRegionServiceImpl.java` -- tree CRUD pattern, `fillGeography()` at lines 275-279
-- Direct codebase analysis of `GeographyTree.vue` -- hard-coded depth level nesting pattern, 357 lines
-- Direct codebase analysis of `XmlParser.java` -- Jackson XML limitations documented in `WorldSettingXmlDto.java` line 23
-- Direct grep of `getForces()` across 7 files showing 10+ read locations requiring migration
-- `CONCERNS.md` -- known issues with XML parsing fragility, missing transaction management, null handling
+- Direct codebase analysis of `Foreshadowing.java` entity -- field structure showing Integer chapter references without volume context
+- Direct codebase analysis of `ForeshadowingService.java` -- `getPendingForeshadowingFromMemories()` showing dual-source foreshadowing tracking via `chapter_plot_memory`
+- Direct codebase analysis of `ChapterPlotMemory.java` -- `foreshadowingPlanted`/`foreshadowingResolved`/`pendingForeshadowing` JSON text fields
+- Direct codebase analysis of `ChapterGenerationTaskStrategy.java` -- `parseSingleChapter()` switch statement and `sanitizeXmlForDomParsing()` container tags
+- Direct codebase analysis of `ChapterPlanDrawer.vue` -- 725-line drawer with 5 tabs, foreshadow tab as simple textareas
+- Direct codebase analysis of `PromptTemplateBuilder.java` -- `buildTemplateVariables()` showing cumulative context injection without length budget
+- Direct codebase analysis of `ChapterContext.java` -- `pendingForeshadowing` as `List<String>` from memory system
+- Direct codebase analysis of `ChapterPlanUpdateRequest.java` and `ChapterPlanDto.java` -- foreshadowingSetup/foreshadowingPayoff fields in DTOs
+- v1.0.5 precedent: character planning XML tags (`<ch>`, `<cn>`, `<cd>`, `<ci>`) added to same parser, same pattern for foreshadowing
 
 ---
-*Pitfalls research for: faction/force structured refactoring*
-*Researched: 2026-04-01*
+*Pitfalls research for: foreshadowing management integration (v1.0.6)*
+*Researched: 2026-04-10*

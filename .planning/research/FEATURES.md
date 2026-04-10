@@ -1,14 +1,14 @@
-# Feature Research: Chapter Character Planning System
+# Feature Research: Foreshadowing Management System
 
-**Domain:** Chapter-level character planning and enforcement for AI novel generation
-**Researched:** 2026-04-07
-**Confidence:** HIGH (based on thorough codebase analysis of existing planning, generation, and extraction pipelines)
+**Domain:** Foreshadowing (伏笔) lifecycle management for AI novel generation
+**Researched:** 2026-04-10
+**Confidence:** HIGH (based on codebase analysis of existing foreshadowing infrastructure, competitor research, and the AutoNovel pipeline pattern)
 
 ## Executive Summary
 
-The current AI novel generation pipeline operates in an open-loop for character management: the AI generates chapter plans (with no explicit character assignments), then generates chapter content (injecting all non-NPC characters as context), and finally extracts characters post-generation into `novel_character_chapter` records. This creates three problems: (1) the AI decides character appearances ad-hoc with no pre-planning, leading to inconsistent screen time; (2) the generation prompt includes ALL non-NPC characters regardless of relevance, wasting token budget and confusing the model; (3) there is no way for users to control or predict which characters appear in which chapters.
+The AI Factory codebase already has a `novel_foreshadowing` table with basic CRUD (ForeshadowingService, ForeshadowingController, 6 REST endpoints) and a text-based foreshadowing tracking system in `ChapterPlotMemory` (foreshadowingPlanted/foreshadowingResolved/pendingForeshadowing JSON arrays). However, these two systems are disconnected: the `novel_foreshadowing` table is never referenced during chapter planning or generation, and the chapter plan's `foreshadowingSetup`/`foreshadowingPayoff` text fields are manually edited but never used by AI. The milestone goal is to unify these into a single structured foreshadowing lifecycle that drives both chapter planning (LLM decides which foreshadowing to plant/resolve) and chapter generation (LLM is constrained to execute those decisions).
 
-The chapter character planning system closes this loop by adding a "plan characters -> generate by plan -> extract and verify" cycle. The key insight is that the `novel_chapter_plan` table already has an unused `character_arcs` JSON column, the `ChapterGenerationTaskStrategy` already calls `buildCharacterPromptInfoList()` during planning, and the `PromptTemplateBuilder` already has `buildCharacterInfoText()`. The changes are primarily about threading planned character data through existing pipelines rather than building new infrastructure.
+The key architectural insight from the [AutoNovel project](https://github.com/NousResearch/autonovel/blob/master/gen_outline.py) is that foreshadowing management requires a persistent **ledger** that flows through the entire pipeline: outline planning sets up foreshadowing entries, chapter drafting plants/resolves them, and evaluation verifies balance. The existing `novel_foreshadowing` table is this ledger, but it lacks volume-level granularity (no `plantedVolume`/`plannedCallbackVolume` fields) and is not integrated into the AI prompt chain.
 
 ## Current State Analysis
 
@@ -16,229 +16,249 @@ The chapter character planning system closes this loop by adding a "plan charact
 
 | Component | Current Behavior | Gap |
 |-----------|------------------|-----|
-| `ChapterGenerationTaskStrategy` | Generates chapter plans with XML output containing n/t/p/e/g/w/s/f fields. No character planning fields. | No `<characters>` section in XML output or prompt. |
-| `ChapterPlanXmlDto` (two copies: `common.xml` and `dto`) | Parses XML into `ChapterPlanItem` with 8 fields. | No character-related fields in DTO. |
-| `NovelChapterPlan` entity | Has `plotOutline`, `keyEvents`, `chapterGoal`, etc. DB already has `character_arcs` JSON column. | `character_arcs` column unused in entity and service. No `planned_characters` field. |
-| `ChapterContentGenerateTaskStrategy` | Builds prompt via `PromptTemplateBuilder`, generates chapter, then calls `ChapterCharacterExtractService.extractCharacters()`. | Injects ALL non-NPC characters via `buildCharacterPromptInfoList()`. No filtering by plan. |
-| `PromptTemplateBuilder` | `buildCharacterPromptInfoList()` gets all non-NPC characters + last appearance state. `buildCharacterInfoText()` formats them for the prompt. | No awareness of planned characters. Cannot constrain to "only these characters should appear." |
-| `ChapterCharacterExtractService` | Post-generation: calls LLM to extract character info from chapter content, matches/creates characters, saves to `novel_character_chapter`. | No cross-reference against planned characters. No validation that planned characters actually appeared. |
-| `ChapterPlanDrawer.vue` | Shows chapter plan details in a drawer: chapter number, title, summary, key events, characters (comma-separated text input), foreshadowing. | "Characters" field is a free-text comma-separated string (`newCharacters`), not linked to `novel_character` table. |
-| `CreationCenter.vue` | Sets `chapter.newCharacters` as comma-separated string into the editor store. | No structured character display or planning UI. |
+| `Foreshadowing` entity | 12 fields: id, projectId, title, type, description, layoutType, plantedChapter, plannedCallbackChapter, actualCallbackChapter, status, priority, notes. | No volume fields. plantedChapter/plannedCallbackChapter use chapter numbers but no volume context. |
+| `ForeshadowingService` | CRUD + `markAsCompleted()` + `getForeshadowingStats()` + `getPendingForeshadowingFromMemories()` + `buildPendingForeshadowingText()`. | `getPendingForeshadowingFromMemories()` works against `ChapterPlotMemory` text arrays, NOT against `novel_foreshadowing` table. The two data sources are never reconciled. |
+| `ForeshadowingController` | 6 endpoints: list, detail, create, update, delete, markAsCompleted, stats. | No endpoint for querying foreshadowing by volume. No endpoint for batch-creating foreshadowing from AI plan output. |
+| `ChapterPlotMemory` | `foreshadowingPlanted`/`foreshadowingResolved`/`pendingForeshadowing` as JSON text arrays. Populated post-generation by AI memory extraction. | Free-text strings, not linked to `novel_foreshadowing` records. No IDs, no structure. Just narrative descriptions. |
+| `NovelChapterPlan` | `foreshadowingSetup` and `foreshadowingPayoff` text fields. Editable in ChapterPlanDrawer. | These fields are never injected into the chapter generation prompt. They are orphaned UI-only fields. |
+| `ChapterContext` | `pendingForeshadowing` as `List<String>`. Populated by `ForeshadowingService.getLatestPendingForeshadowing()` which reads from ChapterPlotMemory text arrays. | Injected into generation prompt as free-text reminders, but not linked to structured foreshadowing records. No "plant this foreshadowing" instruction. |
+| `PromptTemplateBuilder` | `getPlotStageDescription()` mentions "埋设伏笔" and "回收伏笔" in stage descriptions, but these are generic narrative guidance, not specific foreshadowing instructions. | No mechanism to inject specific foreshadowing records into prompts. No "plant these foreshadowing in this chapter" or "resolve these foreshadowing in this chapter" prompt section. |
+| `ChapterPlanDrawer.vue` | Has "伏笔管理" tab with two text areas: `foreshadowingSetup` and `foreshadowingPayoff`. Users can type free text. | No connection to `novel_foreshadowing` table. No structured display. No add/edit/delete of actual foreshadowing records. |
+| `ProjectSidebar.vue` | 5 nav items: overview, world-setting, settings, creation, characters. | No foreshadowing management menu. No project-level foreshadowing overview page. |
 
 ### Key Data Points
 
-- `novel_chapter_plan` table has `character_arcs` JSON column (already in DB schema, not used in Java entity).
-- `novel_chapter_plan` table does NOT have `planned_characters` -- this needs adding.
-- `ChapterPlanXmlDto` exists in two packages: `com.aifactory.common.xml` (used by `ChapterGenerationTaskStrategy`) and `com.aifactory.dto` (appears older/alternative). Only the `common.xml` version is actively used.
-- The prompt template code `llm_outline_chapter_generate` controls what the AI outputs for chapter planning.
-- The prompt template code `llm_chapter_generate_standard` controls how characters are injected during chapter generation.
-- Character extraction template `llm_chapter_character_extract` already handles post-generation extraction.
+- `novel_foreshadowing` table exists with chapter-number references but no volume references.
+- `novel_chapter_plan` has `foreshadowing_actions` JSON column in DB (in addition to `foreshadowing_setup`/`foreshadowing_payoff` text columns). The `foreshadowing_actions` column is not mapped in the Java entity.
+- The chapter generation prompt already receives `pendingForeshadowing` text via `ChapterContext`/`ChapterService.buildChapterContextText()`, but only as generic "consider resolving these" reminders.
+- The chapter plan generation template (`llm_outline_chapter_generate`) has no foreshadowing-related output instructions.
+- The `novel_volume_plan` table has `stage_foreshadowings` JSON column -- a volume-level foreshadowing config field that is not used by any service.
+- `ProjectBasicSettings` has `foreshadowingSettings` text field for configuring foreshadowing frequency/payoff cycle preferences.
 
 ## Table Stakes (Must Have)
 
-Features that are essential to close the "plan -> generate -> verify" character loop. Missing any of these means the system still operates open-loop.
+Features essential to make foreshadowing a first-class driver of the AI generation pipeline. Missing any means the system still has foreshadowing as a manual afterthought.
 
-| # | Feature | Why Expected | Complexity | Trigger (AI vs User) | Notes |
-|---|---------|--------------|------------|----------------------|-------|
-| T-01 | Planned characters field in chapter plan | The entire feature premise. Each chapter plan must record which characters are expected to appear and what roles they play. Without this, there is nothing to enforce. | LOW | AI (during planning) + User (manual override) | DB: add `planned_characters` JSON column to `novel_chapter_plan`. Entity: add field. DTO: add field. The existing `character_arcs` JSON column can store arc-level info per character. |
-| T-02 | AI generates character assignments during chapter planning | The AI already generates plot outlines per chapter. It should also decide which characters appear and what they do, based on the volume's character roster and story needs. | MEDIUM | AI | Modify `llm_outline_chapter_generate` prompt template to request `<characters>` section in XML output. Modify `ChapterGenerationTaskStrategy` to inject existing character list into planning prompt. |
-| T-03 | Parse character planning from XML output | The AI's chapter plan XML must be parsed to extract character assignments and persisted to `planned_characters` JSON. | MEDIUM | AI (parsing) | Extend `ChapterPlanXmlDto.Chapter` to include character list. Add parsing in `ChapterGenerationTaskStrategy.saveChaptersToDatabase()`. Must handle AI outputting character names (not IDs) and resolve them. |
-| T-04 | Inject planned characters into chapter generation prompt | When generating chapter content, the system should inject ONLY the planned characters (with their planned roles/arcs), not ALL non-NPC characters. This is the enforcement mechanism. | MEDIUM | AI | Modify `ChapterContentGenerateTaskStrategy` to read `planned_characters` from the chapter plan. Modify `PromptTemplateBuilder` to accept planned character constraints. Add a "character plan" section to the prompt telling the AI exactly which characters must appear and what they should do. |
-| T-05 | Frontend display of planned characters in chapter plan | Users need to see which characters are planned for each chapter. This is basic visibility. | LOW | User (viewing) | Modify `ChapterPlanDrawer.vue` to show planned character list (read from plan data). Can use simple card/list layout. No editing needed for v1 -- AI plans, user views. |
-| T-06 | Cross-reference extracted characters against plan | After chapter generation + extraction, compare extracted characters with planned characters. If a planned character was not extracted, flag it. | LOW | AI (automated) | Post-extraction validation step in `ChapterContentGenerateTaskStrategy`. Compare `extractCharacters()` output with `planned_characters`. Log warnings, do not block. |
+| # | Feature | Why Expected | Complexity | Notes |
+|---|---------|--------------|------------|-------|
+| T-01 | Volume fields on novel_foreshadowing | Cross-volume foreshadowing (plant in volume 1, resolve in volume 3) is fundamental to long-form novels. Without volume context, the chapter numbers are ambiguous when a novel spans multiple volumes. | LOW | Add `planted_volume` and `planned_callback_volume` integer columns. Migration is straightforward. Update entity, DTOs, query logic. |
+| T-02 | Remove foreshadowingSetup/foreshadowingPayoff from chapter plan | These text fields are orphaned -- never used by AI, duplicated purpose with the foreshadowing table. Keeping them creates two sources of truth. | LOW | Remove from `NovelChapterPlan` entity, `ChapterPlanUpdateRequest`, `ChapterPlanDrawer.vue` form. DB columns can stay (no DDL risk). The structured foreshadowing table replaces them. |
+| T-03 | AI chapter plan includes foreshadowing decisions | When generating chapter plans, the LLM must decide which foreshadowing to plant and which to resolve in each chapter. This is the core integration point. | MEDIUM | Extend `llm_outline_chapter_generate` template to output foreshadowing XML tags. Extend `ChapterGenerationTaskStrategy.parseSingleChapter()` to parse them. Inject existing foreshadowing context (pending foreshadowing from the table) into the planning prompt. Auto-create `novel_foreshadowing` records from AI output. |
+| T-04 | Chapter generation injects foreshadowing constraints | When generating chapter content, the LLM must be told specifically which foreshadowing to plant and which to resolve in this chapter, drawn from the foreshadowing table records linked to this chapter plan. | MEDIUM | Replace the current free-text `pendingForeshadowing` injection with structured "plant these" and "resolve these" sections. Query `novel_foreshadowing` where `plantedChapter == currentChapter` (plant) or `plannedCallbackChapter == currentChapter` (resolve). Modify `ChapterContext` or create a new `ForeshadowingContext` to carry structured data. |
+| T-05 | ChapterPlanDrawer foreshadowing management UI | Users need to see, edit, add, and delete foreshadowing records linked to a chapter plan. Replace the current text areas with structured cards. | MEDIUM | Replace the two textareas with: (1) "To Plant" section showing foreshadowing records where `plantedChapter == this chapter`, (2) "To Resolve" section showing records where `plannedCallbackChapter == this chapter`. Each card shows title, type, description. Add/delete buttons. Uses existing foreshadowing API. |
+| T-06 | Project-level foreshadowing management page | Users need a project-wide view of all foreshadowing, filterable by status, type, volume. This is the "foreshadowing ledger" view. | MEDIUM | New route (`/project/:id/foreshadowing`), new sidebar nav item, new page component. Table/card list view with filters. Reuses existing `ForeshadowingController` list/stats endpoints. |
 
 ## Differentiators (Competitive Advantage)
 
-Features that go beyond the basic loop and provide meaningful user control over character narrative.
+Features that go beyond basic CRUD and make the AI-driven foreshadowing lifecycle truly intelligent.
 
-| # | Feature | Value Proposition | Complexity | Trigger (AI vs User) | Notes |
-|---|---------|-------------------|------------|----------------------|-------|
-| D-01 | Manual character planning override | Users can manually edit the planned character list before generation. This gives authors creative control -- they can add/remove characters and adjust arcs without re-running AI planning. | MEDIUM | User | Requires character picker UI (multi-select from project's character list) + arc text input per character. Save back to `planned_characters` JSON. |
-| D-02 | Character arc tracking per chapter plan | Each planned character can have a "role in this chapter" description (e.g., "Li Yun discovers the spy's identity" or "Chen Feng trains new technique"). This gives the AI more specific guidance than just a name. | LOW | AI (auto-generate) + User (edit) | Use the existing `character_arcs` JSON column. Schema: `[{"characterId": 1, "characterName": "...", "role": "...", "arc": "..."}]`. |
-| D-03 | Character appearance density analysis | Show users how many chapters each character is planned for vs. actually appeared in. Helps identify overused or underused characters. | MEDIUM | User (viewing) | Aggregate query across `planned_characters` (planned) and `novel_character_chapter` (actual). Display as a simple table or chart in a future reporting view. |
-| D-04 | Re-planning triggered by character changes | When a user edits a character's fundamental info (name, role type), offer to re-plan affected chapters where that character was planned. | HIGH | User (trigger) | Complex dependency chain. Requires knowing which plans reference which characters, then re-running AI planning for those chapters. Defer to future. |
+| # | Feature | Value Proposition | Complexity | Notes |
+|---|---------|-------------------|------------|-------|
+| D-01 | Auto-enforce minimum plant-to-payoff distance | The [AutoNovel project](https://github.com/NousResearch/autonovel/blob/master/PIPELINE.md) enforces at least 3 chapters between plant and payoff. This prevents "instant gratification" foreshadowing that lacks narrative tension. | LOW | Validation in `ForeshadowingService.createForeshadowing()`: reject if `plannedCallbackChapter - plantedChapter < 3`. Configurable via `ProjectBasicSettings.foreshadowingSettings`. |
+| D-02 | Foreshadowing balance score | Show users a "foreshadowing health" metric: ratio of planted to resolved, average plant-to-payoff distance, overdue unresolved count. The [AutoNovel evaluator](https://github.com/NousResearch/autonovel/blob/master/evaluate.py) weights foreshadowing at 9/10. | LOW | Extend `ForeshadowingService.ForeshadowingStats` record with overdue count, average distance. Display in project-level foreshadowing page. |
+| D-03 | Volume-level foreshadowing summary in volume plan | When viewing a volume, show how many foreshadowing are planted/resolved within it, and which cross-volume foreshadowing pass through it. | MEDIUM | Aggregate query by `plantedVolume`/`plannedCallbackVolume`. Display in volume plan view. |
+| D-04 | AI suggests foreshadowing during volume planning | When generating volume plans, the LLM could suggest foreshadowing to plant across volumes. This pre-seeds the foreshadowing table before chapter-level planning. | HIGH | Requires modifying `VolumeOptimizeTaskStrategy` to output foreshadowing suggestions. The `novel_volume_plan.stage_foreshadowings` JSON column already exists for this purpose. Defer unless simple. |
+| D-05 | Post-generation foreshadowing verification | After chapter generation, verify that the AI actually planted/resolved the planned foreshadowing. Like the character comparison view (v1.0.5), show planned vs actual. | HIGH | Requires LLM to extract planted/resolved foreshadowing from generated text (like character extraction). Match against plan. Display comparison in ChapterPlanDrawer. |
 
 ## Anti-Features (Explicitly Do NOT Build)
 
-Features that seem natural but would overcomplicate the system or contradict the project's AI-first philosophy.
+Features that seem natural but would overcomplicate the system or contradict existing architecture.
 
 | Anti-Feature | Why It Seems Appealing | Why We Should NOT Build It | What To Do Instead |
 |-------------|----------------------|---------------------------|-------------------|
-| Hard enforcement (block generation if planned characters not in content) | "Ensure the AI follows the plan exactly" | AI-generated text is probabilistic. Hard enforcement would cause infinite regeneration loops. The plan is guidance, not a contract. | Soft enforcement: inject planned characters strongly in the prompt, log post-generation mismatches, let users decide whether to re-generate. |
-| Per-character screen time / word count quotas | "Ensure balanced character appearances" | This is a screenplay/analytics feature, not a novel planning feature. Tracking word count per character in generated text requires NLP parsing and is unreliable. | Let the AI naturally balance appearances based on the planned roles. Provide visibility (D-03) but not quotas. |
-| Character relationship graph per chapter | "Visualize character interactions per chapter" | Requires a graph rendering library and complex interaction data extraction. The ROI for writing (vs. TTRPG management) is low. | Simple list display. Relationship data already exists in `novel_faction_relation` and `novel_faction_character` for faction-based relationships. |
-| Automatic re-generation when planned vs. actual mismatch | "If a planned character doesn't appear, auto-re-generate" | Creates unpredictable generation loops and cost. A missing character might be intentionally omitted by the AI for narrative reasons. | Warn the user. Let them manually trigger re-generation if desired. |
-| Character scheduling across chapters (timeline view) | "Gantt chart of character appearances across chapters" | Over-engineered for current scope. Requires a full timeline/gantt component that doesn't exist in the frontend stack. | Simple table view of planned characters per chapter. Timeline visualization is a v2+ feature. |
-| Mandatory character planning before generation | "Users must plan characters before any chapter can be generated" | This would break the existing workflow for users who don't care about character planning. It also blocks users who want to let the AI decide. | Make character planning opt-in: if `planned_characters` is null/empty, fall back to current behavior (inject all non-NPC characters). |
+| Merge ChapterPlotMemory foreshadowing into novel_foreshadowing | "One source of truth" -- unify text arrays in memory with structured table. | ChapterPlotMemory is a post-hoc AI analysis of what happened. novel_foreshadowing is a pre-planned intent. They serve different purposes (after-the-fact vs before-the-fact). Merging would lose the distinction between "AI noticed it happened" and "user/AI planned it." | Keep both systems. ChapterPlotMemory continues as automated post-generation analysis. novel_foreshadowing is the planning ledger. In the future, cross-reference them for verification (D-05). |
+| Hard enforcement (block generation if foreshadowing not resolved) | "Ensure every planted foreshadowing gets resolved" | AI text is probabilistic. Hard enforcement would cause regeneration loops. Some foreshadowing is intentionally left as open threads (series hooks). | Soft guidance: inject foreshadowing constraints strongly in the prompt. Show overdue foreshadowing as warnings. Let users decide. |
+| Visual foreshadowing timeline / Gantt chart | "See foreshadowing threads spanning chapters visually" | Requires a timeline/gantt rendering library that does not exist in the frontend stack. High frontend cost for low writing-value ROI. | Table/list view with sort/filter by volume, status, chapter. Sufficient for managing foreshadowing during writing. |
+| Foreshadowing dependency graph (A requires B to be resolved first) | "Manage foreshadowing that depends on other foreshadowing" | Adds a graph data model to what is currently a flat table. Over-engineered for the current scope. Most novels have at most dozens of active foreshadowing, manageable without dependency tracking. | Use the `notes` field to document dependencies manually. Priority field handles ordering. |
+| Automatic foreshadowing creation from ChapterPlotMemory | "Every foreshadowing the AI memory extraction finds should become a novel_foreshadowing record" | This would create noise. The AI memory extraction is noisy and includes generic observations. Structured foreshadowing should be intentional, not auto-discovered. | Let AI planning (T-03) create foreshadowing intentionally. Users can manually add foreshadowing for things the AI missed. |
 
-## Feature Dependency Graph
+## Feature Dependencies
 
 ```
-[T-01: planned_characters field in DB/entity]
+[T-01: Volume fields on novel_foreshadowing]
     |
-    +---> [T-02: AI generates character assignments during planning]
-    |         +--requires--> [Existing character list query] (already exists in ChapterCharacterExtractService)
+    +---> [T-03: AI chapter plan includes foreshadowing decisions]
+    |         +--requires--> [Existing foreshadowing table] (already exists)
+    |         +--requires--> [T-01] (volume context for cross-volume foreshadowing)
     |         +--requires--> [Prompt template update: llm_outline_chapter_generate]
+    |         +--requires--> [XML parsing extension: ChapterGenerationTaskStrategy]
+    |         +--produces--> [novel_foreshadowing records from AI output]
     |
-    +---> [T-03: Parse character planning from XML]
-    |         +--requires--> [T-02] (XML output must contain characters)
-    |         +--requires--> [ChapterPlanXmlDto extension]
-    |         +--requires--> [Character name-to-ID resolution] (same pattern as faction name matching)
-    |
-    +---> [T-04: Inject planned characters into generation prompt]
-    |         +--requires--> [T-01] (data must exist in chapter plan)
+    +---> [T-04: Chapter generation injects foreshadowing constraints]
+    |         +--requires--> [T-01] (volume context)
+    |         +--requires--> [T-03] (foreshadowing records must exist in table)
+    |         +--requires--> [ChapterContext or new ForeshadowingContext]
     |         +--requires--> [PromptTemplateBuilder modification]
-    |         +--requires--> [Prompt template update: llm_chapter_generate_standard]
-    |         +--degrades-gracefully--> [Current behavior: inject all non-NPC characters]
+    |         +--degrades-gracefully--> [Current behavior: free-text pending reminders from ChapterPlotMemory]
     |
-    +---> [T-05: Frontend display]
-    |         +--requires--> [T-01] (data in API response)
-    |         +--requires--> [ChapterPlanDrawer.vue modification]
+    +---> [T-02: Remove foreshadowingSetup/foreshadowingPayoff]
+    |         +--requires--> [T-05] (replacement UI must exist first)
+    |         +--cleans-up--> [NovelChapterPlan entity, ChapterPlanDrawer.vue, ChapterPlanUpdateRequest]
     |
-    +---> [T-06: Cross-reference extraction vs plan]
-    |         +--requires--> [T-01] (plan data)
-    |         +--requires--> [Existing extraction pipeline] (ChapterCharacterExtractService)
-              +--runs-after--> [Chapter content generation + character extraction]
+    +---> [T-05: ChapterPlanDrawer foreshadowing management]
+    |         +--requires--> [T-01] (volume context in data)
+    |         +--requires--> [Existing foreshadowing API] (ForeshadowingController)
+    |         +--replaces--> [Current textareas for foreshadowingSetup/foreshadowingPayoff]
+    |
+    +---> [T-06: Project-level foreshadowing page]
+              +--requires--> [T-01] (volume-based filtering)
+              +--requires--> [Router + sidebar nav update]
 
-[D-01: Manual override]
-    +--requires--> [T-01]
-    +--requires--> [Character picker UI component]
+[D-01: Min plant-to-payoff distance]
+    +--requires--> [T-01] (needs chapter numbers)
+    +--standalone--> [Validation logic in ForeshadowingService]
 
-[D-02: Character arc per chapter]
-    +--requires--> [T-01]
-    +--uses--> [Existing character_arcs JSON column]
-
-[D-03: Appearance density analysis]
-    +--requires--> [T-01] (planned data)
-    +--requires--> [novel_character_chapter table] (actual data, already exists)
+[D-02: Foreshadowing balance score]
+    +--requires--> [T-01] (volume context for overdue calculation)
+    +--standalone--> [Extends ForeshadowingStats]
 ```
 
-### Critical Dependency Notes
+### Dependency Notes
 
-1. **T-01 is the foundation.** Everything depends on having `planned_characters` in the database and entity. This is a single ALTER TABLE + entity field addition. The existing `character_arcs` JSON column can store the arc/role details per character.
+1. **T-01 is the foundation.** Volume fields must exist before any cross-volume foreshadowing operations work. This is a simple migration: two integer columns, entity update, DTO update.
 
-2. **T-04 degrades gracefully.** If `planned_characters` is null or empty (existing plans, or plans where AI did not output characters), the system falls back to the current behavior of injecting all non-NPC characters. This means the feature is backward-compatible and can be rolled out incrementally.
+2. **T-03 and T-04 can be developed in sequence but not parallel.** T-03 (AI planning creates foreshadowing records) must complete before T-04 (generation uses those records) can be tested end-to-end. However, T-04's prompt changes can be developed against manually-created foreshadowing records.
 
-3. **Name resolution follows the established pattern.** The AI outputs character names (not IDs). The backend must resolve names to IDs using the same approach as faction/region/power system name matching -- exact match first, then fuzzy match. The `NovelCharacterService` already has `getNonNpcCharacters()` which returns all characters for matching.
+3. **T-02 must come AFTER T-05.** The old text fields must remain functional until the new structured UI replaces them. Removing them first would break the existing ChapterPlanDrawer.
 
-4. **Two ChapterPlanXmlDto classes exist.** `com.aifactory.common.xml.ChapterPlanXmlDto` (used by `ChapterGenerationTaskStrategy`) and `com.aifactory.dto.ChapterPlanXmlDto` (used elsewhere). Both need updating, or consolidate to one.
+4. **T-06 is independent of T-03/T-04.** The project-level foreshadowing page can be built with just the existing CRUD API + volume fields. It does not need the AI integration to be useful.
 
-5. **The planning prompt needs character context.** Currently `ChapterGenerationTaskStrategy.buildChapterPromptUsingTemplate()` sets `variables.put("characterInfo", "No characters")`. This must change to inject the project's character roster so the AI can assign characters to chapters.
+5. **The ChapterPlotMemory system remains untouched.** It continues to provide post-generation foreshadowing analysis independently. The new system adds pre-planning intent. In the future (D-05), the two can be cross-referenced.
 
-## MVP Recommendation
+## MVP Definition
 
-### Phase 1: Data Foundation (T-01 + T-03 partial)
-The bare minimum to make the data flow work end-to-end.
+### Launch With (v1.0.6)
 
-1. Add `planned_characters` JSON column to `novel_chapter_plan` table.
-2. Add `plannedCharacters` field to `NovelChapterPlan` entity.
-3. Extend `ChapterPlanXmlDto.Chapter` with character list fields.
-4. Update `ChapterPlanDto` to include planned characters.
+The minimum to make foreshadowing a structured, AI-driven part of the pipeline.
 
-**Rationale:** Cannot do anything without the data layer. This is a 2-3 hour task with minimal risk.
+- [ ] T-01: Volume fields on novel_foreshadowing -- data foundation, no AI or UI changes
+- [ ] T-03: AI chapter plan outputs foreshadowing planting/resolution -- core AI integration
+- [ ] T-04: Chapter generation injects structured foreshadowing constraints -- enforcement mechanism
+- [ ] T-05: ChapterPlanDrawer foreshadowing management UI -- user visibility and control at chapter level
+- [ ] T-06: Project-level foreshadowing page -- project-wide ledger view with sidebar nav
 
-### Phase 2: AI Planning Output (T-02 + T-03)
-Make the AI produce character assignments during chapter planning.
+### Add After Validation (v1.0.7)
 
-1. Update `llm_outline_chapter_generate` prompt template to request character planning.
-2. Inject character roster into `ChapterGenerationTaskStrategy`'s planning prompt.
-3. Parse character XML and persist to `planned_characters` JSON.
-4. Handle name-to-ID resolution with the existing character list.
+- [ ] T-02: Remove foreshadowingSetup/foreshadowingPayoff fields -- cleanup after new UI is validated
+- [ ] D-01: Minimum plant-to-payoff distance enforcement -- simple validation, low risk
+- [ ] D-02: Foreshadowing balance score -- extends existing stats endpoint
 
-**Rationale:** This is the core AI integration. The planning prompt must be carefully designed to output character data in a parseable XML format without breaking existing chapter plan output.
+### Future Consideration (v1.1+)
 
-### Phase 3: Generation Enforcement (T-04)
-Make chapter generation respect planned characters.
+- [ ] D-03: Volume-level foreshadowing summary -- aggregate view per volume
+- [ ] D-04: AI suggests foreshadowing during volume planning -- pre-seeds table before chapter planning
+- [ ] D-05: Post-generation foreshadowing verification -- planned vs actual comparison view
+- [ ] Cross-reference ChapterPlotMemory with novel_foreshadowing for automated verification
 
-1. Modify `ChapterContentGenerateTaskStrategy` to read `planned_characters` from the plan.
-2. Modify `PromptTemplateBuilder.buildCharacterInfoText()` to accept planned character constraints.
-3. Update `llm_chapter_generate_standard` template to include character plan section.
-4. Add fallback logic: if no planned characters, use current behavior.
+## Feature Prioritization Matrix
 
-**Rationale:** This is the enforcement mechanism. The prompt must strongly instruct the AI to include ONLY the planned characters (with their specified roles/arcs) and not introduce unplanned characters.
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| T-01: Volume fields | HIGH | LOW (migration + entity) | P1 |
+| T-03: AI plan outputs foreshadowing | HIGH | MEDIUM (prompt + parsing + persistence) | P1 |
+| T-04: Generation injects foreshadowing | HIGH | MEDIUM (prompt + context modification) | P1 |
+| T-05: ChapterPlanDrawer foreshadowing UI | HIGH | MEDIUM (new component section) | P1 |
+| T-06: Project foreshadowing page | MEDIUM | MEDIUM (new route + page + sidebar) | P1 |
+| T-02: Remove old text fields | LOW (cleanup) | LOW | P2 |
+| D-01: Min distance validation | MEDIUM | LOW | P2 |
+| D-02: Balance score | MEDIUM | LOW | P2 |
+| D-03: Volume summary | LOW | MEDIUM | P3 |
+| D-04: Volume planning suggestions | MEDIUM | HIGH | P3 |
+| D-05: Post-gen verification | HIGH | HIGH | P3 |
 
-### Phase 4: Frontend + Verification (T-05 + T-06)
-Close the loop with visibility and verification.
+## Competitor Feature Analysis
 
-1. Update `ChapterPlanDrawer.vue` to display planned characters.
-2. Update API responses to include planned character data.
-3. Add post-extraction comparison in `ChapterContentGenerateTaskStrategy`.
-4. Log warnings when planned characters are missing from extraction results.
+| Feature | Scrivener | Plottr | AutoNovel | AI Factory (Our Approach) |
+|---------|-----------|--------|-----------|---------------------------|
+| Foreshadowing tracking | Manual (keywords, status labels, notes) | Visual timeline + subplot layers | Automated ledger with plant/payoff chapters | Structured table + AI-driven planning + user editing |
+| AI-assisted planting | None | None | Full auto (generates ledger during outline) | Semi-auto (AI suggests during chapter planning, user approves/edits) |
+| Plant-to-payoff distance | Manual awareness | Visual gap on timeline | Enforced (minimum 3 chapters) | Planned: configurable minimum distance (D-01) |
+| Cross-volume foreshadowing | Manual (folder organization) | Series-level tracking | N/A (single novel) | Volume fields on foreshadowing records (T-01) |
+| Balance scoring | None | None | Automated evaluation (weight 9/10) | Stats + overdue detection (D-02) |
+| Verification (planned vs actual) | None | None | Evaluation script checks every plant has payoff | Future: cross-reference with ChapterPlotMemory (D-05) |
 
-**Rationale:** Frontend is straightforward once the data flows. Verification is a logging concern, not a blocking check.
+**Competitive advantage:** AI Factory is the only tool that combines AI-driven foreshadowing planning (auto-creating ledger entries during chapter planning), structured persistence, user override, and AI-constrained generation in a single pipeline. Scrivener/Plottr are purely manual. AutoNovel is fully automated with no user intervention.
 
-### Phase 5: Manual Override (D-01 + D-02)
-Give users control after the automated system works.
+## AI Integration Architecture for Foreshadowing
 
-1. Add character picker UI to chapter plan drawer.
-2. Allow editing planned character roles/arcs.
-3. Save manual changes back to `planned_characters` JSON.
+### Chapter Planning Phase (T-03)
 
-**Rationale:** Manual override only makes sense after users can see what the AI planned. Building it first would mean editing empty data.
-
-## Feature Complexity Estimates
-
-| Feature | Backend LOC | Frontend LOC | DB Changes | AI Prompt Changes | Total Effort |
-|---------|------------|-------------|------------|-------------------|-------------|
-| T-01: DB field + entity | ~20 | 0 | 1 ALTER TABLE | 0 | 0.5 day |
-| T-02: AI planning output | ~50 | 0 | 0 | 1 template (moderate) | 1 day |
-| T-03: XML parsing + persistence | ~80 | 0 | 0 | 0 | 1 day |
-| T-04: Generation enforcement | ~60 | 0 | 0 | 1 template (moderate) | 1 day |
-| T-05: Frontend display | ~10 | ~80 | 0 | 0 | 0.5 day |
-| T-06: Cross-reference check | ~30 | 0 | 0 | 0 | 0.5 day |
-| D-01: Manual override | ~30 | ~120 | 0 | 0 | 1 day |
-| D-02: Character arc editing | ~20 | ~60 | 0 | 0 | 0.5 day |
-| **Total MVP (T-01 through T-06)** | **~250** | **~80** | **1 migration** | **2 templates** | **~4.5 days** |
-| **Total with D-01 + D-02** | **~300** | **~260** | **0** | **0** | **~6 days** |
-
-## Planned Characters Data Schema
-
-The `planned_characters` JSON column should store structured data that serves both AI planning and frontend display:
-
-```json
-[
-  {
-    "characterId": 42,
-    "characterName": "Li Yun",
-    "roleInChapter": "protagonist",
-    "plannedArc": "Discovers the spy within the sect and confronts them",
-    "plannedBehavior": "Investigates suspicious activities, confronts Elder Chen",
-    "plannedEmotion": "Suspicion -> Anger -> Determination"
-  },
-  {
-    "characterId": 15,
-    "characterName": "Chen Feng",
-    "roleInChapter": "supporting",
-    "plannedArc": "Trains new technique and demonstrates growth",
-    "plannedBehavior": "Spars with senior disciple, reveals improved swordsmanship",
-    "plannedEmotion": "Frustration -> Breakthrough -> Pride"
-  }
-]
+The LLM chapter plan output currently uses this XML schema:
+```xml
+<c>
+  <o>
+    <n>1</n>  <!-- chapterNumber -->
+    <t>Title</t>  <!-- chapterTitle -->
+    <p>Plot outline</p>
+    <e>Key events</e>
+    <g>Chapter goal</g>
+    <w>3000</w>  <!-- wordCountTarget -->
+    <s>Starting scene</s>
+    <f>Ending scene</f>
+    <ch>  <!-- plannedCharacters (added v1.0.5) -->
+      <cn>Name</cn>
+      <cd>Description</cd>
+      <ci>importance</ci>
+    </ch>
+  </o>
+</c>
 ```
 
-The `characterId` may be null for characters the AI names but that do not yet exist in the database (new characters introduced in this chapter). The `characterName` always serves as the display/lookup key.
+For foreshadowing, new XML tags should be added:
+```xml
+    <fs>  <!-- foreshadowing to plant -->
+      <fst>Title</fst>
+      <fsd>Description of foreshadowing</fsd>
+      <fsy>character</fsy>  <!-- type: character/item/event/secret -->
+      <fsv>2</fsv>  <!-- plannedCallbackVolume -->
+    </fs>
+    <fr>  <!-- foreshadowing to resolve -->
+      <frt>Existing foreshadowing title</frt>
+      <frd>How it resolves</frd>
+    </fr>
+```
 
-## AI Operation vs User Operation Classification
+The planning prompt must inject the current list of unresolved foreshadowing (from `novel_foreshadowing` table, not from ChapterPlotMemory) so the AI can decide which to resolve.
 
-| Operation | Actor | Automated? | Notes |
-|-----------|-------|-----------|-------|
-| Generate character assignments during chapter planning | AI | Yes | Part of existing `ChapterGenerationTaskStrategy`. Runs automatically when user clicks "generate chapter plans." |
-| Parse and persist character planning data | System | Yes | Post-AI-response parsing. Transparent to user. |
-| Inject planned characters into generation prompt | System | Yes | Transparent to user. System reads plan, builds prompt section. |
-| Post-generation extraction (existing) | AI | Yes | `ChapterCharacterExtractService.extractCharacters()`. Already runs after chapter generation. |
-| Cross-reference plan vs extraction | System | Yes | Automated comparison. Logs warnings. User sees nothing unless they check logs. |
-| View planned characters in chapter plan | User | No | User opens ChapterPlanDrawer to see what was planned. |
-| Override planned characters (D-01) | User | No | User manually adds/removes characters from the plan before generation. |
-| Edit character arc in plan (D-02) | User | No | User adjusts the planned arc description for a character. |
-| Trigger re-generation | User | No | User decides whether to re-generate a chapter based on mismatch warnings. |
+### Chapter Generation Phase (T-04)
+
+The current prompt injection via `ChapterContext.pendingForeshadowing` provides generic text like "consider resolving these." This must change to structured instructions:
+
+```
+### Foreshadowing Instructions for This Chapter
+
+**Plant (埋设) these foreshadowing:**
+1. [Title]: [Description] (Type: [type], Plan to resolve in Volume [N])
+
+**Resolve (回收) these foreshadowing:**
+1. [Title]: [Description] (Planted in Chapter [N], Volume [V])
+
+**IMPORTANT:** You MUST plant the items listed above and MUST resolve the items listed above. Integrate them naturally into the narrative.
+```
+
+This is analogous to how `hasPlannedCharacters()` injects character constraints -- the same pattern applies here: check if there are foreshadowing records for this chapter, and if so, build a structured instruction section.
+
+## Data Schema for Foreshadowing Table (Post-Migration)
+
+```sql
+ALTER TABLE novel_foreshadowing
+  ADD COLUMN planted_volume INT NULL COMMENT '埋设伏笔的卷号' AFTER planted_chapter,
+  ADD COLUMN planned_callback_volume INT NULL COMMENT '计划填坑的卷号' AFTER planned_callback_chapter;
+```
+
+The `planted_volume` and `planned_callback_volume` fields enable:
+- Cross-volume foreshadowing queries
+- Volume-scoped foreshadowing views
+- Overdue detection: foreshadowing where `plannedCallbackVolume < currentVolume` and status != completed
 
 ## Sources
 
-- **Codebase analysis:** `NovelChapterPlan.java`, `ChapterPlanXmlDto.java` (both copies), `ChapterGenerationTaskStrategy.java`, `ChapterContentGenerateTaskStrategy.java`, `PromptTemplateBuilder.java`, `ChapterCharacterExtractService.java`, `NovelCharacterChapterService.java`, `ChapterPlanDrawer.vue`, `CreationCenter.vue`, `sql/init.sql`
-- **DB schema:** `novel_chapter_plan` table definition (already has `character_arcs` JSON column)
-- **PROJECT.md:** Milestone v1.0.5 scope and out-of-scope items
-- **Existing patterns:** Faction name-to-ID resolution, geography tree parsing, DOM XML parsing, prompt template system
+- **Codebase analysis:** `Foreshadowing.java`, `ForeshadowingService.java`, `ForeshadowingController.java`, `ChapterPlotMemory.java`, `ChapterContext.java`, `NovelChapterPlan.java`, `ChapterContentGenerateTaskStrategy.java`, `ChapterGenerationTaskStrategy.java`, `PromptTemplateBuilder.java`, `ChapterPlanDrawer.vue`, `ProjectSidebar.vue`, `sql/init.sql`
+- **Competitor research:** [Scrivener forum - subplot tracking](https://forum.literatureandlatte.com/t/how-do-you-keep-track-of-sub-plots-in-a-book/140479), [Plottr visual story planning](https://www.draft2digital.com/blog/visual-story-planning-with-plottr-ep122/)
+- **Academic reference:** [AutoNovel pipeline (NousResearch)](https://github.com/NousResearch/autonovel/blob/master/PIPELINE.md) -- foreshadowing ledger pattern with plant-to-payoff distance enforcement and automated balance evaluation
+- **AutoNovel code:** [gen_outline.py](https://github.com/NousResearch/autonovel/blob/master/gen_outline.py), [evaluate.py](https://github.com/NousResearch/autonovel/blob/master/evaluate.py), [draft_chapter.py](https://github.com/NousResearch/autonovel/blob/master/draft_chapter.py)
+- **Existing patterns in AI Factory:** Character planning integration (v1.0.5), faction name resolution, DOM XML parsing, prompt template system
 
 ---
-*Feature research for: chapter character planning system in AI novel generation*
-*Researched: 2026-04-07*
+*Feature research for: foreshadowing management system in AI novel generation*
+*Researched: 2026-04-10*

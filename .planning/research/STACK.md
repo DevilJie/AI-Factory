@@ -1,14 +1,14 @@
-# Stack Research - Chapter Character Planning (v1.0.5)
+# Stack Research - Foreshadowing Management (v1.0.6)
 
-**Domain:** Chapter character planning system for AI novel generation
-**Researched:** 2026-04-07
+**Domain:** Foreshadowing (伏笔) management activation for AI novel generation
+**Researched:** 2026-04-10
 **Confidence:** HIGH (entirely based on codebase analysis, zero new external dependencies)
 
 ## Executive Summary
 
-This milestone requires **zero new dependencies**. All changes are extensions of existing patterns: adding a JSON column to `novel_chapter_plan`, mapping an existing unmapped JSON column, updating two AI prompt templates, extending regex-based XML parsing, and adding a display section to an existing drawer component. The entire implementation fits within the validated Spring Boot 3.2 + MyBatis-Plus + Vue 3 stack.
+This milestone requires **zero new dependencies**. All changes are extensions of existing patterns already validated in v1.0.2--v1.0.5. The `novel_foreshadowing` table, entity, service, controller, and DTOs already exist with full CRUD. The work involves: adding two volume-number columns to the existing entity, extending the chapter plan XML parsing to extract foreshadowing data, injecting foreshadowing constraints into chapter generation prompts (mirroring the character planning injection pattern from v1.0.5), and building a frontend foreshadowing management panel (mirroring the existing `ChapterPlanDrawer` character tab pattern).
 
-The key insight is that the database already has a `character_arcs` JSON column on `novel_chapter_plan` that the Java entity does not map. We need one new column (`planned_characters`) for pre-generation character planning, and we map the existing `character_arcs` for post-generation arc tracking. The AI template system (`PromptTemplateService`) and XML parsing (`OutlineTaskStrategy.parseChaptersXml`) are already proven patterns that simply need field additions.
+The key insight is that the system already has two parallel foreshadowing tracking mechanisms: (1) the structured `novel_foreshadowing` table with ID-based tracking, and (2) the text-based `ChapterPlotMemory` foreshadowing fields (`foreshadowingPlanted`, `foreshadowingResolved`, `pendingForeshadowing`). This milestone activates the structured table as the primary driver for chapter planning and generation, while the memory-based system continues to serve its existing purpose for runtime recall. The `foreshadowingSetup` and `foreshadowingPayoff` JSON fields on `novel_chapter_plan` will be removed as part of consolidating onto the structured table.
 
 ## Recommended Stack (No Changes to Core Stack)
 
@@ -23,423 +23,194 @@ The key insight is that the database already has a `character_arcs` JSON column 
 | Tailwind CSS | 4.1.x | Styling | Unchanged |
 | LangChain4j | 1.11.0 | AI orchestration | Unchanged |
 | Jackson ObjectMapper | (Spring Boot managed) | JSON serialization | Unchanged |
+| DOM XML parsing (javax.xml) | (JDK bundled) | XML parsing of AI output | Unchanged |
+| Lucide Vue Next | 0.469.x | Icon library | Unchanged |
 
 ### No New Dependencies Required
 
 | Need | Existing Solution | Location |
 |------|-------------------|----------|
-| JSON field storage | MySQL `JSON` column type + `String` field in entity | `novel_chapter_plan.character_arcs` (DB has it, entity does not map it) |
-| JSON serialization | `com.fasterxml.jackson.databind.ObjectMapper` (already injected) | `PromptTemplateBuilder` line 50, `OutlineTaskStrategy` line 30 |
-| XML parsing (AI output) | Regex-based `extractXmlFieldCData()` pattern | `OutlineTaskStrategy` lines 1273-1289 |
-| AI template system | `PromptTemplateService.executeTemplate()` | Used everywhere for all 3 existing templates |
-| Frontend drawer/panel | `ChapterPlanDrawer.vue` pattern | Existing component at line 1 |
-| Frontend types | `ChapterPlan` interface in `types/project.ts` | Existing type at line 140 |
+| Foreshadowing entity/table | `Foreshadowing.java` with `novel_foreshadowing` table | Already exists with full CRUD |
+| Volume number tracking | Add `plantedVolume`, `plannedCallbackVolume` Integer fields to existing entity | Simple field addition |
+| JSON field storage | MySQL columns + `String` fields in entity (existing pattern) | `NovelChapterPlan` JSON fields |
+| Foreshadowing CRUD API | `ForeshadowingController` with 7 REST endpoints | Already exists |
+| Foreshadowing service | `ForeshadowingService` with list/create/update/delete/stats | Already exists, needs extension |
+| Chapter plan XML parsing | DOM-based `parseChaptersXml` in `ChapterGenerationTaskStrategy` | Extend to extract foreshadowing tags |
+| AI prompt template system | `PromptTemplateService.executeTemplate()` | Extend chapter plan template |
+| Chapter generation constraint injection | `ChapterGenerationTaskStrategy` | Extend like character injection in v1.0.5 |
+| Frontend drawer component | `ChapterPlanDrawer.vue` with tab sections | Extend "伏笔管理" tab |
+| Frontend API client | Axios + typed request pattern (`chapter.ts`, `faction.ts`) | Add `foreshadowing.ts` |
+| Frontend sidebar navigation | `ProjectSidebar.vue` with `navItems` array | Add menu entry |
+| Frontend routing | Vue Router lazy-loaded routes in `router/index.ts` | Add foreshadowing route |
+| Frontend type definitions | TypeScript interfaces in `types/project.ts` | Add/update foreshadowing types |
 
 ---
 
 ## Database Changes
 
-### Change 1: Add `planned_characters` Column (NEW)
+### Change 1: Add Volume Number Fields to `novel_foreshadowing` (NEW columns)
 
-The table already has `character_arcs JSON DEFAULT NULL` (line 381 of `sql/init.sql`) and `foreshadowing_actions JSON DEFAULT NULL` (line 382), but no `planned_characters` column. Add it.
+The existing `Foreshadowing` entity has `plantedChapter` and `plannedCallbackChapter` (Integer) for chapter-level tracking, but no volume-level fields. Cross-volume foreshadowing (a foreshadowing planted in volume 1 and resolved in volume 3) needs volume numbers for proper scoping and UI display.
 
 ```sql
--- V5__chapter_plan_planned_characters.sql
+-- V7__foreshadowing_add_volume_fields.sql
+
+ALTER TABLE novel_foreshadowing
+  ADD COLUMN planted_volume INT DEFAULT NULL
+    COMMENT '埋设伏笔的分卷编号' AFTER planted_chapter,
+  ADD COLUMN planned_callback_volume INT DEFAULT NULL
+    COMMENT '计划回收伏笔的分卷编号' AFTER planned_callback_chapter;
+```
+
+**Why separate volume fields rather than computing from chapter numbers:** Volume-to-chapter ranges are not fixed (volumes can be reorganized). Storing explicit volume numbers gives the UI direct grouping capability without joining to volume tables or recomputing ranges. This matches the existing pattern where `NovelChapterPlan` stores both `volumePlanId` (volume reference) and `chapterNumber` (position).
+
+### Change 2: Remove `foreshadowingSetup` and `foreshadowingPayoff` from `novel_chapter_plan` (MIGRATION)
+
+These two JSON columns on `novel_chapter_plan` are redundant once foreshadowing is tracked in the dedicated `novel_foreshadowing` table with proper chapter references. They were placeholders before the structured table existed.
+
+```sql
+-- Part of V7 migration or separate V8
 
 ALTER TABLE novel_chapter_plan
-  ADD COLUMN planned_characters JSON DEFAULT NULL
-  COMMENT '规划登场角色（JSON数组，由AI章节规划阶段生成）'
-  AFTER foreshadowing_payoff;
+  DROP COLUMN foreshadowing_setup,
+  DROP COLUMN foreshadowing_payoff;
 ```
 
-**Why a new column instead of reusing `character_arcs`:** `character_arcs` stores post-generation arc data (what actually happened to characters after the chapter is written). `planned_characters` stores pre-generation planning (which characters should appear and what they should do). Separating them enables comparing plan vs. actual and avoids semantic confusion. This follows the existing pattern where `foreshadowing_setup` (planned) and `foreshadowing_payoff` (actual) are separate fields.
+**Caveat:** The frontend `ChapterPlanDrawer.vue` currently reads/writes these fields (lines 31-32, 249-250, 309-310). The "伏笔管理" tab currently displays two textareas bound to these fields. This entire section will be rebuilt to use the structured foreshadowing API instead. The removal is safe because the data in these fields was never systematically used for AI generation -- it was only displayed in the drawer.
 
-### Change 2: Map Existing `character_arcs` Column (No Migration)
-
-The `character_arcs` column already exists in the database (`character_arcs json DEFAULT NULL COMMENT '人物弧光变化'`). It is simply not mapped in `NovelChapterPlan.java`. No SQL change needed -- only a Java entity field addition.
+**Decision:** Remove the columns rather than deprecate them. There is no migration path for the data because the existing text-based `foreshadowingSetup`/`foreshadowingPayoff` content is freeform text, not structured references that could map to `novel_foreshadowing` rows.
 
 ---
 
-## JSON Field Structures
+## Backend Changes (All Extensions of Existing Code)
 
-### `planned_characters` - New Column
+### Entity Changes
 
-```json
-[
-  {
-    "characterName": "林动",
-    "roleType": "protagonist",
-    "plannedRole": "本章核心视角人物",
-    "plannedScene": "在天剑宗外门考核中展示新突破的武技",
-    "plannedEmotion": "紧张、兴奋、决心",
-    "plannedDevelopment": "从怯懦到自信的转变",
-    "importance": "primary"
-  },
-  {
-    "characterName": "萧炎",
-    "roleType": "supporting",
-    "plannedRole": "协助与冲突对象",
-    "plannedScene": "作为对手在考核中出现",
-    "plannedEmotion": "不屑、惊讶",
-    "plannedDevelopment": "对主角实力重新评估",
-    "importance": "secondary"
-  }
-]
-```
+| File | Change | Pattern Followed |
+|------|--------|-----------------|
+| `Foreshadowing.java` | Add `plantedVolume` (Integer), `plannedCallbackVolume` (Integer) | Same as adding `plannedCharacters` to `NovelChapterPlan` in v1.0.5 |
+| `NovelChapterPlan.java` | Remove `foreshadowingSetup`, `foreshadowingPayoff` fields | Field removal, DB columns dropped |
+| `ForeshadowingCreateDto.java` | Add `plantedVolume`, `plannedCallbackVolume` | Existing DTO pattern |
+| `ForeshadowingUpdateDto.java` | Add `plantedVolume`, `plannedCallbackVolume` | Existing DTO pattern |
+| `ForeshadowingDto.java` | Add `plantedVolume`, `plannedCallbackVolume` | Existing DTO pattern |
+| `ChapterPlanUpdateRequest.java` | Remove `foreshadowingSetup`, `foreshadowingPayoff` | Field removal |
 
-**Field rationale:**
+### Service Changes
 
-| Field | Type | Why |
-|-------|------|-----|
-| `characterName` | string | AI generates by name; IDs resolved at save time via `NovelCharacterService` name lookup (same proven pattern as faction parsing in `WorldviewXmlParser`) |
-| `roleType` | enum string | Matches existing `protagonist/supporting/antagonist/npc` enum used in `NovelCharacter.roleType` |
-| `plannedRole` | free text | The character's narrative function in this specific chapter (not their global role) |
-| `plannedScene` | free text | What the character does -- feed this into chapter generation prompt |
-| `plannedEmotion` | free text (optional) | Emotional arc guidance for the writer AI |
-| `plannedDevelopment` | free text (optional) | Growth direction for this chapter |
-| `importance` | enum: `primary`/`secondary`/`minor` | Controls prompt emphasis; `primary` characters get detailed instructions, `minor` characters may be omitted from generation |
+| File | Change | Pattern Followed |
+|------|--------|-----------------|
+| `ForeshadowingService.java` | Add `getForeshadowingsForChapter(Long projectId, Integer chapterNumber)` -- returns foreshadowings to plant + foreshadowings to resolve for a given chapter | Mirrors `getPendingForeshadowingFromMemories` but queries structured table |
+| `ForeshadowingService.java` | Add `batchCreateFromPlan(Long projectId, List<ParsedForeshadowing> items)` -- bulk create after AI chapter plan parsing | Mirrors `FactionService.saveTree` batch pattern |
+| `ForeshadowingService.java` | Add `buildForeshadowingConstraintText(Long projectId, Integer chapterNumber)` -- builds prompt injection text | Mirrors `buildPendingForeshadowingText` + v1.0.5 character constraint injection |
+| `ChapterGenerationTaskStrategy.java` | Extend `parseChaptersXml` to extract `<fs>` (foreshadowing setup) and `<fp>` (foreshadowing payoff) tags from chapter plan XML | Same DOM parsing pattern already used for `<ch>`, `<cn>`, `<cd>`, `<ci>` character tags |
+| `ChapterGenerationTaskStrategy.java` | After parsing, create `novel_foreshadowing` rows for each parsed foreshadowing item | Mirrors v1.0.5 where `plannedCharacters` JSON is persisted after parsing |
+| `ChapterGenerationTaskStrategy.java` | Inject foreshadowing constraints into chapter generation prompt (call `buildForeshadowingConstraintText`) | Mirrors v1.0.5 character constraint injection (`hasPlannedCharacters` + `buildPlannedCharacterInfoText`) |
 
-### `character_arcs` - Existing Column (Now Mapped)
+### Controller Changes
 
-```json
-[
-  {
-    "characterName": "林动",
-    "arcType": "growth",
-    "startState": "紧张不安",
-    "endState": "自信坚定",
-    "keyMoment": "考核中突破自我极限"
-  }
-]
-```
+| File | Change | Pattern Followed |
+|------|--------|-----------------|
+| `ForeshadowingController.java` | Add `GET /api/novel/{projectId}/foreshadowings/by-chapter?chapterNumber=N` -- returns foreshadowings relevant to a specific chapter | Standard REST endpoint pattern |
+| `ForeshadowingController.java` | Add `POST /api/novel/{projectId}/foreshadowings/batch` -- batch create from plan | Mirrors existing `createForeshadowing` but for bulk |
+| `ChapterPlanController` (or relevant) | Remove `foreshadowingSetup`/`foreshadowingPayoff` from update endpoint | Field removal |
 
-This field is for post-generation tracking (what actually happened), populated by the chapter generation or character extraction process. Mapping it now enables future features but is not the primary deliverable of this milestone.
+### AI Template Changes
+
+| Template | Change | Pattern Followed |
+|----------|--------|-----------------|
+| Chapter plan template (`llm_chapter_plan_standard` or equivalent) | Add XML output instructions for foreshadowing: `<fs>` for setup items, `<fp>` for payoff items per chapter | Mirrors `<ch>/<cn>/<cd>/<ci>` instructions added in v1.0.5 Phase 12 |
+| Chapter plan template | Add existing foreshadowing context injection: list of unresolved foreshadowings from `novel_foreshadowing` table | Mirrors `characterInfo` injection in v1.0.5 |
+| Chapter generation template (`llm_chapter_create_standard`) | Add foreshadowing constraint block: which foreshadowings to plant, which to resolve in this chapter | Mirrors planned character constraint injection in v1.0.5 Phase 13 |
 
 ---
 
-## Entity Changes
+## Frontend Changes (All Extensions of Existing Patterns)
 
-### NovelChapterPlan.java - Add Two Fields
+### New Files
 
-Add two fields to the existing entity class:
+| File | Purpose | Pattern Followed |
+|------|---------|-----------------|
+| `src/api/foreshadowing.ts` | API client for foreshadowing CRUD | Mirrors `src/api/faction.ts`, `src/api/character.ts` |
+| `src/views/Project/Detail/ForeshadowingManager.vue` | Project-level foreshadowing overview page | Mirrors `Characters.vue` as a list/manager page |
+| `src/views/Project/Detail/components/ForeshadowingDrawer.vue` | Foreshadowing detail editor drawer | Mirrors `CharacterDrawer.vue`, `FactionDrawer.vue` |
 
-```java
-/**
- * 规划登场角色（JSON格式）
- * 由AI章节规划阶段生成，包含角色名、戏份、情绪等规划信息
- * 格式: [{"characterName":"...", "roleType":"...", "plannedRole":"...", ...}]
- */
-private String plannedCharacters;
+### Modified Files
 
-/**
- * 人物弧光变化（JSON格式）
- * 已有数据库列（character_arcs），本次补充Java实体映射
- * 格式: [{"characterName":"...", "arcType":"...", "startState":"...", ...}]
- */
-private String characterArcs;
-```
+| File | Change | Pattern Followed |
+|------|--------|-----------------|
+| `src/components/layout/ProjectSidebar.vue` | Add nav entry: `{ name: '伏笔管理', icon: BookOpen, path: 'foreshadowing' }` | Add to `navItems` array, import icon from `lucide-vue-next` |
+| `src/router/index.ts` | Add child route: `{ path: 'foreshadowing', name: 'ProjectForeshadowing', component: () => import('...ForeshadowingManager.vue') }` | Mirrors `characters` route |
+| `src/types/project.ts` | Remove `foreshadowingSetup`, `foreshadowingPayoff` from `ChapterPlan`/`ChapterPlanUpdate`; add `ForeshadowingItem` interface | Standard type definitions |
+| `src/views/Project/Detail/creation/ChapterPlanDrawer.vue` | Rebuild "伏笔管理" tab: replace textareas with structured foreshadowing list (items from API, with add/edit/delete actions, status badges) | Mirrors the "角色规划" tab's `editableCharacters` pattern |
 
-**Why `String` not a typed JSON field:** Consistent with every other JSON column in the codebase. Evidence:
-- `keyEvents` is `String` (line 62)
-- `foreshadowingSetup` is `String` (line 98)
-- `foreshadowingPayoff` is `String` (line 103)
-- `NovelCharacterChapter.cultivationLevel` is `String` (line 107)
+### Frontend Foreshadowing API Module
 
-MyBatis-Plus handles JSON columns as `String` by default. Jackson `ObjectMapper` is used at the service layer for typed access.
-
----
-
-## AI Template Changes
-
-### Template 1: `llm_outline_chapter_generate` - Add Character Planning Output
-
-**Current output tags:** `<n>` (chapterNumber), `<v>` (volumeNumber), `<t>` (title), `<p>` (plotOutline), `<e>` (keyEvents), `<g>` (goal), `<w>` (wordCount), `<s>` (startingScene), `<f>` (endingScene).
-
-**New output tag:** `<r>` (roles/characters) -- follows single-letter convention, does not collide with existing tags.
-
-Extended XML output format per chapter:
-
-```xml
-<o>
-  <n>1</n>
-  <v>1</v>
-  <t><![CDATA[章节标题]]></t>
-  <p><![CDATA[情节大纲]]></p>
-  <e><![CDATA[关键事件]]></e>
-  <g><![CDATA[本章目标]]></g>
-  <w>3000</w>
-  <s><![CDATA[起点场景]]></s>
-  <f><![CDATA[终点场景]]></f>
-  <r><![CDATA[
-    [
-      {"characterName":"角色名","roleType":"protagonist","plannedRole":"本章角色定位","plannedScene":"计划戏份","plannedEmotion":"情绪走向","importance":"primary"},
-      {"characterName":"角色名2","roleType":"supporting","plannedRole":"协助角色","plannedScene":"计划戏份","importance":"secondary"}
-    ]
-  ]]></r>
-</o>
-```
-
-**Template variable injection:** The template already receives `characterInfo` variable with the project's existing characters (line 940 of `OutlineTaskStrategy`). No new template variables needed -- the LLM uses the existing character list to plan their chapter appearances.
-
-**Template change scope:** Only the output instruction section of the template needs updating. The input variables and structure remain identical.
-
-### Template 2: `llm_chapter_generate_standard` - Inject Planned Characters
-
-**Current variables:** `role`, `targetWordCount`, `maxWordCount`, `minWordCount`, `volumeNumber`, `chapterNumber`, `chapterTitle`, `chapterOutline`, `startingScene`, `endingScene`, `lastChapterEndingScene`, `volumeTitle`, `volumeTheme`, `volumeInfo`, `plotStage`, `plotStageDescription`, `worldview`, `recentChapters`, `knowledgeContext`, narrative settings, `characterInfo`.
-
-**New template variable:**
-
-| Variable Name | Source | Format | Purpose |
-|---------------|--------|--------|---------|
-| `plannedCharacters` | `NovelChapterPlan.plannedCharacters` parsed and formatted | Structured instruction text block | Direct the AI to include specific characters with specific roles |
-
-**Example injection text that `buildPlannedCharactersText()` would produce:**
-
-```
-【本章角色规划 - 必须严格遵循】
-以下角色必须在本章登场，按规划执行戏份：
-
-1. **林动**（主角）- importance: primary
-   - 角色定位：本章核心视角人物
-   - 计划戏份：在天剑宗外门考核中展示新突破的武技
-   - 情绪走向：紧张、兴奋、决心
-   - 成长方向：从怯懦到自信的转变
-
-2. **萧炎**（配角）- importance: secondary
-   - 角色定位：协助与冲突对象
-   - 计划戏份：作为对手在考核中出现
-   - 情绪走向：不屑、惊讶
-
-3. 其他已有角色：如剧情自然需要可以登场，但不作为重点
-```
-
-**Why a separate variable instead of merging into `characterInfo`:** The planned characters are directives (what the AI MUST do), while `characterInfo` is reference data (who exists and their last state). Mixing them would dilute the directive strength. The template can position `plannedCharacters` as a hard constraint section separate from the reference `characterInfo`.
-
----
-
-## Backend Service Changes
-
-### OutlineTaskStrategy.java - Extend XML Parsing
-
-**Method: `parseChaptersXml()`** (line ~1182)
-
-Add extraction of the `<r>` tag alongside existing fields:
-
-```java
-// After existing field extractions (line ~1210):
-extractXmlFieldCData(chapterContent, "r", chapterData);
-
-// In field mapping section (line ~1233):
-if (chapterData.containsKey("r")) {
-    chapterData.put("plannedCharacters", chapterData.get("r"));
-}
-```
-
-**Method: `saveVolumeChaptersToDatabase()`** (line ~585) and **`saveChaptersToDatabase()`** (line ~2085)
-
-Add `plannedCharacters` field when creating/updating `NovelChapterPlan`:
-
-```java
-// When creating new chapter plan:
-chapterPlan.setPlannedCharacters(chapterData.getOrDefault("plannedCharacters", null));
-
-// When updating existing chapter plan:
-existingChapter.setPlannedCharacters(chapterData.getOrDefault("plannedCharacters", null));
-```
-
-### PromptTemplateBuilder.java - Inject Planned Characters into Chapter Generation
-
-**Method: `buildTemplateVariables()`** (line ~149)
-
-After building `characterInfo` (line ~204-207), add planned characters:
-
-```java
-// Inject planned characters from chapter plan (if available)
-String plannedCharacters = chapterPlan.getPlannedCharacters();
-if (plannedCharacters != null && !plannedCharacters.isEmpty()) {
-    variables.put("plannedCharacters", buildPlannedCharactersText(plannedCharacters));
-} else {
-    variables.put("plannedCharacters", "");
-}
-```
-
-**New private method `buildPlannedCharactersText(String json)`:**
-
-Parse the JSON array using the already-injected `ObjectMapper`, iterate over items, format as structured instruction text. This follows the exact same pattern as `buildCharacterInfoText()` (lines 651-718).
-
-### ChapterPromptBuilder.java - Also Inject (Legacy Path)
-
-The non-template `ChapterPromptBuilder` is used as a fallback. In `buildChapterPlanInfo()` (line ~175), add a planned characters section after the existing chapter plan fields, similar to how `buildChapterPlanInfo` currently appends plotOutline, startingScene, endingScene.
-
----
-
-## Frontend Changes
-
-### Types - Extend ChapterPlan Interface
-
-**File:** `ai-factory-frontend/src/types/project.ts` (line ~140)
+The `src/api/foreshadowing.ts` module will follow the existing API client pattern:
 
 ```typescript
-export interface ChapterPlan {
-  id: string
-  volumeId?: string
-  projectId: string
-  chapterNumber: number
+// Pattern from src/api/faction.ts, src/api/character.ts
+import request from '@/utils/request'
+
+export interface ForeshadowingItem {
+  id: number
+  projectId: number
   title: string
-  summary?: string
-  keyEvents?: string
-  characters?: string[]
-  foreshadowing?: string
-  plannedCharacters?: PlannedCharacter[]  // NEW
-  characterArcs?: CharacterArc[]          // NEW (optional, for future use)
+  type: 'character' | 'item' | 'event' | 'secret'
+  description: string
+  layoutType: 'bright1' | 'bright2' | 'bright3' | 'dark'
+  plantedChapter: number | null
+  plantedVolume: number | null
+  plannedCallbackChapter: number | null
+  plannedCallbackVolume: number | null
+  actualCallbackChapter: number | null
+  status: 'pending' | 'in_progress' | 'completed'
+  priority: number
+  notes: string
 }
 
-// NEW interfaces
-export interface PlannedCharacter {
-  characterName: string
-  roleType: string
-  plannedRole: string
-  plannedScene: string
-  plannedEmotion?: string
-  plannedDevelopment?: string
-  importance: 'primary' | 'secondary' | 'minor'
-}
-
-export interface CharacterArc {
-  characterName: string
-  arcType: string
-  startState: string
-  endState: string
-  keyMoment: string
-}
+export const getForeshadowingList = (projectId: string, params?: {...}) => ...
+export const createForeshadowing = (projectId: string, data: {...}) => ...
+export const updateForeshadowing = (projectId: string, id: number, data: {...}) => ...
+export const deleteForeshadowing = (projectId: string, id: number) => ...
+export const getForeshadowingsByChapter = (projectId: string, chapterNumber: number) => ...
 ```
 
-### ChapterPlanDrawer.vue - Display Character Planning
-
-**Approach:** Add a read-only section in the drawer showing planned characters when available.
-
-The component currently shows: chapterNumber, title, summary, keyEvents, characters (comma-separated input), foreshadowing.
-
-Add a section (between keyEvents and characters) that renders when `currentChapterPlan.plannedCharacters?.length > 0`:
-
-```
---- 角色规划 (AI规划) ---
-+-------------------------------------------+
-| 林动 (主角) - 主要                         |
-| 角色定位: 本章核心视角人物                  |
-| 计划戏份: 在考核中展示新武技                |
-| 情绪走向: 紧张、兴奋、决心                  |
-+-------------------------------------------+
-| 萧炎 (配角) - 次要                         |
-| 角色定位: 协助与冲突对象                    |
-| 计划戏份: 作为对手出现                      |
-+-------------------------------------------+
-```
-
-**Design details:**
-- Read-only display (not editable -- the AI generates this, user can regenerate the chapter plan to change it)
-- Use Tailwind CSS card style consistent with existing dark/light mode patterns
-- `importance` shown as colored badge: primary=blue, secondary=gray, minor=transparent
-- Use `v-if` + `v-for` -- no new component needed (data is small, 3-8 characters per chapter)
-- The existing `characters` text input remains for manual override
-
-### API Layer - Extend ChapterPlanDto
-
-**File:** `ai-factory-frontend/src/api/outline.ts` (line ~41)
-
-```typescript
-export interface ChapterPlanDto {
-  id: string
-  chapterNumber: number
-  title: string
-  summary?: string
-  targetWordCount?: number
-  plotPoints?: string
-  generated?: boolean
-  plannedCharacters?: PlannedCharacter[]  // NEW
-  characterArcs?: CharacterArc[]          // NEW
-}
-```
+No new HTTP client, no new state management library -- just `axios` via the existing `request` utility.
 
 ---
 
 ## Alternatives Considered
 
-| Decision Point | Chosen | Alternative | Why Not |
-|----------------|--------|-------------|---------|
-| Storage for planned characters | JSON column on `novel_chapter_plan` | Separate `novel_chapter_plan_character` table | JSON is simpler; data is always read/written together; matches existing pattern (`keyEvents`, `foreshadowingSetup` all stored as JSON/TEXT on the same row). A join table would require JOIN queries and cascade delete for a small list (3-8 items). |
-| Character reference in JSON | By name | By ID | AI does not know database IDs. Name-matching is the proven pattern used for faction parsing (`WorldviewXmlParser.saveTree -> buildNameToIdMap`) and character extraction (`ChapterCharacterExtractService.isSameCharacter`). |
-| Template output format | JSON inside CDATA `<r>` tag | Nested XML `<character><name>...</name></character>` tags | JSON inside CDATA is simpler to parse. The regex-based `extractXmlFieldCData` already handles CDATA extraction. Nested XML would require recursive DOM parsing for minimal benefit. Consistent with how `keyEvents` (E tag) is already sometimes JSON. |
-| Frontend display | Inline read-only block in ChapterPlanDrawer | New dedicated component / modal | Data is small (3-8 characters per chapter). Inline keeps UX simple. Extract to component only if complexity grows. |
-| `character_arcs` column | Map existing unmapped DB column | Create new column | Column exists in database schema (`sql/init.sql` line 381). Not mapping it is wasted schema. Mapping it is zero-cost (one String field). |
-| Tag letter for characters | `<r>` (roles) | `<ch>`, `<a>` (actors) | `<r>` follows the single-letter convention. Does not collide with any existing tag. `<a>` is already used for "age" in character parsing. |
+| Category | Recommended | Alternative | Why Not |
+|----------|-------------|-------------|---------|
+| Foreshadowing-chapter link | Direct `plantedChapter`/`plannedCallbackChapter` Integer fields on `novel_foreshadowing` | Junction table `novel_foreshadowing_chapter` | Overkill for a 1:N relationship (one foreshadowing is planted in one chapter, resolved in one chapter). Junction tables are for M:N. Current entity already has the integer chapter fields. |
+| Volume tracking | Add `plantedVolume`/`plannedCallbackVolume` fields | Compute from chapter range via JOIN | Volume chapter ranges are not fixed. Explicit fields give direct grouping. Simpler queries. |
+| Frontend state | Local component state (like `ChapterPlanDrawer` pattern) | Pinia store for foreshadowing | The foreshadowing data is scoped to individual views (drawer, manager page). No cross-component sharing needed. A Pinia store would add complexity with no benefit, matching the existing pattern where `Characters.vue` and `ChapterPlanDrawer.vue` both use local state. |
+| AI foreshadowing output | XML tags in chapter plan output (`<fs>`, `<fp>`) | JSON output block | The entire chapter plan parsing pipeline uses DOM XML parsing (established in v1.0.5 Phase 12 specifically because Jackson XML cannot handle nested same-name tags). Introducing JSON for foreshadowing would create an inconsistent parsing path. XML is the proven pattern. |
+| Foreshadowing memory integration | Leave `ChapterPlotMemory` text fields as-is, use `novel_foreshadowing` for structured planning only | Migrate memory fields to reference foreshadowing IDs | The memory system serves a different purpose (runtime AI recall during generation). Coupling it to the structured table would break the existing generation pipeline. Keep them independent -- memory for AI recall, structured table for user management and planning. |
 
 ---
 
-## What NOT to Do
+## Installation
 
-| Avoid | Why | Do Instead |
-|-------|-----|------------|
-| Add a new dependency (JSON library, XML library, UI component library) | Everything needed already exists in the stack | Use existing `ObjectMapper`, `extractXmlFieldCData()`, Tailwind CSS |
-| Use `@TableField(typeHandler = JacksonTypeHandler.class)` for JSON columns | Not used anywhere in the existing codebase for JSON fields; all JSON fields are `String` with manual `ObjectMapper` usage | Keep `String` fields, parse with `ObjectMapper` at service layer |
-| Create a new REST endpoint for planned characters | The data is part of `NovelChapterPlan` and should travel with the existing chapter plan response | Return `plannedCharacters` field in existing chapter plan API response |
-| Make planned characters editable in the frontend drawer | The data is AI-generated guidance; editing individual character plans manually would be fragile and confusing | Display as read-only. User regenerates the chapter plan to get new character planning. |
-| Store planned characters in `novel_character_chapter` table | That table tracks post-generation actual data (what happened), not pre-generation planning (what should happen). Mixing them breaks the plan-vs-actual distinction. | Use `plannedCharacters` JSON on `novel_chapter_plan` for planning; `novel_character_chapter` remains for actuals |
+No installation needed. Zero new packages for either backend or frontend.
 
----
+```bash
+# Backend: No new Maven dependencies
+# Frontend: No new npm packages
 
-## Files to Modify (Complete List)
-
-### Backend Java (4 files modified)
-
-| File | Change | LOC Estimate |
-|------|--------|-------------|
-| `entity/NovelChapterPlan.java` | Add `plannedCharacters` and `characterArcs` String fields | +15 |
-| `service/task/impl/OutlineTaskStrategy.java` | Parse `<r>` tag in `parseChaptersXml()`, save `plannedCharacters` in both save methods | +25 |
-| `service/chapter/prompt/PromptTemplateBuilder.java` | Add `plannedCharacters` variable in `buildTemplateVariables()`, new `buildPlannedCharactersText()` method | +50 |
-| `service/chapter/prompt/ChapterPromptBuilder.java` | Add planned characters section in `buildChapterPlanInfo()` | +20 |
-
-### Database (1 new file)
-
-| File | Change |
-|------|--------|
-| `sql/V5__chapter_plan_planned_characters.sql` (NEW) | `ALTER TABLE` to add `planned_characters` JSON column |
-
-### AI Templates (2 templates updated)
-
-| Template Code | Change |
-|---------------|--------|
-| `llm_outline_chapter_generate` | Add `<r>` output tag instruction and character planning guidance to the prompt text |
-| `llm_chapter_generate_standard` | Add `${plannedCharacters}` variable injection point in the template body |
-
-### Frontend (3 files modified)
-
-| File | Change | LOC Estimate |
-|------|--------|-------------|
-| `types/project.ts` | Add `PlannedCharacter`, `CharacterArc` interfaces, extend `ChapterPlan` | +25 |
-| `api/outline.ts` | Extend `ChapterPlanDto` with new fields | +5 |
-| `views/.../ChapterPlanDrawer.vue` | Add planned characters display section | +40 |
-
-**Total estimated LOC change:** ~180 lines across 8 files (excluding template text changes)
+# Database migration only:
+# Apply V7__foreshadowing_add_volume_fields.sql
+```
 
 ---
 
 ## Sources
 
-- **Codebase analysis (HIGH confidence):**
-  - `entity/NovelChapterPlan.java` -- Current entity fields, missing `plannedCharacters` and `characterArcs` mappings
-  - `sql/init.sql` line 361-386 -- `novel_chapter_plan` table definition with existing `character_arcs` and `foreshadowing_actions` JSON columns
-  - `service/task/impl/OutlineTaskStrategy.java` -- XML parsing pattern (`parseChaptersXml`, `extractXmlFieldCData`), DB save methods
-  - `service/chapter/prompt/PromptTemplateBuilder.java` -- Template variable building, character info formatting
-  - `service/chapter/prompt/ChapterPromptBuilder.java` -- Legacy prompt builder (fallback path)
-  - `service/task/impl/ChapterContentGenerateTaskStrategy.java` -- Chapter generation flow
-  - `service/ChapterCharacterExtractService.java` -- Post-generation character extraction (confirms plan-vs-actual separation)
-  - `dto/CharacterPromptInfo.java` -- Existing character prompt DTO
-  - `entity/NovelCharacterChapter.java` -- Post-generation character tracking fields
-  - `views/.../ChapterPlanDrawer.vue` -- Current frontend drawer
-  - `types/project.ts` -- Frontend type definitions
-  - `api/outline.ts` -- Frontend API layer
-
----
-*Stack research for: Chapter Character Planning (v1.0.5)*
-*Researched: 2026-04-07*
+- Codebase analysis of `Foreshadowing.java`, `ForeshadowingService.java`, `ForeshadowingController.java` (all existing with full CRUD)
+- Codebase analysis of `ChapterGenerationTaskStrategy.java` (DOM XML parsing pattern for chapter plans, character injection pattern)
+- Codebase analysis of `ChapterPlanDrawer.vue` (existing foreshadowing section with textareas, character comparison pattern from v1.0.5)
+- Codebase analysis of `ProjectSidebar.vue` (nav items pattern, icon imports)
+- Codebase analysis of `router/index.ts` (route registration pattern)
+- Previous milestone research: `.planning/research/STACK.md` (v1.0.5 character planning, confirmed zero-dependency pattern)
+- Project context: `.planning/PROJECT.md` (validated decisions from v1.0.2--v1.0.5)
