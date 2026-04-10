@@ -189,10 +189,14 @@ public class ChapterService {
         Map<Long, NovelVolumePlan> volumeMap = volumes.stream()
                 .collect(Collectors.toMap(NovelVolumePlan::getId, v -> v));
 
-        // 4. 查询所有实际章节
+        // 4. 查询所有实际章节，按 chapterPlanId 建立索引（避免 chapterNumber 重复导致错配）
         LambdaQueryWrapper<Chapter> chapterQuery = new LambdaQueryWrapper<>();
         chapterQuery.eq(Chapter::getProjectId, projectId);
         var chapters = chapterMapper.selectList(chapterQuery);
+
+        Map<Long, Chapter> chapterByPlanId = chapters.stream()
+                .filter(ch -> ch.getChapterPlanId() != null)
+                .collect(Collectors.toMap(Chapter::getChapterPlanId, ch -> ch, (a, b) -> a));
 
         // 5. 转换为DTO并填充分卷信息和实际章节信息
         return plans.stream()
@@ -225,20 +229,14 @@ public class ChapterService {
                         dto.setVolumeNumber(volume.getVolumeNumber());
                     }
 
-                    // 检查是否已生成实际章节内容
-                    boolean hasContent = chapters.stream()
-                            .anyMatch(ch -> ch.getChapterNumber().equals(plan.getChapterNumber()));
-                    dto.setHasContent(hasContent);
-
-                    if (hasContent) {
-                        var chapter = chapters.stream()
-                                .filter(ch -> ch.getChapterNumber().equals(plan.getChapterNumber()))
-                                .findFirst()
-                                .orElse(null);
-                        if (chapter != null) {
-                            dto.setChapterId(chapter.getId());
-                            dto.setWordCount(chapter.getWordCount());
-                        }
+                    // 通过 chapterPlanId 精确匹配已生成的章节（而非 chapterNumber）
+                    Chapter chapter = chapterByPlanId.get(plan.getId());
+                    if (chapter != null && chapter.getContent() != null && !chapter.getContent().isEmpty()) {
+                        dto.setHasContent(true);
+                        dto.setChapterId(chapter.getId());
+                        dto.setWordCount(chapter.getWordCount());
+                    } else {
+                        dto.setHasContent(false);
                     }
 
                     return dto;
