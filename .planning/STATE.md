@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.2
 milestone_name: milestone
-status: executing
-stopped_at: Completed 14-01-PLAN.md
-last_updated: "2026-04-09T17:28:28.201Z"
+status: verifying
+stopped_at: Completed 14-02-PLAN.md
+last_updated: "2026-04-09T18:13:18.359Z"
 last_activity: 2026-04-09
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 10
   percent: 25
 ---
 
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 ## Current Position
 
-Phase: 14 (前端展示-闭环验证) — EXECUTING
-Plan: 2 of 2
-Status: Ready to execute
+Phase: 14
+Plan: Not started
+Status: Phase complete — ready for verification
 Last activity: 2026-04-09
 
 Progress: [=====     ] 25%
@@ -53,6 +53,7 @@ Progress: [=====     ] 25%
 | Phase 12 P02 | 9min | 1 tasks | 3 files |
 | Phase 13 P01 | 2min | 2 tasks | 2 files |
 | Phase 14 P01 | 4min | 2 tasks | 3 files |
+| Phase 14 P02 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ All decisions logged in PROJECT.md Key Decisions table (18 items, all Good).
 - [Phase 13]: 13-01: Test uses @Spy ObjectMapper for real JSON parsing instead of mocking deserialization
 - [Phase 14]: 14-01: roleType in ChapterCharacterVO mapped from NovelCharacterChapter.importanceLevel (per-chapter role)
 - [Phase 14]: 14-01: Direct NovelCharacterMapper injection in controller follows existing direct-mapper pattern
+- [Phase 14]: 14-02: ID-first + exact name fallback matching for planned vs actual character comparison
+- [Phase 14]: 14-02: Comparison region above editable list, collapsible via summary bar click
+- [Phase 14]: 14-02: ExternalLink icon only shown when characterId is truthy on planned character
 
 ### Pending Todos
 
@@ -110,6 +114,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-09T17:28:28.193Z
-Stopped at: Completed 14-01-PLAN.md
+Last session: 2026-04-09T17:34:55.606Z
+Stopped at: Completed 14-02-PLAN.md
 Resume file: None

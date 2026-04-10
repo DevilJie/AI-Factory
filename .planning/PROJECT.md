@@ -43,12 +43,13 @@ AI Factory 世界观模块已完成势力阵营结构化重构和世界观生成
 - ✓ 前端独立生成按钮（地理环境、力量体系、阵营势力各一个） — v1.0.3 Phase 09
 - ✓ 章节规划 XML 解析增强（DOM 解析 + <ch> 角色标签提取 + NameMatchUtil 匹配） — v1.0.5 Phase 12
 - ✓ 章节规划模板增加角色规划输出（<ch>/<cn>/<cd>/<ci> XML 标签指令 + characterInfo 注入） — v1.0.5 Phase 12
+- ✓ 章节生成提示词注入规划角色信息（hasPlannedCharacters + buildPlannedCharacterInfoText + fallback） — v1.0.5 Phase 13
+- ✓ 章节实际登场角色后端端点 + 前端 API（ChapterCharacterVO + getChapterCharacters） — v1.0.5 Phase 14
+- ✓ 前端角色对比视图 + 角色详情链接（ChapterPlanDrawer 对比区 + CharacterDrawer） — v1.0.5 Phase 14
 
 ### Active
 
-- [ ] 扩展 novel_chapter_plan 表（planned_characters + character_arcs 字段映射）
-- [ ] 章节生成提示词注入规划角色信息（严格按规划执行）
-- [ ] 前端章节规划展示角色安排
+(No active requirements — all shipped in v1.0.5)
 
 ## Current Milestone: v1.0.5 章节角色规划体系
 
@@ -114,4 +115,4 @@ Post-milestone quick fixes: cascade faction re-generation (geography/power syste
 This document evolves at phase transitions and milestone boundaries.
 
 ---
-*Last updated: 2026-04-08 after v1.0.2~v1.0.4 archived, v1.0.5 in progress*
+*Last updated: 2026-04-10 after Phase 14 (前端展示-闭环验证) completed — milestone v1.0.5 finished*

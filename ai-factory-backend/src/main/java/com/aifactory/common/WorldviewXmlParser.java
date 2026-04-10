@@ -234,7 +234,8 @@ public class WorldviewXmlParser {
                 "      <step>真形凝实</step>\n" +
                 "      <step>真形合一</step>\n" +
                 "    </ll>\n" +
-                "    <ln>法身境</ln>\n" +
+                "    <ll>\n" +
+                "      <ln>法身境</ln>\n" +
                 "      <dd><![CDATA[将血脉真形与肉身彻底融合，铸就古神法身，肉身强度堪比法宝，断肢重生，并开始接触灵魂层面的力量。]]></dd>\n" +
                 "      <bc><![CDATA[以混沌之气为火，血脉为材，将真形烙印进每一寸血肉灵魂，完成法身铸造。]]></bc>\n" +
                 "      <lsp>约2000年</lsp>\n" +
@@ -763,17 +764,18 @@ public class WorldviewXmlParser {
             if (closeCount == openCount) continue; // already balanced
 
             if (closeCount > openCount) {
-                // Remove excess closing tags from the end
-                int excess = closeCount - openCount;
-                int searchFrom = xml.length();
-                while (excess > 0 && searchFrom > 0) {
-                    int idx = xml.lastIndexOf(closeTag, searchFrom - 1);
-                    if (idx < 0) break;
-                    xml = xml.substring(0, idx) + xml.substring(idx + closeTag.length());
-                    searchFrom = idx;
-                    excess--;
+                // Remove stray closing tags using a stack-based approach.
+                // Walk through the XML tracking opens vs closes; any close without
+                // a matching open (depth=0) is a stray and should be removed.
+                // This correctly identifies the stray tag regardless of its position,
+                // unlike naive indexOf/lastIndexOf which removes the wrong tag.
+                List<int[]> strayPositions = findStrayClosingPositions(xml, openTag, closeTag);
+                // Remove strays from end to start to preserve earlier positions
+                for (int j = strayPositions.size() - 1; j >= 0; j--) {
+                    int pos = strayPositions.get(j)[0];
+                    xml = xml.substring(0, pos) + xml.substring(pos + closeTag.length());
                 }
-                log.debug("XML sanitizer: removed {} excess </{}> tags", closeCount - openCount - excess, tag);
+                log.debug("XML sanitizer: removed {} stray </{}> tags", strayPositions.size(), tag);
             } else {
                 // Add missing closing tags at the end
                 int missing = openCount - closeCount;
@@ -864,6 +866,51 @@ public class WorldviewXmlParser {
             idx += sub.length();
         }
         return count;
+    }
+
+    /**
+     * Find positions of stray closing tags (closing tags with no matching opening tag)
+     * using a stack-based approach. Walks through the XML tracking open/close depth;
+     * any close tag encountered when depth is 0 is a stray.
+     *
+     * @param xml      the XML string to scan
+     * @param openTag  the opening tag to match (e.g., "&lt;ll&gt;")
+     * @param closeTag the closing tag to match (e.g., "&lt;/ll&gt;")
+     * @return list of [position, type] pairs where type=1 means stray close; positions are in ascending order
+     */
+    private List<int[]> findStrayClosingPositions(String xml, String openTag, String closeTag) {
+        List<int[]> positions = new ArrayList<>();
+
+        // Collect all open and close tag positions in order
+        List<int[]> allTags = new ArrayList<>(); // [position, type] where type=0 for open, type=1 for close
+        int i = 0;
+        while (i < xml.length()) {
+            if (xml.startsWith(openTag, i)) {
+                allTags.add(new int[]{i, 0});
+                i += openTag.length();
+            } else if (xml.startsWith(closeTag, i)) {
+                allTags.add(new int[]{i, 1});
+                i += closeTag.length();
+            } else {
+                i++;
+            }
+        }
+
+        // Use a stack to find stray closes: any close tag when stack is empty is stray
+        int depth = 0;
+        for (int[] tagInfo : allTags) {
+            if (tagInfo[1] == 0) { // open tag
+                depth++;
+            } else { // close tag
+                if (depth > 0) {
+                    depth--; // matched with an open
+                } else {
+                    positions.add(tagInfo); // stray close with no matching open
+                }
+            }
+        }
+
+        return positions;
     }
 
     // ======================== Utility ========================

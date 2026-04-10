@@ -104,7 +104,7 @@ Plans:
 
 Plans:
 - [x] 14-01-PLAN.md — Wave 1: 后端章节角色端点 + 前端 API 层 (FE-02)
-- [ ] 14-02-PLAN.md — Wave 2: 对比视图 + 角色链接 + CharacterDrawer 集成 + 人工验证 (FE-01, FE-02)
+- [x] 14-02-PLAN.md — Wave 2: 对比视图 + 角色链接 + CharacterDrawer 集成 + 人工验证 (FE-01, FE-02)
 
 </details>
 
@@ -125,4 +125,4 @@ Plans:
 | 11. 数据基础 + 实体映射 | v1.0.5 | 2/2 | Complete    | 2026-04-07 |
 | 12. AI 规划输出 + XML 解析 | v1.0.5 | 2/2 | Complete    | 2026-04-08 |
 | 13. 章节生成约束注入 | v1.0.5 | 1/1 | Complete    | 2026-04-09 |
-| 14. 前端展示 + 闭环验证 | v1.0.5 | 1/2 | In Progress|  |
+| 14. 前端展示 + 闭环验证 | v1.0.5 | 2/2 | Complete    | 2026-04-09 |

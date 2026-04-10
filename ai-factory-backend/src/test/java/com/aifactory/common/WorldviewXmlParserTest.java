@@ -470,6 +470,36 @@ class WorldviewXmlParserTest {
         assertEquals("初醒期、稳固期、显化期", sys1.getLevels().get(0).getSteps().get(0).getLevelName());
     }
 
+    @Test
+    void testParsePowerSystemXml_strayClosingTag_missingLlOpen() {
+        // LLM sometimes forgets <ll> opening but keeps </ll> closing — stray close tag
+        // The sanitizer should remove the stray </ll> (first excess), not a valid one (last)
+        String xml = "<p><ss><name>修仙</name><sf>灵气</sf><cr>灵石</cr><cm>冥想</cm>" +
+            "<d><![CDATA[描述]]></d>" +
+            "<ll><ln>练气期</ln><dd><![CDATA[描述]]></dd><step>初期</step></ll>" +
+            "<ll><ln>筑基期</ln><dd><![CDATA[描述]]></dd><step>初期</step></ll>" +
+            "<ll><ln>金丹期</ln><dd><![CDATA[描述]]></dd><step>初期</step></ll>" +
+            // 4th block: missing <ll> opening but has </ll> closing — stray close tag
+            "<ln>元婴境</ln><dd><![CDATA[描述]]></dd><step>初期</step></ll>" +
+            "<ll><ln>化神境</ln><dd><![CDATA[描述]]></dd><step>初期</step></ll>" +
+            "</ss></p>";
+
+        WorldviewXmlParser.ParsedPowerSystems result = worldviewXmlParser.parsePowerSystemXml(xml, 1L);
+
+        // Should parse without SAXParseException — sanitizer removes the stray </ll>
+        assertEquals(1, result.systems().size());
+        NovelPowerSystem system = result.systems().get(0);
+        assertEquals("修仙", system.getName());
+
+        // Should have 4 properly parsed levels (the stray block's content becomes ss-level text, not a level)
+        // Levels: 练气期, 筑基期, 金丹期, 化神境 (元婴境 has no <ll> wrapper so not parsed as level)
+        assertEquals(4, system.getLevels().size());
+        assertEquals("练气期", system.getLevels().get(0).getLevelName());
+        assertEquals("筑基期", system.getLevels().get(1).getLevelName());
+        assertEquals("金丹期", system.getLevels().get(2).getLevelName());
+        assertEquals("化神境", system.getLevels().get(3).getLevelName());
+    }
+
     // ======================== buildNameToIdMap ========================
 
     @Test

@@ -22,7 +22,7 @@ Requirements for milestone v1.0.5 章节角色规划体系. Each maps to roadmap
 
 ### 前端展示 (FE)
 
-- [ ] **FE-01**: 用户在章节规划 Drawer 中能看到规划角色列表及其戏份梗概
+- [x] **FE-01**: 用户在章节规划 Drawer 中能看到规划角色列表及其戏份梗概
 - [x] **FE-02**: 用户章节生成后能看到规划角色 vs 实际登场角色的对比，标记偏差
 
 ## Future Requirements
@@ -70,7 +70,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CG-01 | Phase 13 | Complete |
 | CG-02 | Phase 13 | Complete |
 | CG-03 | Phase 13 | Pending |
-| FE-01 | Phase 14 | Pending |
+| FE-01 | Phase 14 | Complete |
 | FE-02 | Phase 14 | Complete |
 
 **Coverage:**
