@@ -129,8 +129,6 @@ export interface Chapter {
   status: 'draft' | 'published'
   newCharacters?: string
   plantingForeshadowings?: string
-  foreshadowingSetup?: string
-  foreshadowingPayoff?: string
   chapterNotes?: string
   createTime: string
   updateTime: string
@@ -153,8 +151,6 @@ export interface ChapterPlan {
   chapterNotes?: string
   status?: string
   plotStage?: string
-  foreshadowingSetup?: string
-  foreshadowingPayoff?: string
   plannedCharacters?: string
   characterArcs?: string
   // 扩展字段（来自 ChapterPlanDto）

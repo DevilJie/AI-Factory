@@ -38,8 +38,6 @@ export interface ChapterPlanUpdateRequest {
   chapterNotes?: string
   status?: string
   plotStage?: string
-  foreshadowingSetup?: string
-  foreshadowingPayoff?: string
   plannedCharacters?: string
   characterArcs?: string
 }

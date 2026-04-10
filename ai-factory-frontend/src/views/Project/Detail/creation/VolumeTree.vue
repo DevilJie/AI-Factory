@@ -156,8 +156,6 @@ const handleChapterClick = async (chapter: Chapter) => {
     chapterNotes: (chapter as any).chapterNotes || chapter.chapterNotes,
     status: (chapter as any).status,
     plotStage: (chapter as any).plotStage,
-    foreshadowingSetup: (chapter as any).foreshadowingSetup || chapter.foreshadowingSetup,
-    foreshadowingPayoff: (chapter as any).foreshadowingPayoff || chapter.foreshadowingPayoff,
     plannedCharacters: (chapter as any).plannedCharacters,
     characterArcs: (chapter as any).characterArcs,
     hasContent,
