@@ -1,5 +1,18 @@
 # Milestones
 
+## v1.0.6 伏笔管理 (Shipped: 2026-04-11)
+
+**Phases completed:** 7 phases, 10 plans, 27 tasks
+
+**Key accomplishments:**
+
+- Foreshadowing constraint injection into chapter generation prompts with directive-style text, plus automatic status transitions (pending->in_progress->completed) via batch update in both streaming and synchronous generation paths
+- Backend controller 8-param query bindings + frontend TypeScript types/API client for foreshadowing CRUD
+- ChapterPlanDrawer 5th tab with color-coded foreshadowing cards in 待埋设/待回收/分卷参考 sections, modal CRUD with plantedChapter immutability
+- 项目级伏笔总览页面 with card grid, type/layout/volume/status filters, CRUD modal, and health score dashboard
+
+---
+
 ## v1.0.5 章节角色规划体系 (Shipped: 2026-04-10)
 
 **Phases completed:** 6 phases, 10 plans, 20 tasks

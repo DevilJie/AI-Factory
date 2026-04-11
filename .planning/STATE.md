@@ -4,13 +4,13 @@ milestone: v1.0.6
 milestone_name: 伏笔管理
 status: executing
 stopped_at: Completed 18-01-PLAN.md
-last_updated: "2026-04-11T11:29:43.685Z"
+last_updated: "2026-04-11T17:41:49.568Z"
 last_activity: 2026-04-11
 progress:
-  total_phases: 6
-  completed_phases: 4
+  total_phases: 7
+  completed_phases: 5
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 11
   percent: 60
 ---
 
