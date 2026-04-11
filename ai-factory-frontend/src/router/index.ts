@@ -32,6 +32,7 @@ const router = createRouter({
         { path: 'world-setting', name: 'ProjectWorldSetting', component: () => import('@/views/Project/Detail/WorldSetting.vue') },
         { path: 'settings', name: 'ProjectSettings', component: () => import('@/views/Project/Detail/Settings.vue') },
         { path: 'characters', name: 'ProjectCharacters', component: () => import('@/views/Project/Detail/Characters.vue') },
+        { path: 'foreshadowing', name: 'ProjectForeshadowing', component: () => import('@/views/Project/Detail/Foreshadowing.vue') },
         { path: 'creation', name: 'ProjectCreation', component: () => import('@/views/Project/Detail/creation/CreationCenter.vue') },
         { path: 'creation/volume/:volumeId', name: 'ProjectCreationVolume', component: () => import('@/views/Project/Detail/creation/CreationCenter.vue') },
         { path: 'creation/volume/:volumeId/chapter/:chapterId', name: 'ProjectCreationChapter', component: () => import('@/views/Project/Detail/creation/CreationCenter.vue') }

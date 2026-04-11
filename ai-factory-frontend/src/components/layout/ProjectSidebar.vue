@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, LayoutDashboard, Globe, Settings, PenTool, Users } from 'lucide-vue-next'
+import { ArrowLeft, LayoutDashboard, Globe, Settings, PenTool, Users, BookOpen } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,7 +13,8 @@ const navItems = [
   { name: '世界观设定', icon: Globe, path: 'world-setting' },
   { name: '基础设置', icon: Settings, path: 'settings' },
   { name: '创作中心', icon: PenTool, path: 'creation' },
-  { name: '人物管理', icon: Users, path: 'characters' }
+  { name: '人物管理', icon: Users, path: 'characters' },
+  { name: '伏笔管理', icon: BookOpen, path: 'foreshadowing' }
 ]
 
 const isActive = (path: string) => {
