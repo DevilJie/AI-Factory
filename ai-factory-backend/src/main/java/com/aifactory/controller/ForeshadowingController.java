@@ -66,7 +66,15 @@ public class ForeshadowingController {
             @Parameter(description = "状态：pending(未填回)/in_progress(进行中)/completed(已填回)", example = "pending")
             @RequestParam(required = false) String status,
             @Parameter(description = "当前章节号，用于查询该章节需要填坑的伏笔", example = "10")
-            @RequestParam(required = false) Integer currentChapter
+            @RequestParam(required = false) Integer currentChapter,
+            @Parameter(description = "埋设伏笔的章节号筛选", example = "5")
+            @RequestParam(required = false) Integer plantedChapter,
+            @Parameter(description = "计划回收伏笔的章节号筛选", example = "50")
+            @RequestParam(required = false) Integer plannedCallbackChapter,
+            @Parameter(description = "埋设伏笔的分卷编号筛选", example = "1")
+            @RequestParam(required = false) Integer plantedVolume,
+            @Parameter(description = "计划回收伏笔的分卷编号筛选", example = "2")
+            @RequestParam(required = false) Integer plannedCallbackVolume
     ) {
         Long userId = UserContext.getUserId();
         log.info("用户 {} 获取项目 {} 的伏笔列表", userId, projectId);
@@ -77,6 +85,10 @@ public class ForeshadowingController {
         queryDto.setLayoutType(layoutType);
         queryDto.setStatus(status);
         queryDto.setCurrentChapter(currentChapter);
+        queryDto.setPlantedChapter(plantedChapter);
+        queryDto.setPlannedCallbackChapter(plannedCallbackChapter);
+        queryDto.setPlantedVolume(plantedVolume);
+        queryDto.setPlannedCallbackVolume(plannedCallbackVolume);
 
         List<ForeshadowingDto> foreshadowings = foreshadowingService.getForeshadowingList(queryDto);
         return Result.ok(foreshadowings);
