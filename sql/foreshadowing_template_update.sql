@@ -1,0 +1,127 @@
+-- ============================================================
+-- Phase 16: Add foreshadowing context to chapter planning template
+-- Template code: llm_outline_chapter_generate
+-- ============================================================
+--
+-- This migration adds:
+-- 1. {foreshadowingContext} injection variable (after characterInfo section)
+-- 2. <fs>/<fp> foreshadowing output format instructions (after <f> tag explanation)
+--
+-- IMPORTANT: The template content is stored in ai_prompt_template_version table.
+-- The template uses Hutool StrUtil.format syntax: {variableName}
+-- Run this SQL after checking the current template content.
+-- ============================================================
+
+-- Step 1: Find current template ID and active version ID
+-- SELECT pt.id, ptv.id, ptv.template_content
+-- FROM ai_prompt_template pt
+-- JOIN ai_prompt_template_version ptv ON pt.id = ptv.template_id
+-- WHERE pt.template_code = 'llm_outline_chapter_generate'
+--   AND ptv.is_active = 1
+-- ORDER BY ptv.version DESC LIMIT 1;
+
+-- Expected: template_id = 6 (from init.sql), version_id = 6
+
+-- Step 2: Insert a new version with updated content.
+-- The updated template must contain:
+--   1. {foreshadowingContext} variable after the {characterInfo} section
+--   2. <fs>/<fp> output format instructions after the <f> tag explanation
+--
+-- Below is the content to add at each insertion point.
+
+-- ============================================================
+-- INSERTION POINT 1: After character info section, add foreshadowing context
+-- ============================================================
+-- After the "## 登场角色" / {characterInfo} section, insert:
+--
+-- ---
+--
+-- ## 当前卷活跃伏笔
+-- {foreshadowingContext}
+--
+-- ---
+
+-- ============================================================
+-- INSERTION POINT 2: After <f> tag explanation in XML output format, add fs/fp tags
+-- ============================================================
+-- After the "- f: finish（终点场景）" line and before "- ch: character", insert:
+--
+-- - fs: foreshadowing plant（伏笔埋设，可选）
+-- - fp: foreshadowing payoff（伏笔回收，可选）
+--
+-- And after the closing </o> tag in the XML example, before </c>, add:
+--
+-- 【伏笔输出格式 - 可选】
+-- 如果需要在本章埋设新伏笔，在 <o> 标签内添加：
+-- <fs>
+--   <ft>伏笔标题</ft>
+--   <fy>类型(character/item/event/secret)</fy>
+--   <fl>布局线(bright1/bright2/bright3/dark)</fl>
+--   <fd><![CDATA[伏笔详细描述]]></fd>
+--   <fc>回收分卷号</fc>
+--   <fr>回收章节号</fr>
+-- </fs>
+--
+-- 如果本章需要回收已有伏笔，在 <o> 标签内添加：
+-- <fp>
+--   <ft>伏笔标题（与已有伏笔匹配）</ft>
+--   <fd><![CDATA[回收方式描述]]></fd>
+-- </fp>
+--
+-- 每个章节可包含零个或多个 <fs> 和 <fp> 标签。
+
+-- ============================================================
+-- APPROACH A: Create a new template version (recommended)
+-- ============================================================
+-- This is the preferred approach since the template system supports versioning.
+-- Create a new version with the updated content and activate it.
+--
+-- INSERT INTO ai_prompt_template_version (
+--   id, template_id, version, template_content, variable_definitions,
+--   change_description, is_active, current_version_id, create_time
+-- ) VALUES (
+--   NEXT_VERSION_ID, 6, 2,
+--   CONCAT(existing_content_with_modifications),
+--   '[...updated variable_definitions including foreshadowingContext...]',
+--   'v3: add foreshadowing context injection and fs/fp output format (Phase 16)',
+--   1, NULL, NOW()
+-- );
+--
+-- Then update the template's current_version_id:
+-- UPDATE ai_prompt_template SET current_version_id = NEXT_VERSION_ID WHERE id = 6;
+
+-- ============================================================
+-- APPROACH B: Update the existing active version directly
+-- ============================================================
+-- WARNING: This modifies the existing version. Use only if version history is not critical.
+--
+-- UPDATE ai_prompt_template_version
+-- SET template_content = REPLACE(
+--   template_content,
+--   '{characterInfo}',
+--   CONCAT('{characterInfo}', CHAR(10), CHAR(10),
+--     '---', CHAR(10), CHAR(10),
+--     '## 当前卷活跃伏笔', CHAR(10),
+--     '{foreshadowingContext}', CHAR(10), CHAR(10),
+--     '---')
+-- )
+-- WHERE template_id = 6
+--   AND is_active = 1;
+
+-- ============================================================
+-- Variable definitions update
+-- ============================================================
+-- Add to the variable_definitions JSON array:
+-- {"desc": "当前卷活跃伏笔上下文", "name": "foreshadowingContext", "type": "string", "required": false}
+
+-- ============================================================
+-- MANUAL STEP: Verify and apply the template update
+-- ============================================================
+-- Since template content varies by project state and is long (multi-line),
+-- the executor should:
+-- 1. Read the current template from the database
+-- 2. Add {foreshadowingContext} after the characterInfo section
+-- 3. Add <fs>/<fp> output format instructions after the <f> tag in the XML format section
+-- 4. Add foreshadowingContext to variable_definitions JSON array
+-- 5. Save as a new version or update the existing one
+-- 6. Activate the new version
