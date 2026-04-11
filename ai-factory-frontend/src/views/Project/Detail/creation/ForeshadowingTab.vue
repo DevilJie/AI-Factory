@@ -121,15 +121,15 @@ const loadData = async () => {
   loading.value = true
   try {
     // Query 1: foreshadowing planted in this chapter
-    const planted = await getForeshadowingList(props.projectId, {
-      plantedChapter: props.chapterNumber
-    })
+    const plantedParams: Record<string, any> = { plantedChapter: props.chapterNumber }
+    if (props.volumeNumber) plantedParams.plantedVolume = props.volumeNumber
+    const planted = await getForeshadowingList(props.projectId, plantedParams)
     plantForeshadowings.value = planted || []
 
     // Query 2: foreshadowing planned for callback in this chapter
-    const callbacks = await getForeshadowingList(props.projectId, {
-      plannedCallbackChapter: props.chapterNumber
-    })
+    const callbackParams: Record<string, any> = { plannedCallbackChapter: props.chapterNumber }
+    if (props.volumeNumber) callbackParams.plannedCallbackVolume = props.volumeNumber
+    const callbacks = await getForeshadowingList(props.projectId, callbackParams)
     callbackForeshadowings.value = callbacks || []
 
     // Query 3: volume active foreshadowing
