@@ -1,7 +1,7 @@
 ---
 phase: 18
 slug: frontend-chapter-foreshadowing
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-11
@@ -36,7 +36,8 @@ Declared values (multiples of 4, matching existing ChapterPlanDrawer pattern):
 |-------|-------|---------------------|
 | xs | 4px | Icon gaps, inline badge padding (`gap-1`, `p-1`) |
 | sm | 8px | Compact element spacing, badge padding (`gap-2`, `p-2`) |
-| md | 16px | Default element spacing, card padding (`p-4`, `gap-4`, `space-y-4`) |
+| card | 12px | Card padding, card gaps (`p-3`, `space-y-3`) |
+| md | 16px | Default element spacing (`p-4`, `gap-4`, `space-y-4`) |
 | lg | 24px | Section padding, card inner spacing (`p-6`) |
 | xl | 32px | Layout gaps between major sections (`space-y-8`) |
 
@@ -54,10 +55,10 @@ Exceptions:
 |------|------|--------|-------------|-------|
 | Body | 14px (`text-sm`) | 400 (default) | ~1.5 | Card description, form labels, section content |
 | Label | 12px (`text-xs`) | 500 (`font-medium`) | ~1.4 | Badge text, meta labels, form sub-labels |
-| Heading | 18px (`text-lg`) | 600 (`font-semibold`) | ~1.3 | Section headers, modal title |
+| Heading | 18px (`text-lg`) | 500 (`font-medium`) | ~1.3 | Section headers, modal title |
 | Display | 16px (`text-base`) | 500 (`font-medium`) | ~1.4 | Card titles, collapsible section headers |
 
-**Source:** Pre-populated from existing ChapterPlanDrawer.vue patterns. The drawer header uses `text-lg font-semibold` (line 334), labels use `text-sm font-medium` (line 370), metadata uses `text-xs` (line 337).
+**Source:** Pre-populated from existing ChapterPlanDrawer.vue patterns. Reduced to 2 font weights (400, 500) — heading hierarchy driven by size (18px vs 16px) rather than weight.
 
 ---
 
@@ -391,4 +392,4 @@ No third-party registries or blocks. All components are hand-built using Tailwin
 - [ ] Dimension 5 Spacing: PASS
 - [ ] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-04-11
