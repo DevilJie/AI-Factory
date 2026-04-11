@@ -15,7 +15,7 @@
 | Phase | Name | Plans | Status |
 |-------|------|-------|--------|
 | 15 | Data Foundation | Complete    | 2026-04-10 |
-| 16 | AI Chapter Planning | 1/2 | In Progress |
+| 16 | 2/1 | Complete   | 2026-04-11 |
 | 17 | AI Generation Constraints | 0/1 | Not Started |
 | 18 | Frontend Chapter Foreshadowing | 0/2 | Not Started |
 | 19 | Frontend Project Management | 0/1 | Not Started |
@@ -65,7 +65,7 @@
 **Milestone Goal:** 激活 novel_foreshadowing 表为章节规划和生成的核心驱动，让 LLM 自动规划伏笔埋设/回收，用户可跨卷管理伏笔。
 
 - [x] **Phase 15: Data Foundation** — 伏笔表扩展 + 旧字段删除 + 距离校验 (completed 2026-04-10)
-- [ ] **Phase 16: AI Chapter Planning** — 章节规划伏笔上下文注入 + XML 输出 + 解析保存
+- [x] **Phase 16: AI Chapter Planning** — 章节规划伏笔上下文注入 + XML 输出 + 解析保存 (completed 2026-04-11)
 - [ ] **Phase 17: AI Generation Constraints** — 章节生成伏笔约束注入
 - [ ] **Phase 18: Frontend Chapter Foreshadowing** — ChapterPlanDrawer 伏笔管理区
 - [ ] **Phase 19: Frontend Project Management** — 项目级伏笔总览页面 + 健康度评分
@@ -105,8 +105,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 16-01: TBD
-- [ ] 16-02: TBD
+- [x] 16-01: TBD
+- [x] 16-02: TBD
 
 ### Phase 17: AI Generation Constraints
 **Goal**: 章节生成时注入伏笔硬性创作指令，确保 LLM 按规划埋设或回收伏笔

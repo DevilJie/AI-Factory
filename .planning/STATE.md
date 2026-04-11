@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0.6
 milestone_name: 伏笔管理
 status: executing
-stopped_at: Completed 16-01-PLAN.md
-last_updated: "2026-04-11T04:50:30Z"
-last_activity: 2026-04-11 -- Phase 16 Plan 01 executed
+stopped_at: Completed 16-02-PLAN.md
+last_updated: "2026-04-11T05:06:37.638Z"
+last_activity: 2026-04-11
 progress:
-  total_phases: 4
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 3
+  completed_phases: 3
+  total_plans: 6
+  completed_plans: 7
+  percent: 60
 ---
 
 # 项目状态
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-10)
 ## Current Position
 
 Phase: 16 (ai-chapter-planning) -- EXECUTING
-Plan: 1 of 2 (Plan 01 complete)
-Status: Executing Phase 16
-Last activity: 2026-04-11 -- Phase 16 Plan 01 executed
+Plan: 2 of 2 (Plan 01 complete)
+Status: Ready to execute
+Last activity: 2026-04-11
 
 Progress: [======----] 60%
 
@@ -53,6 +53,7 @@ Progress: [======----] 60%
 | 19. Frontend Project Management | — | — | — |
 
 *Updated after each plan completion*
+| Phase 16 P02 | 5min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,9 @@ Recent decisions for v1.0.6:
 - D-01: Structured list format for foreshadowing context (title, type, layout line, status, locations)
 - D-02: Only inject active foreshadowing for current volume (pending plants + in_progress callbacks)
 - D-07: Inject into both template and hardcoded prompt paths for full coverage
+- [Phase 16]: D-03/D-04: <fs> sub-tags ft/fy/fl/fd/fc/fr with multi-plant per chapter; <fp> sub-tags ft/fd
+- [Phase 16]: D-05: <fp> payoff data parsed but NOT used for status updates (deferred to Phase 17)
+- [Phase 16]: D-06: deletePendingForeshadowingForVolume only deletes plantedVolume + pending status, NOT plannedCallbackVolume
 
 ### Pending Todos
 
@@ -81,6 +85,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-11T04:50:30Z
-Stopped at: Completed 16-01-PLAN.md
-Resume file: .planning/phases/16-ai-chapter-planning/16-01-SUMMARY.md
+Last session: 2026-04-11T05:06:37.638Z
+Stopped at: Completed 16-02-PLAN.md
+Resume file: None
