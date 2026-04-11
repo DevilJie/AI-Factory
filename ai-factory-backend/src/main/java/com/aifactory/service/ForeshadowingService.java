@@ -11,6 +11,7 @@ import com.aifactory.mapper.ChapterPlotMemoryMapper;
 import com.aifactory.mapper.ForeshadowingMapper;
 import com.aifactory.mapper.NovelVolumePlanMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -146,6 +147,16 @@ public class ForeshadowingService {
         // 按回收分卷筛选
         if (queryDto.getPlannedCallbackVolume() != null) {
             queryWrapper.eq(Foreshadowing::getPlannedCallbackVolume, queryDto.getPlannedCallbackVolume());
+        }
+
+        // 按埋设章节筛选
+        if (queryDto.getPlantedChapter() != null) {
+            queryWrapper.eq(Foreshadowing::getPlantedChapter, queryDto.getPlantedChapter());
+        }
+
+        // 按计划回收章节筛选
+        if (queryDto.getPlannedCallbackChapter() != null) {
+            queryWrapper.eq(Foreshadowing::getPlannedCallbackChapter, queryDto.getPlannedCallbackChapter());
         }
 
         // 按优先级和创建时间排序
@@ -319,6 +330,43 @@ public class ForeshadowingService {
             int completedCount,       // 已填回数量
             double completionRate     // 完成率
     ) {
+    }
+
+    /**
+     * 批量更新伏笔状态（章节生成成功后调用）
+     * Per D-04: pending -> in_progress for planted, in_progress -> completed for resolved
+     * Per D-05: re-generation does NOT roll back status
+     *
+     * @param projectId 项目ID
+     * @param chapterNumber 当前章节全局序号
+     * @return 更新的记录数
+     */
+    @Transactional
+    public int batchUpdateStatusForChapter(Long projectId, int chapterNumber) {
+        int updated = 0;
+
+        // pending -> in_progress (planted this chapter)
+        LambdaUpdateWrapper<Foreshadowing> plantWrapper = new LambdaUpdateWrapper<>();
+        plantWrapper.eq(Foreshadowing::getProjectId, projectId)
+                    .eq(Foreshadowing::getPlantedChapter, chapterNumber)
+                    .eq(Foreshadowing::getStatus, "pending")
+                    .set(Foreshadowing::getStatus, "in_progress")
+                    .set(Foreshadowing::getUpdateTime, LocalDateTime.now());
+        updated += foreshadowingMapper.update(null, plantWrapper);
+
+        // in_progress -> completed (resolved this chapter)
+        LambdaUpdateWrapper<Foreshadowing> resolveWrapper = new LambdaUpdateWrapper<>();
+        resolveWrapper.eq(Foreshadowing::getProjectId, projectId)
+                      .eq(Foreshadowing::getPlannedCallbackChapter, chapterNumber)
+                      .eq(Foreshadowing::getStatus, "in_progress")
+                      .set(Foreshadowing::getStatus, "completed")
+                      .set(Foreshadowing::getActualCallbackChapter, chapterNumber)
+                      .set(Foreshadowing::getUpdateTime, LocalDateTime.now());
+        updated += foreshadowingMapper.update(null, resolveWrapper);
+
+        log.info("批量更新伏笔状态，projectId={}, chapterNumber={}, updatedCount={}",
+                 projectId, chapterNumber, updated);
+        return updated;
     }
 
     // ==================== 章节记忆伏笔管理 ====================

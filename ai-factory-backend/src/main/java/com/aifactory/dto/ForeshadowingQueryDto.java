@@ -64,4 +64,16 @@ public class ForeshadowingQueryDto {
      */
     @Schema(description = "计划回收伏笔的分卷编号筛选", example = "2")
     private Integer plannedCallbackVolume;
+
+    /**
+     * 埋设伏笔的章节号筛选
+     */
+    @Schema(description = "埋设伏笔的章节号筛选", example = "5")
+    private Integer plantedChapter;
+
+    /**
+     * 计划回收伏笔的章节号筛选
+     */
+    @Schema(description = "计划回收伏笔的章节号筛选", example = "50")
+    private Integer plannedCallbackChapter;
 }

@@ -2,6 +2,8 @@ package com.aifactory.service.chapter.prompt;
 
 import com.aifactory.constants.BasicSettingsDictionary;
 import com.aifactory.dto.CharacterPromptInfo;
+import com.aifactory.dto.ForeshadowingDto;
+import com.aifactory.dto.ForeshadowingQueryDto;
 import com.aifactory.entity.Chapter;
 import com.aifactory.entity.NovelChapterPlan;
 import com.aifactory.entity.NovelCharacter;
@@ -63,6 +65,9 @@ public class PromptTemplateBuilder {
 
     @Autowired
     private FactionService factionService;
+
+    @Autowired
+    private ForeshadowingService foreshadowingService;
 
     /**
      * 构建章节生成提示词
@@ -215,6 +220,13 @@ public class PromptTemplateBuilder {
             characterInfo = buildCharacterInfoText(characterPromptInfoList);
         }
         variables.put("characterInfo", characterInfo);
+
+        // 伏笔约束注入（D-06: mirror character constraint pattern）
+        String foreshadowingConstraint = "";
+        if (hasForeshadowingConstraints(projectId, chapterPlan.getChapterNumber())) {
+            foreshadowingConstraint = buildForeshadowingConstraintText(projectId, chapterPlan.getChapterNumber());
+        }
+        variables.put("foreshadowingConstraint", foreshadowingConstraint);
 
         return variables;
     }
@@ -659,6 +671,83 @@ public class PromptTemplateBuilder {
         String pc = chapterPlan.getPlannedCharacters();
         if (pc == null || pc.trim().isEmpty()) return false;
         return !pc.trim().equals("[]");
+    }
+
+    /**
+     * 检查当前章节是否有伏笔约束（需埋设或需回收）
+     */
+    private boolean hasForeshadowingConstraints(Long projectId, Integer chapterNumber) {
+        if (projectId == null || chapterNumber == null) return false;
+
+        // Check for pending foreshadowing to plant this chapter
+        ForeshadowingQueryDto plantQuery = new ForeshadowingQueryDto();
+        plantQuery.setProjectId(projectId);
+        plantQuery.setPlantedChapter(chapterNumber);
+        plantQuery.setStatus("pending");
+        List<ForeshadowingDto> toPlant = foreshadowingService.getForeshadowingList(plantQuery);
+        if (!toPlant.isEmpty()) return true;
+
+        // Check for in_progress foreshadowing to resolve this chapter
+        ForeshadowingQueryDto resolveQuery = new ForeshadowingQueryDto();
+        resolveQuery.setProjectId(projectId);
+        resolveQuery.setPlannedCallbackChapter(chapterNumber);
+        resolveQuery.setStatus("in_progress");
+        List<ForeshadowingDto> toResolve = foreshadowingService.getForeshadowingList(resolveQuery);
+        return !toResolve.isEmpty();
+    }
+
+    /**
+     * 构建伏笔约束文本
+     * Per D-01: directive language style ("必须埋设"/"必须回收")
+     * Per D-02: each item contains title + description only (no type/layout)
+     * Per D-03: only current chapter foreshadowing
+     */
+    private String buildForeshadowingConstraintText(Long projectId, Integer chapterNumber) {
+        StringBuilder sb = new StringBuilder();
+
+        // Query foreshadowing to plant this chapter (pending, plantedChapter == current)
+        ForeshadowingQueryDto plantQuery = new ForeshadowingQueryDto();
+        plantQuery.setProjectId(projectId);
+        plantQuery.setPlantedChapter(chapterNumber);
+        plantQuery.setStatus("pending");
+        List<ForeshadowingDto> toPlant = foreshadowingService.getForeshadowingList(plantQuery);
+
+        if (!toPlant.isEmpty()) {
+            sb.append("【本章节必须埋设的伏笔】\n");
+            sb.append("以下是本章需要埋设的伏笔，请务必自然地融入情节，不可生硬：\n\n");
+            for (int i = 0; i < toPlant.size(); i++) {
+                ForeshadowingDto fs = toPlant.get(i);
+                sb.append(i + 1).append(". ").append(fs.getTitle());
+                if (fs.getDescription() != null && !fs.getDescription().isEmpty()) {
+                    sb.append(" -- ").append(fs.getDescription());
+                }
+                sb.append("\n");
+            }
+            sb.append("\n");
+        }
+
+        // Query foreshadowing to resolve this chapter (in_progress, plannedCallbackChapter == current)
+        ForeshadowingQueryDto resolveQuery = new ForeshadowingQueryDto();
+        resolveQuery.setProjectId(projectId);
+        resolveQuery.setPlannedCallbackChapter(chapterNumber);
+        resolveQuery.setStatus("in_progress");
+        List<ForeshadowingDto> toResolve = foreshadowingService.getForeshadowingList(resolveQuery);
+
+        if (!toResolve.isEmpty()) {
+            sb.append("【本章节必须回收的伏笔】\n");
+            sb.append("以下是前文埋设的伏笔，需要在本章自然地揭示或解决：\n\n");
+            for (int i = 0; i < toResolve.size(); i++) {
+                ForeshadowingDto fs = toResolve.get(i);
+                sb.append(i + 1).append(". ").append(fs.getTitle());
+                if (fs.getDescription() != null && !fs.getDescription().isEmpty()) {
+                    sb.append(" -- ").append(fs.getDescription());
+                }
+                sb.append("\n");
+            }
+            sb.append("\n");
+        }
+
+        return sb.toString();
     }
 
     /**
