@@ -84,6 +84,9 @@ public class ChapterContentGenerateTaskStrategy implements TaskStrategy {
     @Autowired
     private ChapterCharacterExtractService chapterCharacterExtractService;
 
+    @Autowired
+    private com.aifactory.service.ForeshadowingService foreshadowingService;
+
     @Override
     public String getTaskType() {
         return "generate_chapter_content";
@@ -269,6 +272,19 @@ public class ChapterContentGenerateTaskStrategy implements TaskStrategy {
                 log.info("章节角色提取完成，chapterId={}", chapter.getId());
             } catch (Exception e) {
                 log.error("章节角色提取失败，chapterId={}，错误：{}",
+                    chapter.getId(), e.getMessage());
+            }
+
+            // 批量更新伏笔状态（D-04）
+            try {
+                int updated = foreshadowingService.batchUpdateStatusForChapter(
+                    chapterPlan.getProjectId(), chapterPlan.getChapterNumber());
+                if (updated > 0) {
+                    log.info("伏笔状态批量更新成功，projectId={}, chapterNumber={}, count={}",
+                        chapterPlan.getProjectId(), chapterPlan.getChapterNumber(), updated);
+                }
+            } catch (Exception e) {
+                log.error("伏笔状态更新失败，不影响章节保存，chapterId={}，错误：{}",
                     chapter.getId(), e.getMessage());
             }
 

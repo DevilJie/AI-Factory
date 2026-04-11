@@ -947,6 +947,19 @@ public class ChapterService {
                     // 记忆保存失败是严重问题，但仍然继续完成章节
                 }
 
+                // 11. 批量更新伏笔状态（D-04: pending -> in_progress, in_progress -> completed）
+                try {
+                    int updated = foreshadowingService.batchUpdateStatusForChapter(
+                        projectId, plan.getChapterNumber());
+                    if (updated > 0) {
+                        log.info("伏笔状态批量更新成功，projectId={}, chapterNumber={}, count={}",
+                            projectId, plan.getChapterNumber(), updated);
+                    }
+                } catch (Exception e) {
+                    log.error("伏笔状态更新失败，不影响章节保存，projectId={}，错误：{}",
+                        projectId, e.getMessage());
+                }
+
                 // 12. 短暂延迟确保前端接收完所有内容
                 try {
                     Thread.sleep(500);

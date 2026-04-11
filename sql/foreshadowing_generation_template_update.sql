@@ -1,0 +1,83 @@
+-- ============================================================
+-- Phase 17: Add foreshadowing constraint to chapter generation template
+-- Template code: llm_chapter_generate_standard (template_id = 1)
+-- ============================================================
+--
+-- This migration adds:
+-- 1. {foreshadowingConstraint} injection variable after {characterInfo} section
+--
+-- The variable will contain directive-style foreshadowing constraints:
+--   - "本章节必须埋设的伏笔" for pending foreshadowing planted this chapter
+--   - "本章节必须回收的伏笔" for in_progress foreshadowing due this chapter
+-- When no foreshadowing exists for the current chapter, the variable is empty string.
+--
+-- IMPORTANT: The template content is stored in ai_prompt_template_version table.
+-- The template uses Hutool StrUtil.format syntax: {variableName}
+-- Run this SQL after checking the current template content.
+-- ============================================================
+
+-- Step 1: Verify current template
+-- SELECT ptv.id, ptv.template_content
+-- FROM ai_prompt_template_version ptv
+-- WHERE ptv.template_id = 1
+--   AND ptv.is_active = 1;
+
+-- ============================================================
+-- INSERTION POINT: After {characterInfo} section, before ## 本章要求
+-- ============================================================
+-- Current template has:
+--   ## 已登场的人物信息
+--   {characterInfo}
+--
+--
+--   ## 本章要求
+--
+-- After update, it should be:
+--   ## 已登场的人物信息
+--   {characterInfo}
+--
+--   {foreshadowingConstraint}
+--
+--   ## 本章要求
+
+-- ============================================================
+-- APPROACH A: Update existing version content via REPLACE
+-- ============================================================
+-- This replaces the double-newline gap between {characterInfo} and ## 本章要求
+-- with a section that includes the new variable.
+--
+-- UPDATE ai_prompt_template_version
+-- SET template_content = REPLACE(
+--   template_content,
+--   CONCAT('{characterInfo}', CHAR(13), CHAR(10), CHAR(13), CHAR(10), CHAR(13), CHAR(10), '## 本'),
+--   CONCAT('{characterInfo}', CHAR(13), CHAR(10), CHAR(13), CHAR(10), '{foreshadowingConstraint}', CHAR(13), CHAR(10), CHAR(13), CHAR(10), '## 本')
+-- )
+-- WHERE template_id = 1
+--   AND is_active = 1;
+
+-- ============================================================
+-- APPROACH B: Manual verification and update (recommended)
+-- ============================================================
+-- Since template content may have been modified since init.sql,
+-- the executor should:
+-- 1. Read the current template from the database:
+--    SELECT template_content FROM ai_prompt_template_version WHERE template_id = 1 AND is_active = 1;
+-- 2. Locate the section: ## 已登场的人物信息 \r\n {characterInfo}
+-- 3. After {characterInfo}, add a blank line and then {foreshadowingConstraint}
+-- 4. The result should look like:
+--    ## 已登场的人物信息\r\n
+--    {characterInfo}\r\n
+--    \r\n
+--    {foreshadowingConstraint}\r\n
+--    \r\n
+--    ## 本章要求
+-- 5. Update the template:
+--    UPDATE ai_prompt_template_version SET template_content = '...' WHERE template_id = 1 AND is_active = 1;
+--
+-- NOTE: Use \r\n line endings (Windows-style) as the original template uses \r\n.
+
+-- ============================================================
+-- Variable definitions update
+-- ============================================================
+-- Add to the variable_definitions JSON array in ai_prompt_template_version:
+-- {"desc": "伏笔约束文本（需埋设/回收的伏笔指令）", "name": "foreshadowingConstraint", "type": "string", "required": false}
