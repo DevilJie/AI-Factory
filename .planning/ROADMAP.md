@@ -16,7 +16,7 @@
 |-------|------|-------|--------|
 | 15 | Data Foundation | Complete    | 2026-04-10 |
 | 16 | AI Chapter Planning | Complete    | 2026-04-11 |
-| 17 | 1/1 | Complete   | 2026-04-11 |
+| 17 | 1/1 | Complete    | 2026-04-11 |
 | 18 | Frontend Chapter Foreshadowing | 0/2 | Not Started |
 | 19 | Frontend Project Management | 0/1 | Not Started |
 
@@ -74,7 +74,7 @@
 
 - [x] Phase 15: 数据基础 (2/2 plans) — completed 2026-04-11
 - [x] Phase 16: AI 章节规划伏笔 (completed 2026-04-11)
-- [ ] Phase 17: AI 生成伏笔约束
+- [x] Phase 17: AI 生成伏笔约束 (completed 2026-04-11)
 - [ ] Phase 18: 前端章节伏笔管理
 - [ ] Phase 19: 前端项目伏笔管理
 
@@ -127,11 +127,11 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. ChapterPlanDrawer 伏笔区展示本章节需埋设和需回收的伏笔卡片，替代原有 textarea
   2. 用户可在伏笔管理区直接编辑伏笔内容、添加新伏笔、删除已有伏笔
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 18-01: TBD
-- [ ] 18-02: TBD
+- [ ] 18-01-PLAN.md — Backend query params + frontend types and API client [FC-01, FC-02]
+- [ ] 18-02-PLAN.md — ForeshadowingTab component + ChapterPlanDrawer integration [FC-01, FC-02]
 **UI hint**: yes
 
 ### Phase 19: Frontend Project Management
