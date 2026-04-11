@@ -671,8 +671,11 @@ public class OutlineTaskStrategy implements TaskStrategy {
 
             // 解析并保存伏笔数据
             int foreshadowingCount = 0;
+            log.info("开始解析第{}卷伏笔数据(saveVolumeChaptersToDatabase)，章节数: {}", volumeNumber, chaptersList.size());
             for (Map<String, String> chapterData : chaptersList) {
                 String plantCountStr = chapterData.get("_foreshadowingPlants_count");
+                String chNum = chapterData.getOrDefault("chapterNumber", "?");
+                log.info("章节 {} : _foreshadowingPlants_count = {}", chNum, plantCountStr);
                 if (plantCountStr != null) {
                     int plantCount = Integer.parseInt(plantCountStr);
                     String chapterNumberStr = chapterData.getOrDefault("chapterNumber", "0");
@@ -1266,6 +1269,8 @@ public class OutlineTaskStrategy implements TaskStrategy {
 
                 // 提取伏笔埋设和回收标签 (per D-03, D-04)
                 List<Map<String, String>> foreshadowingPlants = extractForeshadowingPlants(chapterContent);
+                log.info("章节 {} 解析到 {} 个伏笔埋设标签, chapterContent长度: {}",
+                    chapterData.get("n"), foreshadowingPlants.size(), chapterContent.length());
                 if (!foreshadowingPlants.isEmpty()) {
                     chapterData.put("_foreshadowingPlants_count", String.valueOf(foreshadowingPlants.size()));
                     for (int i = 0; i < foreshadowingPlants.size(); i++) {
@@ -2309,8 +2314,11 @@ public class OutlineTaskStrategy implements TaskStrategy {
 
         // 解析并保存伏笔数据
         int foreshadowingCount = 0;
+        log.info("开始解析第{}卷伏笔数据，章节数: {}", volumeNumber, chaptersList.size());
         for (Map<String, String> chapterData : chaptersList) {
             String plantCountStr = chapterData.get("_foreshadowingPlants_count");
+            String chapterNum = chapterData.getOrDefault("chapterNumber", "?");
+            log.info("章节 {} : _foreshadowingPlants_count = {}", chapterNum, plantCountStr);
             if (plantCountStr != null) {
                 int plantCount = Integer.parseInt(plantCountStr);
                 String chapterNumberStr = chapterData.getOrDefault("chapterNumber", "0");

@@ -159,9 +159,10 @@ public class ForeshadowingService {
             queryWrapper.eq(Foreshadowing::getPlannedCallbackChapter, queryDto.getPlannedCallbackChapter());
         }
 
-        // 按优先级和创建时间排序
-        queryWrapper.orderByDesc(Foreshadowing::getPriority)
-                .orderByDesc(Foreshadowing::getCreateTime);
+        // 按埋设分卷、埋设章节升序排序
+        queryWrapper.orderByAsc(Foreshadowing::getPlantedVolume)
+                .orderByAsc(Foreshadowing::getPlantedChapter)
+                .orderByAsc(Foreshadowing::getCreateTime);
 
         List<Foreshadowing> foreshadowings = foreshadowingMapper.selectList(queryWrapper);
         return foreshadowings.stream()

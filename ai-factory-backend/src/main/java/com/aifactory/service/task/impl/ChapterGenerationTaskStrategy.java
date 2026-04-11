@@ -85,6 +85,9 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
     @Autowired
     private NovelCharacterService novelCharacterService;
 
+    @Autowired
+    private com.aifactory.service.ForeshadowingService foreshadowingService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -307,7 +310,7 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
                 log.info("成功解析 {} 个章节", chaptersList.size());
 
                 // 保存到数据库
-                saveChaptersToDatabase(projectId, volumeId, plotStage, currentChapterNumber, chaptersList, allCharacters);
+                saveChaptersToDatabase(projectId, volumeId, volumeNumber, plotStage, currentChapterNumber, chaptersList, allCharacters);
 
                 // 更新上下文（用于下一批的连贯性）
                 recentContext = buildRecentContextFromChapters(chaptersList);
@@ -678,7 +681,7 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
             String chapterXml = "<root>" + xmlStr.substring(start, end + 4) + "</root>";
 
             // 清理XML，修复常见的LLM输出问题
-            chapterXml = sanitizeXmlForDomParsing(chapterXml, new String[]{"o", "ch"});
+            chapterXml = sanitizeXmlForDomParsing(chapterXml, new String[]{"o", "ch", "fs"});
 
             // DOM解析
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -736,6 +739,7 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
      */
     private Map<String, String> parseSingleChapter(Element oElement) {
         List<Map<String, Object>> plannedChars = new ArrayList<>();
+        List<Map<String, String>> foreshadowingPlants = new ArrayList<>();
         Map<String, String> chapter = new HashMap<>();
 
         org.w3c.dom.NodeList children = oElement.getChildNodes();
@@ -761,6 +765,13 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
                         plannedChars.add(charData);
                     }
                 }
+                case "fs" -> {
+                    // 解析伏笔埋设标签: <fs><ft>标题</ft><fy>类型</fy><fl>布局线</fl><fd>描述</fd><fc>回收分卷</fc><fr>回收章节</fr></fs>
+                    Map<String, String> fsData = parseForeshadowingPlantTag((Element) child);
+                    if (fsData != null) {
+                        foreshadowingPlants.add(fsData);
+                    }
+                }
             }
         }
 
@@ -776,6 +787,17 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
                 chapter.put("plannedCharacters", objectMapper.writeValueAsString(plannedChars));
             } catch (Exception e) {
                 log.warn("序列化角色数据失败: {}", e.getMessage());
+            }
+        }
+
+        // 如果有伏笔埋设数据，存储为带前缀的键
+        if (!foreshadowingPlants.isEmpty()) {
+            chapter.put("_foreshadowingPlants_count", String.valueOf(foreshadowingPlants.size()));
+            for (int i = 0; i < foreshadowingPlants.size(); i++) {
+                Map<String, String> plant = foreshadowingPlants.get(i);
+                for (Map.Entry<String, String> entry : plant.entrySet()) {
+                    chapter.put("_fs_" + i + "_" + entry.getKey(), entry.getValue());
+                }
             }
         }
 
@@ -809,6 +831,36 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
         }
 
         return charData;
+    }
+
+    /**
+     * 解析<fs>伏笔埋设标签: 提取 <ft>(标题), <fy>(类型), <fl>(布局线), <fd>(描述), <fc>(回收分卷), <fr>(回收章节)
+     */
+    private Map<String, String> parseForeshadowingPlantTag(Element fsElement) {
+        Map<String, String> data = new HashMap<>();
+
+        org.w3c.dom.NodeList children = fsElement.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            org.w3c.dom.Node child = children.item(i);
+            if (child.getNodeType() != org.w3c.dom.Node.ELEMENT_NODE) continue;
+            String tag = child.getNodeName();
+            String text = child.getTextContent().trim();
+
+            switch (tag) {
+                case "ft" -> data.put("ft", text);   // title
+                case "fy" -> data.put("fy", text);    // type
+                case "fl" -> data.put("fl", text);    // layout line
+                case "fd" -> data.put("fd", text);    // description
+                case "fc" -> data.put("fc", text);    // callback volume
+                case "fr" -> data.put("fr", text);    // callback chapter
+            }
+        }
+
+        if (!data.containsKey("ft") || data.get("ft").isEmpty()) {
+            return null;
+        }
+
+        return data;
     }
 
     /**
@@ -857,7 +909,7 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
      * 保存章节到数据库（重构版：保存plotStage字段 + 角色规划数据）
      * 注意：继续生成模式，不删除已有章节
      */
-    private void saveChaptersToDatabase(Long projectId, Long volumeId, String plotStage,
+    private void saveChaptersToDatabase(Long projectId, Long volumeId, int volumeNumber, String plotStage,
                                        int startChapterNumber, List<Map<String, String>> chaptersList,
                                        List<NovelCharacter> allCharacters) {
         LocalDateTime now = LocalDateTime.now();
@@ -895,6 +947,42 @@ public class ChapterGenerationTaskStrategy implements TaskStrategy {
         }
 
         log.info("保存第{}卷{}阶段的新章节 {} 个", volumeId, plotStage, chaptersList.size());
+
+        // 解析并保存伏笔数据
+        int foreshadowingCount = 0;
+        for (Map<String, String> chapterData : chaptersList) {
+            String plantCountStr = chapterData.get("_foreshadowingPlants_count");
+            if (plantCountStr != null) {
+                int plantCount = Integer.parseInt(plantCountStr);
+                String chapterNumberStr = String.valueOf(startChapterNumber + chaptersList.indexOf(chapterData));
+                for (int i = 0; i < plantCount; i++) {
+                    try {
+                        com.aifactory.dto.ForeshadowingCreateDto fsDto = new com.aifactory.dto.ForeshadowingCreateDto();
+                        fsDto.setTitle(chapterData.getOrDefault("_fs_" + i + "_ft", "未命名伏笔"));
+                        fsDto.setType(chapterData.getOrDefault("_fs_" + i + "_fy", "event"));
+                        fsDto.setDescription(chapterData.getOrDefault("_fs_" + i + "_fd", ""));
+                        fsDto.setLayoutType(chapterData.getOrDefault("_fs_" + i + "_fl", "bright1"));
+                        fsDto.setPlantedChapter(Integer.parseInt(chapterNumberStr));
+                        fsDto.setPlantedVolume(volumeNumber);
+
+                        String fcStr = chapterData.get("_fs_" + i + "_fc");
+                        if (fcStr != null && !fcStr.isEmpty()) {
+                            try { fsDto.setPlannedCallbackVolume(Integer.parseInt(fcStr)); } catch (NumberFormatException ignored) {}
+                        }
+                        String frStr = chapterData.get("_fs_" + i + "_fr");
+                        if (frStr != null && !frStr.isEmpty()) {
+                            try { fsDto.setPlannedCallbackChapter(Integer.parseInt(frStr)); } catch (NumberFormatException ignored) {}
+                        }
+
+                        foreshadowingService.createForeshadowing(projectId, fsDto);
+                        foreshadowingCount++;
+                    } catch (Exception e2) {
+                        log.warn("保存第{}卷第{}章伏笔失败(第{}个): {}", volumeNumber, chapterNumberStr, i, e2.getMessage());
+                    }
+                }
+            }
+        }
+        log.info("保存第{}卷{}阶段伏笔 {} 个", volumeNumber, plotStage, foreshadowingCount);
     }
 
     // ======================== XML Sanitization (duplicated from WorldviewXmlParser) ========================
