@@ -104,13 +104,16 @@ const layoutTypeOptions = [
 
 // Chapter reference line helper
 const getChapterRef = (f: Foreshadowing): string => {
+  const plantedVol = f.plantedVolume ? `第${f.plantedVolume}卷` : ''
   if (f.status === 'completed' && f.actualCallbackChapter) {
-    return `第${f.plantedChapter}章埋设 -> 第${f.actualCallbackChapter}章回收`
+    const cbVol = f.plannedCallbackVolume && f.plannedCallbackVolume !== f.plantedVolume ? `第${f.plannedCallbackVolume}卷` : plantedVol
+    return `${plantedVol}第${f.plantedChapter}章埋设 -> ${cbVol}第${f.actualCallbackChapter}章回收`
   }
   if (f.plannedCallbackChapter) {
-    return `第${f.plantedChapter}章埋设 -> 第${f.plannedCallbackChapter}章回收`
+    const cbVol = f.plannedCallbackVolume && f.plannedCallbackVolume !== f.plantedVolume ? `第${f.plannedCallbackVolume}卷` : plantedVol
+    return `${plantedVol}第${f.plantedChapter}章埋设 -> ${cbVol}第${f.plannedCallbackChapter}章回收`
   }
-  return `第${f.plantedChapter}章埋设`
+  return `${plantedVol}第${f.plantedChapter}章埋设`
 }
 
 // Data loading
