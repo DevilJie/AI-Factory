@@ -1225,6 +1225,29 @@ public class OutlineTaskStrategy implements TaskStrategy {
                 extractXmlFieldCData(chapterContent, "s", chapterData);
                 extractXmlFieldCData(chapterContent, "f", chapterData);
 
+                // 提取伏笔埋设和回收标签 (per D-03, D-04)
+                List<Map<String, String>> foreshadowingPlants = extractForeshadowingPlants(chapterContent);
+                if (!foreshadowingPlants.isEmpty()) {
+                    chapterData.put("_foreshadowingPlants_count", String.valueOf(foreshadowingPlants.size()));
+                    for (int i = 0; i < foreshadowingPlants.size(); i++) {
+                        Map<String, String> plant = foreshadowingPlants.get(i);
+                        for (Map.Entry<String, String> entry : plant.entrySet()) {
+                            chapterData.put("_fs_" + i + "_" + entry.getKey(), entry.getValue());
+                        }
+                    }
+                }
+
+                List<Map<String, String>> foreshadowingPayoffs = extractForeshadowingPayoffs(chapterContent);
+                if (!foreshadowingPayoffs.isEmpty()) {
+                    chapterData.put("_foreshadowingPayoffs_count", String.valueOf(foreshadowingPayoffs.size()));
+                    for (int i = 0; i < foreshadowingPayoffs.size(); i++) {
+                        Map<String, String> payoff = foreshadowingPayoffs.get(i);
+                        for (Map.Entry<String, String> entry : payoff.entrySet()) {
+                            chapterData.put("_fp_" + i + "_" + entry.getKey(), entry.getValue());
+                        }
+                    }
+                }
+
                 // 将简化标签映射回标准字段名
                 if (chapterData.containsKey("n")) {
                     chapterData.put("chapterNumber", chapterData.get("n"));
@@ -1303,6 +1326,52 @@ public class OutlineTaskStrategy implements TaskStrategy {
         } catch (Exception e) {
             // 忽略解析错误
         }
+    }
+
+    /**
+     * 从章节内容中提取 <fs> 伏笔埋设标签
+     * Per D-03: <fs> 子标签: <ft>标题, <fy>类型, <fl>布局线, <fd>描述, <fc>回收分卷, <fr>回收章节
+     * Per D-04: 每个章节可包含零个或多个 <fs> 标签
+     */
+    private List<Map<String, String>> extractForeshadowingPlants(String chapterContent) {
+        List<Map<String, String>> plants = new ArrayList<>();
+        Pattern fsPattern = Pattern.compile("<fs>\\s*([\\s\\S]*?)\\s*</fs>", Pattern.DOTALL);
+        Matcher fsMatcher = fsPattern.matcher(chapterContent);
+        while (fsMatcher.find()) {
+            String fsContent = fsMatcher.group(1);
+            Map<String, String> data = new HashMap<>();
+            extractXmlFieldCData(fsContent, "ft", data);  // title
+            extractXmlField(fsContent, "fy", data);        // type (character/item/event/secret)
+            extractXmlField(fsContent, "fl", data);         // layout line (bright1/bright2/bright3/dark)
+            extractXmlFieldCData(fsContent, "fd", data);   // description
+            extractXmlField(fsContent, "fc", data);         // callback volume
+            extractXmlField(fsContent, "fr", data);         // callback chapter
+            if (data.containsKey("ft")) {
+                plants.add(data);
+            }
+        }
+        return plants;
+    }
+
+    /**
+     * 从章节内容中提取 <fp> 伏笔回收标签
+     * Per D-03: <fp> 子标签: <ft>标题, <fd>回收方式描述
+     * Per D-05: <fp> 仅作为信息参考，不自动更新已有伏笔状态
+     */
+    private List<Map<String, String>> extractForeshadowingPayoffs(String chapterContent) {
+        List<Map<String, String>> payoffs = new ArrayList<>();
+        Pattern fpPattern = Pattern.compile("<fp>\\s*([\\s\\S]*?)\\s*</fp>", Pattern.DOTALL);
+        Matcher fpMatcher = fpPattern.matcher(chapterContent);
+        while (fpMatcher.find()) {
+            String fpContent = fpMatcher.group(1);
+            Map<String, String> data = new HashMap<>();
+            extractXmlFieldCData(fpContent, "ft", data);  // title (for reference)
+            extractXmlFieldCData(fpContent, "fd", data);   // payoff description
+            if (data.containsKey("ft")) {
+                payoffs.add(data);
+            }
+        }
+        return payoffs;
     }
 
     /**

@@ -232,6 +232,20 @@ public class ForeshadowingService {
     }
 
     /**
+     * 删除指定分卷的pending状态伏笔（重新规划时先删后建）
+     * Per D-06: 仅删除 plantedVolume 匹配当前卷且 status=pending 的伏笔
+     */
+    public int deletePendingForeshadowingForVolume(Long projectId, int volumeNumber) {
+        LambdaQueryWrapper<Foreshadowing> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Foreshadowing::getProjectId, projectId)
+               .eq(Foreshadowing::getPlantedVolume, volumeNumber)
+               .eq(Foreshadowing::getStatus, "pending");
+        int deleted = foreshadowingMapper.delete(wrapper);
+        log.info("删除第{}卷pending伏笔 {} 个, projectId={}", volumeNumber, deleted, projectId);
+        return deleted;
+    }
+
+    /**
      * 标记伏笔为已填回
      */
     @Transactional
