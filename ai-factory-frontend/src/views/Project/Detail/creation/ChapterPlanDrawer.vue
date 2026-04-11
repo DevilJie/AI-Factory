@@ -5,6 +5,7 @@ import { useEditorStore } from '@/stores/editor'
 import { updateChapterPlan, type ChapterPlanUpdateRequest, getChapterCharacters, type ChapterCharacter } from '@/api/chapter'
 import { success, error } from '@/utils/toast'
 import type { ChapterPlan } from '@/types/project'
+import ForeshadowingTab from './ForeshadowingTab.vue'
 
 const editorStore = useEditorStore()
 
@@ -59,7 +60,8 @@ const sections = [
   { key: 'basic', label: '基本信息' },
   { key: 'plot', label: '情节规划' },
   { key: 'scene', label: '场景设定' },
-  { key: 'character', label: '角色规划' }
+  { key: 'character', label: '角色规划' },
+  { key: 'foreshadowing', label: '伏笔管理' }
 ] as const
 
 // Status options
@@ -628,6 +630,14 @@ const chapterNumber = computed(() => {
                 </button>
               </div>
             </div>
+
+            <!-- Foreshadowing Section -->
+            <ForeshadowingTab
+              v-if="activeSection === 'foreshadowing'"
+              :project-id="projectId"
+              :chapter-number="chapterNumber"
+              :volume-number="currentChapterPlan?.volumeNumber"
+            />
           </div>
 
           <!-- Footer -->
