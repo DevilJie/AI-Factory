@@ -15,7 +15,7 @@
 | Phase | Name | Plans | Status |
 |-------|------|-------|--------|
 | 15 | Data Foundation | Complete    | 2026-04-10 |
-| 16 | AI Chapter Planning | 0/2 | Not Started |
+| 16 | AI Chapter Planning | 1/2 | In Progress |
 | 17 | AI Generation Constraints | 0/1 | Not Started |
 | 18 | Frontend Chapter Foreshadowing | 0/2 | Not Started |
 | 19 | Frontend Project Management | 0/1 | Not Started |

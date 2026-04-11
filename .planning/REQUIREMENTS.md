@@ -15,7 +15,7 @@ Requirements for v1.0.6. Each maps to roadmap phases.
 
 ### AI Planning (AIP)
 
-- [ ] **AIP-01**: 章节规划提示词注入已有活跃伏笔上下文（待埋设 + 待回收），让 LLM 了解当前伏笔状态
+- [x] **AIP-01**: 章节规划提示词注入已有活跃伏笔上下文（待埋设 + 待回收），让 LLM 了解当前伏笔状态
 - [ ] **AIP-02**: 章节规划 LLM 输出新增 <fs>（伏笔埋设）和 <fp>（伏笔回收）XML 标签，包含标题、描述、类型、布局线等子标签
 - [ ] **AIP-03**: DOM 解析器扩展处理 <fs>/<fp> 标签，解析伏笔数据并批量保存到 novel_foreshadowing 表
 
@@ -55,7 +55,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-01 | Phase 15 | Pending |
 | DATA-02 | Phase 15 | Pending |
 | DATA-03 | Phase 15 | Pending |
-| AIP-01 | Phase 16 | Pending |
+| AIP-01 | Phase 16 | Complete |
 | AIP-02 | Phase 16 | Pending |
 | AIP-03 | Phase 16 | Pending |
 | AIC-01 | Phase 17 | Pending |

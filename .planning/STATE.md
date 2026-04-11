@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0.6
 milestone_name: 伏笔管理
-status: completed
-stopped_at: Phase 16 context gathered
-last_updated: "2026-04-10T17:21:17.783Z"
-last_activity: 2026-04-10
+status: executing
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-04-11T04:50:30Z"
+last_activity: 2026-04-11 -- Phase 16 Plan 01 executed
 progress:
   total_phases: 4
   completed_phases: 2
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-10)
 
 **Core value:** 势力的结构化数据能让 AI 生成章节时准确引用势力关系，也让用户方便地查看、编辑、管理势力体系。
-**Current focus:** Phase 15 — data-foundation (all plans complete)
+**Current focus:** Phase 16 -- ai-chapter-planning
 
 ## Current Position
 
-Phase: 15
-Plan: Not started
-Status: Plan 15-02 completed, phase 15 complete
-Last activity: 2026-04-10
+Phase: 16 (ai-chapter-planning) -- EXECUTING
+Plan: 1 of 2 (Plan 01 complete)
+Status: Executing Phase 16
+Last activity: 2026-04-11 -- Phase 16 Plan 01 executed
 
-Progress: [==========] 100%
+Progress: [======----] 60%
 
 ## Performance Metrics
 
@@ -47,7 +47,7 @@ Progress: [==========] 100%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 15. Data Foundation | 2/2 | 13min | 6.5min |
-| 16. AI Chapter Planning | — | — | — |
+| 16. AI Chapter Planning | 1/2 | 10min | 10min |
 | 17. AI Generation Constraints | — | — | — |
 | 18. Frontend Chapter Foreshadowing | — | — | — |
 | 19. Frontend Project Management | — | — | — |
@@ -66,6 +66,9 @@ Recent decisions for v1.0.6:
 - plantedVolume immutable after creation (only plannedCallbackVolume on UpdateDto)
 - Dark-line foreshadowing exempt from distance validation per D-07
 - Validation skipped when volume plan not found (volume not yet planned)
+- D-01: Structured list format for foreshadowing context (title, type, layout line, status, locations)
+- D-02: Only inject active foreshadowing for current volume (pending plants + in_progress callbacks)
+- D-07: Inject into both template and hardcoded prompt paths for full coverage
 
 ### Pending Todos
 
@@ -78,6 +81,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-10T17:21:17.774Z
-Stopped at: Phase 16 context gathered
-Resume file: .planning/phases/16-ai-chapter-planning/16-CONTEXT.md
+Last session: 2026-04-11T04:50:30Z
+Stopped at: Completed 16-01-PLAN.md
+Resume file: .planning/phases/16-ai-chapter-planning/16-01-SUMMARY.md
