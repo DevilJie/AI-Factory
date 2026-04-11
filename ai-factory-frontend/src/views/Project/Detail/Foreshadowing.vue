@@ -27,6 +27,9 @@ const loading = ref(false)
 const foreshadowings = ref<Foreshadowing[]>([])
 const searchKeyword = ref('')
 const filterStatus = ref<ForeshadowingStatus | 'all'>('all')
+const filterType = ref<ForeshadowingType | 'all'>('all')
+const filterLayoutType = ref<ForeshadowingLayoutType | 'all'>('all')
+const filterVolume = ref<number | 'all'>('all')
 
 // Modal state
 const showModal = ref(false)
@@ -104,6 +107,26 @@ const statusTabs = [
   { value: 'completed', label: '已完成' }
 ]
 
+const typeFilterOptions = [
+  { value: 'all', label: '全部类型' },
+  ...typeOptions
+]
+
+const layoutFilterOptions = [
+  { value: 'all', label: '全部布局' },
+  ...layoutTypeOptions
+]
+
+// Available volumes from data
+const volumeOptions = computed(() => {
+  const volumes = new Set<number>()
+  foreshadowings.value.forEach(f => {
+    if (f.plantedVolume) volumes.add(f.plantedVolume)
+    if (f.plannedCallbackVolume) volumes.add(f.plannedCallbackVolume)
+  })
+  return Array.from(volumes).sort((a, b) => a - b)
+})
+
 // Filtered list
 const filteredForeshadowings = computed(() => {
   let items = foreshadowings.value
@@ -117,7 +140,60 @@ const filteredForeshadowings = computed(() => {
     items = items.filter(f => f.status === filterStatus.value)
   }
 
+  if (filterType.value !== 'all') {
+    items = items.filter(f => f.type === filterType.value)
+  }
+
+  if (filterLayoutType.value !== 'all') {
+    items = items.filter(f => f.layoutType === filterLayoutType.value)
+  }
+
+  if (filterVolume.value !== 'all') {
+    const vol = filterVolume.value
+    items = items.filter(f => f.plantedVolume === vol || f.plannedCallbackVolume === vol)
+  }
+
   return items
+})
+
+// Health score (FP-04)
+const healthScore = computed(() => {
+  const all = foreshadowings.value
+  if (all.length === 0) return null
+
+  const planted = all.filter(f => f.status === 'pending').length
+  const inProgress = all.filter(f => f.status === 'in_progress').length
+  const completed = all.filter(f => f.status === 'completed').length
+  const total = all.length
+
+  // Completion ratio
+  const completionRatio = completed / total
+
+  // Overdue count: in_progress items where plannedCallbackChapter exists but chapter has passed
+  // (We can't know current chapter count, so count items with callback planned but still in_progress)
+  const overdue = all.filter(f =>
+    f.status === 'in_progress' && f.plannedCallbackChapter !== null && f.plannedCallbackChapter !== undefined
+  ).length
+
+  // Average distance between plant and callback (for completed items)
+  const completedWithDistance = all.filter(f => f.status === 'completed' && f.actualCallbackChapter && f.plantedChapter)
+  const avgDistance = completedWithDistance.length > 0
+    ? Math.round(completedWithDistance.reduce((sum, f) => sum + Math.abs((f.actualCallbackChapter || 0) - f.plantedChapter), 0) / completedWithDistance.length)
+    : 0
+
+  // Overall score: weighted combination
+  const score = Math.round(completionRatio * 100)
+
+  return {
+    total,
+    planted,
+    inProgress,
+    completed,
+    completionRatio: Math.round(completionRatio * 100),
+    overdue,
+    avgDistance,
+    score
+  }
 })
 
 // Data loading
@@ -279,7 +355,7 @@ const getChapterRef = (f: Foreshadowing): string => {
 
     <!-- Filter Bar -->
     <div class="flex-shrink-0 px-6 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-4 flex-wrap">
         <!-- Search -->
         <div class="relative flex-1 max-w-xs">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -306,6 +382,62 @@ const getChapterRef = (f: Foreshadowing): string => {
           >
             {{ tab.label }}
           </button>
+        </div>
+
+        <!-- Type Filter -->
+        <select
+          v-model="filterType"
+          class="px-3 py-1.5 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option v-for="opt in typeFilterOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+
+        <!-- Layout Filter -->
+        <select
+          v-model="filterLayoutType"
+          class="px-3 py-1.5 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option v-for="opt in layoutFilterOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+
+        <!-- Volume Filter -->
+        <select
+          v-if="volumeOptions.length > 0"
+          v-model="filterVolume"
+          class="px-3 py-1.5 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">全部分卷</option>
+          <option v-for="vol in volumeOptions" :key="vol" :value="vol">第{{ vol }}卷</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Health Score (FP-04) -->
+    <div v-if="healthScore && healthScore.total > 0" class="flex-shrink-0 px-6 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="text-center">
+          <p class="text-2xl font-bold" :class="healthScore.score >= 70 ? 'text-green-600 dark:text-green-400' : healthScore.score >= 40 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'">
+            {{ healthScore.score }}
+          </p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">健康度</p>
+        </div>
+        <div class="text-center">
+          <p class="text-2xl font-bold text-gray-700 dark:text-gray-300">{{ healthScore.total }}</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">总数</p>
+        </div>
+        <div class="text-center">
+          <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ healthScore.completionRatio }}%</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">回收率</p>
+        </div>
+        <div class="text-center">
+          <p class="text-2xl font-bold" :class="healthScore.overdue > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400'">
+            {{ healthScore.overdue }}
+          </p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">进行中待回收</p>
+        </div>
+        <div class="text-center">
+          <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ healthScore.avgDistance }}</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">平均埋设-回收距离</p>
         </div>
       </div>
     </div>
