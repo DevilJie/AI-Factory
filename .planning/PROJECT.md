@@ -58,9 +58,11 @@ AI Factory 世界观模块已完成势力阵营结构化重构、世界观生成
 - ✓ 章节规划伏笔上下文注入（buildActiveForeshadowingContext + 双路径注入） — v1.0.6 Phase 16
 - ✓ parseChaptersXml 伏笔标签解析（<fs>/<fp> 提取 + 伏笔持久化） — v1.0.6 Phase 16
 
+- ✓ 章节创作注入伏笔约束（PromptTemplateBuilder + batchUpdateStatusForChapter 双路径） — v1.0.6 Phase 17
+
 ### Active
 
-- [ ] 章节创作注入伏笔约束（本章节埋设 + 回收）
+- [x] 章节创作注入伏笔约束（本章节埋设 + 回收） — v1.0.6 Phase 17
 - [ ] ChapterPlanDrawer 伏笔管理区（查看/编辑/添加/删除）
 - [ ] 侧边栏伏笔管理菜单（项目级伏笔总览）
 

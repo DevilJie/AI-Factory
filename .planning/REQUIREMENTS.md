@@ -21,8 +21,8 @@ Requirements for v1.0.6. Each maps to roadmap phases.
 
 ### AI Constraints (AIC)
 
-- [ ] **AIC-01**: 章节生成提示词注入伏笔约束——"本章节需埋设的伏笔"和"本章节需回收的伏笔"——作为硬性创作指令
-- [ ] **AIC-02**: 伏笔约束文本使用简洁格式，仅注入当前章节相关项，避免上下文窗口溢出
+- [x] **AIC-01**: 章节生成提示词注入伏笔约束——"本章节需埋设的伏笔"和"本章节需回收的伏笔"——作为硬性创作指令
+- [x] **AIC-02**: 伏笔约束文本使用简洁格式，仅注入当前章节相关项，避免上下文窗口溢出
 
 ### Frontend Chapter (FC)
 
@@ -58,8 +58,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AIP-01 | Phase 16 | Complete |
 | AIP-02 | Phase 16 | Complete |
 | AIP-03 | Phase 16 | Complete |
-| AIC-01 | Phase 17 | Pending |
-| AIC-02 | Phase 17 | Pending |
+| AIC-01 | Phase 17 | Complete |
+| AIC-02 | Phase 17 | Complete |
 | FC-01 | Phase 18 | Pending |
 | FC-02 | Phase 18 | Pending |
 | FP-01 | Phase 19 | Pending |

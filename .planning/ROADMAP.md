@@ -15,8 +15,8 @@
 | Phase | Name | Plans | Status |
 |-------|------|-------|--------|
 | 15 | Data Foundation | Complete    | 2026-04-10 |
-| 16 | 2/1 | Complete    | 2026-04-11 |
-| 17 | AI Generation Constraints | 0/1 | Not Started |
+| 16 | AI Chapter Planning | Complete    | 2026-04-11 |
+| 17 | 1/1 | Complete   | 2026-04-11 |
 | 18 | Frontend Chapter Foreshadowing | 0/2 | Not Started |
 | 19 | Frontend Project Management | 0/1 | Not Started |
 
@@ -64,16 +64,16 @@
 
 **Milestone Goal:** 激活 novel_foreshadowing 表为章节规划和生成的核心驱动，让 LLM 自动规划伏笔埋设/回收，用户可跨卷管理伏笔。
 
-- [x] **Phase 15: Data Foundation** — 伏笔表扩展 + 旧字段删除 + 距离校验 (completed 2026-04-10)
-- [x] **Phase 16: AI Chapter Planning** — 章节规划伏笔上下文注入 + XML 输出 + 解析保存 (completed 2026-04-11)
-- [ ] **Phase 17: AI Generation Constraints** — 章节生成伏笔约束注入
+- [x] **Phase 15: Data Foundation** — 伏笔表扩展 + 旧字段删除 + 距离校验 (completed 2026-04-10)
+- [x] **Phase 16: AI Chapter Planning** — 章节规划伏笔上下文注入 + XML 输出 + 解析保存 (completed 2026-04-11)
+- [x] **Phase 17: AI Generation Constraints** — 章节生成伏笔约束注入 (completed 2026-04-11)
 - [ ] **Phase 18: Frontend Chapter Foreshadowing** — ChapterPlanDrawer 伏笔管理区
 - [ ] **Phase 19: Frontend Project Management** — 项目级伏笔总览页面 + 健康度评分
 
 ## v1.0.6 伏笔管理 (Phases 15-19) — IN PROGRESS
 
 - [x] Phase 15: 数据基础 (2/2 plans) — completed 2026-04-11
-- [x] Phase 16: AI 章节规划伏笔 (completed 2026-04-11)
+- [x] Phase 16: AI 章节规划伏笔 (completed 2026-04-11)
 - [ ] Phase 17: AI 生成伏笔约束
 - [ ] Phase 18: 前端章节伏笔管理
 - [ ] Phase 19: 前端项目伏笔管理
@@ -102,11 +102,11 @@ Plans:
   1. 章节规划提示词包含当前活跃伏笔列表（待埋设 + 待回收），LLM 能看到伏笔上下文
   2. LLM 章节规划输出包含 <fs>/<fp> XML 标签，含标题、描述、类型、布局线等子标签
   3. DOM 解析器正确解析 <fs>/<fp> 标签，批量创建/更新 novel_foreshadowing 记录
-**Plans**: TBD
+**Plans**: 2/2 complete
 
 Plans:
-- [x] 16-01: TBD
-- [x] 16-02: TBD
+- [x] 16-01: Foreshadowing context injection into chapter planning prompts [AIP-01]
+- [x] 16-02: Foreshadowing XML parsing and persistence [AIP-02, AIP-03]
 
 ### Phase 17: AI Generation Constraints
 **Goal**: 章节生成时注入伏笔硬性创作指令，确保 LLM 按规划埋设或回收伏笔
@@ -115,10 +115,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. 章节生成提示词包含"本章节需埋设的伏笔"和"本章节需回收的伏笔"约束段落
   2. 约束文本仅包含当前章节相关项，格式简洁，不会导致上下文窗口溢出
-**Plans**: TBD
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 17-01: TBD
+- [x] 17-01-PLAN.md — Foreshadowing constraint injection + batch status update [AIC-01, AIC-02]
 
 ### Phase 18: Frontend Chapter Foreshadowing
 **Goal**: 用户在章节规划抽屉中查看和管理本章节的伏笔埋设/回收
@@ -157,8 +157,8 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 15. Data Foundation | v1.0.6 | 0/2 | Planned | - |
-| 16. AI Chapter Planning | v1.0.6 | 0/? | Not started | - |
-| 17. AI Generation Constraints | v1.0.6 | 0/? | Not started | - |
+| 15. Data Foundation | v1.0.6 | 2/2 | Complete | 2026-04-10 |
+| 16. AI Chapter Planning | v1.0.6 | 2/2 | Complete | 2026-04-11 |
+| 17. AI Generation Constraints | v1.0.6 | 0/1 | Planned | - |
 | 18. Frontend Chapter Foreshadowing | v1.0.6 | 0/? | Not started | - |
 | 19. Frontend Project Management | v1.0.6 | 0/? | Not started | - |

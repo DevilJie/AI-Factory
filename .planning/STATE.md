@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.6
 milestone_name: 伏笔管理
-status: executing
-stopped_at: Phase 17 context gathered
-last_updated: "2026-04-11T07:14:08.778Z"
+status: verifying
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-04-11T09:14:32.311Z"
 last_activity: 2026-04-11
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
+  completed_phases: 4
+  total_plans: 8
+  completed_plans: 8
   percent: 60
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-10)
 
 **Core value:** 势力的结构化数据能让 AI 生成章节时准确引用势力关系，也让用户方便地查看、编辑、管理势力体系。
-**Current focus:** Phase 16 -- ai-chapter-planning
+**Current focus:** Phase 17 — ai-generation-constraints
 
 ## Current Position
 
-Phase: 16
-Plan: Not started
-Status: Ready to execute
+Phase: 17 (ai-generation-constraints) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
 Last activity: 2026-04-11
 
 Progress: [======----] 60%
@@ -54,6 +54,7 @@ Progress: [======----] 60%
 
 *Updated after each plan completion*
 | Phase 16 P02 | 5min | 2 tasks | 2 files |
+| Phase 17 P01 | 6min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,10 @@ Recent decisions for v1.0.6:
 - [Phase 16]: D-03/D-04: <fs> sub-tags ft/fy/fl/fd/fc/fr with multi-plant per chapter; <fp> sub-tags ft/fd
 - [Phase 16]: D-05: <fp> payoff data parsed but NOT used for status updates (deferred to Phase 17)
 - [Phase 16]: D-06: deletePendingForeshadowingForVolume only deletes plantedVolume + pending status, NOT plannedCallbackVolume
+- [Phase 17]: D-04: auto foreshadowing status update (pending->in_progress, in_progress->completed) after chapter generation
+- [Phase 17]: D-05: chapter re-generation does NOT roll back foreshadowing status
+- [Phase 17]: D-06: foreshadowing constraint injection mirrors character constraint pattern (hasCheck + buildText + variable.put)
+- [Phase 17]: D-07: SQL template migration as reference file with manual verification instructions
 
 ### Pending Todos
 
@@ -85,6 +90,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-11T07:14:08.763Z
-Stopped at: Phase 17 context gathered
-Resume file: .planning/phases/17-ai-generation-constraints/17-CONTEXT.md
+Last session: 2026-04-11T09:14:32.304Z
+Stopped at: Completed 17-01-PLAN.md
+Resume file: None
