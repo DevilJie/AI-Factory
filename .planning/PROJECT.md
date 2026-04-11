@@ -55,9 +55,11 @@ AI Factory 世界观模块已完成势力阵营结构化重构、世界观生成
 - ✓ novel_foreshadowing 分卷字段 + 距离校验 + 回收章节边界校验 — v1.0.6 Phase 15
 - ✓ 移除 novel_chapter_plan foreshadowingSetup/foreshadowingPayoff 冗余字段 — v1.0.6 Phase 15
 
+- ✓ 章节规划伏笔上下文注入（buildActiveForeshadowingContext + 双路径注入） — v1.0.6 Phase 16
+- ✓ parseChaptersXml 伏笔标签解析（<fs>/<fp> 提取 + 伏笔持久化） — v1.0.6 Phase 16
+
 ### Active
 
-- [ ] 章节规划 LLM 输出伏笔规划（埋设 + 回收）
 - [ ] 章节创作注入伏笔约束（本章节埋设 + 回收）
 - [ ] ChapterPlanDrawer 伏笔管理区（查看/编辑/添加/删除）
 - [ ] 侧边栏伏笔管理菜单（项目级伏笔总览）
@@ -132,4 +134,4 @@ Post-v1.0.5 fixes: chapterPlanId matching fix, 章节序号显示, WorldviewXmlP
 This document evolves at phase transitions and milestone boundaries.
 
 ---
-*Last updated: 2026-04-10 after milestone v1.0.6 started*
+*Last updated: 2026-04-11 after Phase 16 (AI Chapter Planning) complete*
