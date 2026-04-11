@@ -666,6 +666,45 @@ public class OutlineTaskStrategy implements TaskStrategy {
 
             log.info("保存第{}卷章节完成，共{}章", volumeNumber, chaptersList.size());
 
+            // Per D-06: 重新规划时先删除该卷pending伏笔，再根据LLM输出重建
+            foreshadowingService.deletePendingForeshadowingForVolume(projectId, volumeNumber);
+
+            // 解析并保存伏笔数据
+            int foreshadowingCount = 0;
+            for (Map<String, String> chapterData : chaptersList) {
+                String plantCountStr = chapterData.get("_foreshadowingPlants_count");
+                if (plantCountStr != null) {
+                    int plantCount = Integer.parseInt(plantCountStr);
+                    String chapterNumberStr = chapterData.getOrDefault("chapterNumber", "0");
+                    for (int i = 0; i < plantCount; i++) {
+                        try {
+                            com.aifactory.dto.ForeshadowingCreateDto fsDto = new com.aifactory.dto.ForeshadowingCreateDto();
+                            fsDto.setTitle(chapterData.getOrDefault("_fs_" + i + "_ft", "未命名伏笔"));
+                            fsDto.setType(chapterData.getOrDefault("_fs_" + i + "_fy", "event"));
+                            fsDto.setDescription(chapterData.getOrDefault("_fs_" + i + "_fd", ""));
+                            fsDto.setLayoutType(chapterData.getOrDefault("_fs_" + i + "_fl", "bright1"));
+                            fsDto.setPlantedChapter(Integer.parseInt(chapterNumberStr));
+                            fsDto.setPlantedVolume(volumeNumber);
+
+                            String fcStr = chapterData.get("_fs_" + i + "_fc");
+                            if (fcStr != null && !fcStr.isEmpty()) {
+                                fsDto.setPlannedCallbackVolume(parseIntSafe(fcStr, null));
+                            }
+                            String frStr = chapterData.get("_fs_" + i + "_fr");
+                            if (frStr != null && !frStr.isEmpty()) {
+                                fsDto.setPlannedCallbackChapter(parseIntSafe(frStr, null));
+                            }
+
+                            foreshadowingService.createForeshadowing(projectId, fsDto);
+                            foreshadowingCount++;
+                        } catch (Exception e2) {
+                            log.warn("保存第{}卷第{}章伏笔失败(第{}个): {}", volumeNumber, chapterNumberStr, i, e2.getMessage());
+                        }
+                    }
+                }
+            }
+            log.info("保存第{}卷伏笔 {} 个", volumeNumber, foreshadowingCount);
+
         } catch (Exception e) {
             log.error("!!! 保存第{}卷章节到数据库失败", volumeNumber, e);
             log.error("!!! 原始XML数据:\n{}", chaptersXml);
@@ -2264,5 +2303,58 @@ public class OutlineTaskStrategy implements TaskStrategy {
         }
 
         log.info("保存第{}卷的新章节 {} 个", volumeNumber, chaptersList.size());
+
+        // Per D-06: 重新规划时先删除该卷pending伏笔
+        foreshadowingService.deletePendingForeshadowingForVolume(projectId, volumeNumber);
+
+        // 解析并保存伏笔数据
+        int foreshadowingCount = 0;
+        for (Map<String, String> chapterData : chaptersList) {
+            String plantCountStr = chapterData.get("_foreshadowingPlants_count");
+            if (plantCountStr != null) {
+                int plantCount = Integer.parseInt(plantCountStr);
+                String chapterNumberStr = chapterData.getOrDefault("chapterNumber", "0");
+                for (int i = 0; i < plantCount; i++) {
+                    try {
+                        com.aifactory.dto.ForeshadowingCreateDto fsDto = new com.aifactory.dto.ForeshadowingCreateDto();
+                        fsDto.setTitle(chapterData.getOrDefault("_fs_" + i + "_ft", "未命名伏笔"));
+                        fsDto.setType(chapterData.getOrDefault("_fs_" + i + "_fy", "event"));
+                        fsDto.setDescription(chapterData.getOrDefault("_fs_" + i + "_fd", ""));
+                        fsDto.setLayoutType(chapterData.getOrDefault("_fs_" + i + "_fl", "bright1"));
+                        fsDto.setPlantedChapter(Integer.parseInt(chapterNumberStr));
+                        fsDto.setPlantedVolume(volumeNumber);
+
+                        String fcStr = chapterData.get("_fs_" + i + "_fc");
+                        if (fcStr != null && !fcStr.isEmpty()) {
+                            fsDto.setPlannedCallbackVolume(parseIntSafe(fcStr, null));
+                        }
+                        String frStr = chapterData.get("_fs_" + i + "_fr");
+                        if (frStr != null && !frStr.isEmpty()) {
+                            fsDto.setPlannedCallbackChapter(parseIntSafe(frStr, null));
+                        }
+
+                        foreshadowingService.createForeshadowing(projectId, fsDto);
+                        foreshadowingCount++;
+                    } catch (Exception e) {
+                        log.warn("保存第{}卷第{}章伏笔失败(第{}个): {}", volumeNumber, chapterNumberStr, i, e.getMessage());
+                    }
+                }
+            }
+        }
+        log.info("保存第{}卷伏笔 {} 个", volumeNumber, foreshadowingCount);
+    }
+
+    /**
+     * 安全解析整数，解析失败返回默认值
+     */
+    private Integer parseIntSafe(String value, Integer defaultValue) {
+        if (value == null || value.trim().isEmpty()) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 }
