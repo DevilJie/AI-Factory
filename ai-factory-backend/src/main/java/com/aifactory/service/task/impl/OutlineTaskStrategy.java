@@ -19,7 +19,10 @@ import com.aifactory.mapper.NovelWorldviewMapper;
 import com.aifactory.mapper.ProjectMapper;
 import com.aifactory.service.ContinentRegionService;
 import com.aifactory.service.FactionService;
+import com.aifactory.service.ForeshadowingService;
 import com.aifactory.service.PowerSystemService;
+import com.aifactory.dto.ForeshadowingQueryDto;
+import com.aifactory.dto.ForeshadowingDto;
 import com.aifactory.service.llm.LLMProviderFactory;
 import com.aifactory.service.prompt.PromptContextBuilder;
 import com.aifactory.service.prompt.PromptTemplateService;
@@ -87,6 +90,9 @@ public class OutlineTaskStrategy implements TaskStrategy {
 
     @Autowired
     private FactionService factionService;
+
+    @Autowired
+    private ForeshadowingService foreshadowingService;
 
     @Override
     public String getTaskType() {
@@ -939,6 +945,10 @@ public class OutlineTaskStrategy implements TaskStrategy {
             }
             variables.put("characterInfo", characterBuilder.length() > 0 ? characterBuilder.toString() : "暂无登场角色");
 
+            // 伏笔上下文 (per D-01, D-02)
+            String foreshadowingContext = buildActiveForeshadowingContext(context.getProjectId(), volumeNumber);
+            variables.put("foreshadowingContext", foreshadowingContext);
+
             // 执行模板
             String templateCode = "llm_outline_chapter_generate";
             return promptTemplateService.executeTemplate(templateCode, variables);
@@ -1003,6 +1013,12 @@ public class OutlineTaskStrategy implements TaskStrategy {
                 }
                 prompt.append("\n");
             }
+        }
+
+        // 添加伏笔上下文（如果有）
+        String foreshadowingContext = buildActiveForeshadowingContext(context.getProjectId(), volumeNumber);
+        if (foreshadowingContext != null && !foreshadowingContext.isEmpty()) {
+            prompt.append(foreshadowingContext);
         }
 
         prompt.append("【预计章节数】").append(chapterCount).append("章\n");
@@ -1287,6 +1303,69 @@ public class OutlineTaskStrategy implements TaskStrategy {
         } catch (Exception e) {
             // 忽略解析错误
         }
+    }
+
+    /**
+     * 构建当前分卷的活跃伏笔上下文（用于章节规划提示词注入）
+     * Per D-01: 结构化列表格式，每个伏笔显示标题、类型、布局线、状态、埋设/回收位置
+     * Per D-02: 仅注入当前分卷活跃伏笔（status=pending 或 in_progress）
+     */
+    private String buildActiveForeshadowingContext(Long projectId, int volumeNumber) {
+        StringBuilder sb = new StringBuilder();
+
+        // 查询当前分卷待埋设的伏笔（status=pending）
+        ForeshadowingQueryDto plantQuery = new ForeshadowingQueryDto();
+        plantQuery.setProjectId(projectId);
+        plantQuery.setPlantedVolume(volumeNumber);
+        plantQuery.setStatus("pending");
+        List<ForeshadowingDto> pendingPlants = foreshadowingService.getForeshadowingList(plantQuery);
+
+        // 查询当前分卷待回收的伏笔（status=in_progress）
+        ForeshadowingQueryDto callbackQuery = new ForeshadowingQueryDto();
+        callbackQuery.setProjectId(projectId);
+        callbackQuery.setPlannedCallbackVolume(volumeNumber);
+        callbackQuery.setStatus("in_progress");
+        List<ForeshadowingDto> pendingCallbacks = foreshadowingService.getForeshadowingList(callbackQuery);
+
+        if (pendingPlants.isEmpty() && pendingCallbacks.isEmpty()) {
+            return "";  // 当前分卷无活跃伏笔
+        }
+
+        sb.append("\n【当前卷活跃伏笔】\n");
+
+        if (!pendingPlants.isEmpty()) {
+            sb.append("\n待埋设伏笔（需在本卷各章节中埋设）：\n");
+            for (int i = 0; i < pendingPlants.size(); i++) {
+                ForeshadowingDto fs = pendingPlants.get(i);
+                sb.append(i + 1).append(". ").append(fs.getTitle());
+                sb.append(" | 类型: ").append(fs.getType() != null ? fs.getType() : "未设定");
+                sb.append(" | 布局线: ").append(fs.getLayoutType() != null ? fs.getLayoutType() : "未设定");
+                sb.append(" | 状态: ").append(fs.getStatus());
+                if (fs.getPlannedCallbackVolume() != null && fs.getPlannedCallbackChapter() != null) {
+                    sb.append(" | 计划回收: 第").append(fs.getPlannedCallbackVolume()).append("卷第").append(fs.getPlannedCallbackChapter()).append("章");
+                }
+                sb.append("\n");
+            }
+        }
+
+        if (!pendingCallbacks.isEmpty()) {
+            sb.append("\n待回收伏笔（前文已埋设，需在本卷回收）：\n");
+            for (int i = 0; i < pendingCallbacks.size(); i++) {
+                ForeshadowingDto fs = pendingCallbacks.get(i);
+                sb.append(i + 1).append(". ").append(fs.getTitle());
+                sb.append(" | 类型: ").append(fs.getType() != null ? fs.getType() : "未设定");
+                sb.append(" | 布局线: ").append(fs.getLayoutType() != null ? fs.getLayoutType() : "未设定");
+                sb.append(" | 状态: ").append(fs.getStatus());
+                if (fs.getPlantedVolume() != null && fs.getPlantedChapter() != null) {
+                    sb.append(" | 埋设: 第").append(fs.getPlantedVolume()).append("卷第").append(fs.getPlantedChapter()).append("章");
+                }
+                sb.append("\n");
+            }
+        }
+
+        sb.append("\n注：暗线(dark)伏笔为全书级悬念，可跨卷埋设线索，不急于回收。\n");
+
+        return sb.toString();
     }
 
     /**
