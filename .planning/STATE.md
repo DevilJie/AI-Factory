@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.6
 milestone_name: 伏笔管理
-status: verifying
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-04-11T09:14:32.311Z"
+status: executing
+stopped_at: Completed 18-01-PLAN.md
+last_updated: "2026-04-11T11:29:43.685Z"
 last_activity: 2026-04-11
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 10
+  completed_plans: 9
   percent: 60
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-10)
 
 **Core value:** 势力的结构化数据能让 AI 生成章节时准确引用势力关系，也让用户方便地查看、编辑、管理势力体系。
-**Current focus:** Phase 17 — ai-generation-constraints
+**Current focus:** Phase 18 — frontend-chapter-foreshadowing
 
 ## Current Position
 
-Phase: 17 (ai-generation-constraints) — EXECUTING
-Plan: 1 of 1
-Status: Phase complete — ready for verification
+Phase: 18 (frontend-chapter-foreshadowing) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-11
 
 Progress: [======----] 60%
@@ -55,6 +55,7 @@ Progress: [======----] 60%
 *Updated after each plan completion*
 | Phase 16 P02 | 5min | 2 tasks | 2 files |
 | Phase 17 P01 | 6min | 2 tasks | 6 files |
+| Phase 18 P01 | 8min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Recent decisions for v1.0.6:
 - [Phase 17]: D-05: chapter re-generation does NOT roll back foreshadowing status
 - [Phase 17]: D-06: foreshadowing constraint injection mirrors character constraint pattern (hasCheck + buildText + variable.put)
 - [Phase 17]: D-07: SQL template migration as reference file with manual verification instructions
+- [Phase 18]: Mapped ForeshadowingDto LocalDateTime to TypeScript string (JSON serialization)
+- [Phase 18]: ForeshadowingUpdateRequest omits plantedChapter per D-05 immutability rule
 
 ### Pending Todos
 
@@ -90,6 +93,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-11T09:14:32.304Z
-Stopped at: Completed 17-01-PLAN.md
+Last session: 2026-04-11T11:29:43.685Z
+Stopped at: Completed 18-01-PLAN.md
 Resume file: None

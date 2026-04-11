@@ -17,7 +17,7 @@
 | 15 | Data Foundation | Complete    | 2026-04-10 |
 | 16 | AI Chapter Planning | Complete    | 2026-04-11 |
 | 17 | 1/1 | Complete    | 2026-04-11 |
-| 18 | Frontend Chapter Foreshadowing | 0/2 | Not Started |
+| 18 | 1/2 | In Progress|  |
 | 19 | Frontend Project Management | 0/1 | Not Started |
 
 ## Phases
@@ -130,7 +130,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 18-01-PLAN.md — Backend query params + frontend types and API client [FC-01, FC-02]
+- [x] 18-01-PLAN.md — Backend query params + frontend types and API client [FC-01, FC-02]
 - [ ] 18-02-PLAN.md — ForeshadowingTab component + ChapterPlanDrawer integration [FC-01, FC-02]
 **UI hint**: yes
 

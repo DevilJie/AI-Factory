@@ -26,8 +26,8 @@ Requirements for v1.0.6. Each maps to roadmap phases.
 
 ### Frontend Chapter (FC)
 
-- [ ] **FC-01**: ChapterPlanDrawer 伏笔管理区替换现有 textarea，展示本章节相关伏笔卡片（需埋设 + 需回收）
-- [ ] **FC-02**: 用户可在章节伏笔管理区编辑、添加、删除伏笔（调用伏笔 API）
+- [x] **FC-01**: ChapterPlanDrawer 伏笔管理区替换现有 textarea，展示本章节相关伏笔卡片（需埋设 + 需回收）
+- [x] **FC-02**: 用户可在章节伏笔管理区编辑、添加、删除伏笔（调用伏笔 API）
 
 ### Frontend Project (FP)
 
@@ -60,8 +60,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AIP-03 | Phase 16 | Complete |
 | AIC-01 | Phase 17 | Complete |
 | AIC-02 | Phase 17 | Complete |
-| FC-01 | Phase 18 | Pending |
-| FC-02 | Phase 18 | Pending |
+| FC-01 | Phase 18 | Complete |
+| FC-02 | Phase 18 | Complete |
 | FP-01 | Phase 19 | Pending |
 | FP-02 | Phase 19 | Pending |
 | FP-03 | Phase 19 | Pending |
