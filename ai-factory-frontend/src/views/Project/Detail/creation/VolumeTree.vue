@@ -161,6 +161,7 @@ const handleChapterClick = async (chapter: Chapter) => {
     hasContent,
     chapterId: (chapter as any).chapterId,
     wordCount: (chapter as any).wordCount,
+    volumeNumber: (chapter as any).volumeNumber,
   })
 
   // 尝试通过规划ID加载章节（无论是否有内容都尝试加载，让 store 处理）

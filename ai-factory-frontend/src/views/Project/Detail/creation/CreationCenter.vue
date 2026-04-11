@@ -117,6 +117,7 @@ const handleSelectChapter = async (chapter: Chapter) => {
     hasContent: !!(chapter as any).hasContent || !!chapter.content,
     chapterId: (chapter as any).chapterId,
     wordCount: (chapter as any).wordCount,
+    volumeNumber: (chapter as any).volumeNumber,
   })
 
   // 使用 loadChapterByPlan 而不是 loadChapter，因为 chapter.id 是规划 ID
