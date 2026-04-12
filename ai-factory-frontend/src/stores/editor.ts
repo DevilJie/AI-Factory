@@ -162,11 +162,11 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   // 保存生成任务状态到 localStorage
-  const saveGeneratingTask = (chapterId: string) => {
+  const saveGeneratingTask = (chapterId: string, taskId?: string) => {
     if (!projectId.value) return
     localStorage.setItem(
       getChapterGenerateTaskKey(projectId.value),
-      JSON.stringify({ chapterId, startTime: Date.now() })
+      JSON.stringify({ chapterId, taskId, startTime: Date.now() })
     )
   }
 
@@ -257,17 +257,33 @@ export const useEditorStore = defineStore('editor', () => {
 
     isGenerating.value = true
     generatingChapterId.value = planId
-    saveGeneratingTask(planId)
 
     try {
       // 使用异步接口生成章节
       const result = await generateChapterApi(projectId.value, planId)
       console.log('AI创作任务已创建:', result)
 
-      // 轮询等待章节生成完成
-      const success = await pollChapterGeneration(planId)
-      if (!success) {
-        throw new Error('章节生成超时')
+      if (!result.taskId) {
+        throw new Error('未返回任务ID')
+      }
+
+      // 保存任务状态（含taskId）到 localStorage，用于页面刷新恢复
+      saveGeneratingTask(planId, result.taskId)
+
+      // 轮询任务状态，等待生成完成
+      await pollTaskUntilComplete(result.taskId)
+
+      // 任务完成后，加载生成的章节内容
+      const chapter = await getChapterByPlanId(projectId.value, planId)
+      if (chapter && chapter.content && chapter.content.trim().length > 0) {
+        currentChapter.value = chapter
+        content.value = chapter.content
+        isChapterGenerated.value = true
+        isDirty.value = false
+        lastSavedAt.value = new Date()
+        console.log('章节生成完成，内容长度:', chapter.content.length)
+      } else {
+        throw new Error('章节生成完成但内容为空')
       }
     } catch (e) {
       console.error('Failed to generate chapter:', e)
@@ -277,6 +293,40 @@ export const useEditorStore = defineStore('editor', () => {
       generatingChapterId.value = null
       clearGeneratingTask()
     }
+  }
+
+  // 轮询任务状态直到完成
+  const pollTaskUntilComplete = async (taskId: string, maxAttempts: number = 120, interval: number = 3000) => {
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(resolve => setTimeout(resolve, interval))
+
+      try {
+        const task = await getTaskStatus(taskId)
+        console.log(`轮询任务状态第${i + 1}次，状态: ${task.status}, 进度: ${task.progress || 0}%`)
+
+        if (task.status === 'completed') {
+          console.log('任务已完成:', task.result)
+          return
+        }
+
+        if (task.status === 'failed') {
+          throw new Error(task.errorMessage || '章节生成失败')
+        }
+
+        if (task.status === 'cancelled') {
+          throw new Error('章节生成任务已取消')
+        }
+        // 继续轮询 (pending/running)
+      } catch (e: any) {
+        // 如果是我们主动抛出的错误（failed/cancelled），直接抛出
+        if (e.message?.includes('失败') || e.message?.includes('取消')) {
+          throw e
+        }
+        // 网络错误等，继续轮询
+        console.log(`轮询第${i + 1}次出错，继续等待:`, e)
+      }
+    }
+    throw new Error('章节生成超时')
   }
 
   // 开始AI剧情修复
@@ -339,10 +389,10 @@ export const useEditorStore = defineStore('editor', () => {
       const taskData = localStorage.getItem(getChapterGenerateTaskKey(projectId.value))
       if (!taskData) return
 
-      const { chapterId: savedChapterId, startTime } = JSON.parse(taskData)
+      const { chapterId: savedChapterId, taskId: savedTaskId, startTime } = JSON.parse(taskData)
 
-      // 检查任务是否超时（超过5分钟认为已超时）
-      if (Date.now() - startTime > 5 * 60 * 1000) {
+      // 检查任务是否超时（超过10分钟认为已超时）
+      if (Date.now() - startTime > 10 * 60 * 1000) {
         clearGeneratingTask()
         return
       }
@@ -351,14 +401,21 @@ export const useEditorStore = defineStore('editor', () => {
       isGenerating.value = true
       generatingChapterId.value = savedChapterId
 
-      // 继续轮询
-      const success = await pollChapterGeneration(savedChapterId)
+      if (savedTaskId) {
+        // 有taskId，通过任务状态轮询
+        await pollTaskUntilComplete(savedTaskId)
+      } else {
+        // 兼容旧数据：没有taskId，回退到内容轮询
+        await pollChapterGeneration(savedChapterId)
+      }
 
-      if (success) {
-        // 生成完成，重新加载章节规划
-        if (currentChapterPlan.value?.id === savedChapterId) {
-          // 保持当前的章节规划信息
-        }
+      // 生成完成后加载章节内容
+      const chapter = await getChapterByPlanId(projectId.value, savedChapterId)
+      if (chapter && chapter.content) {
+        currentChapter.value = chapter
+        content.value = chapter.content
+        isChapterGenerated.value = true
+        isDirty.value = false
       }
 
       isGenerating.value = false

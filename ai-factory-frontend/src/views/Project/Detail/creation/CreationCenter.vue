@@ -217,12 +217,12 @@ const handleAddVolume = () => {
 
 // AI创作
 const handleGenerateChapter = async () => {
-  if (!editorStore.currentChapter?.id && !editorStore.currentChapterPlan?.id) {
+  if (!editorStore.currentChapterPlan?.id) {
     error('请先选择章节')
     return
   }
 
-  const planId = editorStore.currentChapter?.id || editorStore.currentChapterPlan?.id
+  const planId = editorStore.currentChapterPlan.id
   if (!planId) return
 
   try {

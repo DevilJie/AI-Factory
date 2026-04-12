@@ -22,7 +22,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.aifactory.entity.NovelCharacter;
 import com.aifactory.entity.NovelCharacterChapter;
@@ -364,40 +363,6 @@ public class ChapterController {
 
         chapterService.rebuildChapterMemory(chapterId);
         return Result.ok("章节记忆构建成功");
-    }
-
-    /**
-     * AI生成章节（SSE流式输出）
-     */
-    @GetMapping("/generate/{planId}")
-    @Operation(
-        summary = "AI生成章节（SSE流式）",
-        description = "根据章节规划AI生成章节内容，使用SSE（Server-Sent Events）进行流式输出。客户端需要支持SSE接收。" +
-            "生成过程可能需要较长时间（视目标字数而定），建议设置30分钟超时。" +
-            "推荐使用异步生成接口 generate-async 替代。"
-    )
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "SSE流开始，返回章节生成进度"),
-        @ApiResponse(responseCode = "401", description = "未授权，请先登录"),
-        @ApiResponse(responseCode = "404", description = "章节规划不存在"),
-        @ApiResponse(responseCode = "500", description = "AI生成服务异常")
-    })
-    public SseEmitter generateChapterByPlan(
-            @Parameter(description = "项目ID，必须为有效的项目主键", required = true, example = "1")
-            @PathVariable Long projectId,
-            @Parameter(description = "章节规划ID，指定要生成的章节规划", required = true, example = "1")
-            @PathVariable Long planId
-    ) {
-        Long userId = UserContext.getUserId();
-        log.info("用户 {} 请求AI生成章节，projectId={}, planId={}", userId, projectId, planId);
-
-        // 创建SSE发射器，设置超时时间为30分钟（生成章节可能需要较长时间）
-        SseEmitter emitter = new SseEmitter(1800000L);
-
-        // 异步生成章节内容（传递userId，避免异步线程中获取不到）
-        chapterService.generateChapterByPlan(projectId, planId, userId, emitter);
-
-        return emitter;
     }
 
     /**
