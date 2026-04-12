@@ -277,11 +277,16 @@ public class ChapterContentGenerateTaskStrategy implements TaskStrategy {
 
             // 批量更新伏笔状态（D-04）
             try {
+                // 获取分卷号，避免跨卷误更新伏笔状态
+                int volumeNumber = 1;
+                if (volumePlan != null && volumePlan.getVolumeNumber() != null) {
+                    volumeNumber = volumePlan.getVolumeNumber();
+                }
                 int updated = foreshadowingService.batchUpdateStatusForChapter(
-                    chapterPlan.getProjectId(), chapterPlan.getChapterNumber());
+                    chapterPlan.getProjectId(), chapterPlan.getChapterNumber(), volumeNumber);
                 if (updated > 0) {
-                    log.info("伏笔状态批量更新成功，projectId={}, chapterNumber={}, count={}",
-                        chapterPlan.getProjectId(), chapterPlan.getChapterNumber(), updated);
+                    log.info("伏笔状态批量更新成功，projectId={}, volumeNumber={}, chapterNumber={}, count={}",
+                        chapterPlan.getProjectId(), volumeNumber, chapterPlan.getChapterNumber(), updated);
                 }
             } catch (Exception e) {
                 log.error("伏笔状态更新失败，不影响章节保存，chapterId={}，错误：{}",

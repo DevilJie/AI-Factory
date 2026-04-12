@@ -949,11 +949,16 @@ public class ChapterService {
 
                 // 11. 批量更新伏笔状态（D-04: pending -> in_progress, in_progress -> completed）
                 try {
+                    // 获取分卷号，避免跨卷误更新伏笔状态
+                    int volumeNumber = 1;
+                    if (volume != null && volume.getVolumeNumber() != null) {
+                        volumeNumber = volume.getVolumeNumber();
+                    }
                     int updated = foreshadowingService.batchUpdateStatusForChapter(
-                        projectId, plan.getChapterNumber());
+                        projectId, plan.getChapterNumber(), volumeNumber);
                     if (updated > 0) {
-                        log.info("伏笔状态批量更新成功，projectId={}, chapterNumber={}, count={}",
-                            projectId, plan.getChapterNumber(), updated);
+                        log.info("伏笔状态批量更新成功，projectId={}, volumeNumber={}, chapterNumber={}, count={}",
+                            projectId, volumeNumber, plan.getChapterNumber(), updated);
                     }
                 } catch (Exception e) {
                     log.error("伏笔状态更新失败，不影响章节保存，projectId={}，错误：{}",

@@ -340,15 +340,17 @@ public class ForeshadowingService {
      *
      * @param projectId 项目ID
      * @param chapterNumber 当前章节全局序号
+     * @param volumeNumber 当前分卷号（用于精确匹配，避免跨卷误更新）
      * @return 更新的记录数
      */
     @Transactional
-    public int batchUpdateStatusForChapter(Long projectId, int chapterNumber) {
+    public int batchUpdateStatusForChapter(Long projectId, int chapterNumber, int volumeNumber) {
         int updated = 0;
 
         // pending -> in_progress (planted this chapter)
         LambdaUpdateWrapper<Foreshadowing> plantWrapper = new LambdaUpdateWrapper<>();
         plantWrapper.eq(Foreshadowing::getProjectId, projectId)
+                    .eq(Foreshadowing::getPlantedVolume, volumeNumber)
                     .eq(Foreshadowing::getPlantedChapter, chapterNumber)
                     .eq(Foreshadowing::getStatus, "pending")
                     .set(Foreshadowing::getStatus, "in_progress")
@@ -358,6 +360,7 @@ public class ForeshadowingService {
         // in_progress -> completed (resolved this chapter)
         LambdaUpdateWrapper<Foreshadowing> resolveWrapper = new LambdaUpdateWrapper<>();
         resolveWrapper.eq(Foreshadowing::getProjectId, projectId)
+                      .eq(Foreshadowing::getPlannedCallbackVolume, volumeNumber)
                       .eq(Foreshadowing::getPlannedCallbackChapter, chapterNumber)
                       .eq(Foreshadowing::getStatus, "in_progress")
                       .set(Foreshadowing::getStatus, "completed")
@@ -365,8 +368,8 @@ public class ForeshadowingService {
                       .set(Foreshadowing::getUpdateTime, LocalDateTime.now());
         updated += foreshadowingMapper.update(null, resolveWrapper);
 
-        log.info("批量更新伏笔状态，projectId={}, chapterNumber={}, updatedCount={}",
-                 projectId, chapterNumber, updated);
+        log.info("批量更新伏笔状态，projectId={}, volumeNumber={}, chapterNumber={}, updatedCount={}",
+                 projectId, volumeNumber, chapterNumber, updated);
         return updated;
     }
 
